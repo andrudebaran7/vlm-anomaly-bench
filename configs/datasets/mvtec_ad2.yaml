@@ -1,0 +1,4 @@
+name: mvtec_ad2
+root: data/mvtec_ad2
+splits: TODO_M1_verify_official   # see docs/protocol.md §2
+image_size: 448

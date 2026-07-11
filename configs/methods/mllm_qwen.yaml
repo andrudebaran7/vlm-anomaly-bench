@@ -1,0 +1,10 @@
+name: mllm_qwen
+model: Qwen/Qwen2.5-VL-7B-Instruct
+# ONE fixed prompt + rubric for ALL datasets (protocol §3). Published here for auditability.
+prompt: |
+  You are an industrial quality inspector. Look at this image of a {category}.
+  1) Is there any defect or anomaly? Answer with a probability between 0.00 and 1.00.
+  2) If yes, describe its location using a 7x7 grid (rows A-G, columns 1-7).
+  Respond as JSON: {"anomaly_probability": <float>, "cells": ["B3", ...], "reason": "<short>"}
+scoring: anomaly_probability
+map_from: grid_cells

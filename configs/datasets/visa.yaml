@@ -1,0 +1,4 @@
+name: visa
+root: data/visa
+role: reproduction_sanity_check   # protocol §2
+image_size: 448

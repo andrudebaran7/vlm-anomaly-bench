@@ -1,0 +1,15 @@
+torch>=2.2
+torchvision
+open_clip_torch
+transformers>=4.44
+anomalib>=1.1        # PatchCore anchor + some loaders
+scikit-learn
+scikit-image
+numpy
+pandas
+pyarrow
+pyyaml
+pillow
+tqdm
+matplotlib
+pytest

@@ -1,0 +1,6 @@
+name: winclip
+source: official          # pinned commit set at M2
+commit: TODO
+backbone: ViT-B-16-plus-240
+prompts: paper_verbatim   # protocol §3: no prompt tuning
+window_sizes: [2, 3]

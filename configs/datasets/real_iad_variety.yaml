@@ -1,0 +1,4 @@
+name: real_iad_variety
+root: data/real_iad_variety
+splits: TODO_M1_after_approval
+image_size: 448
