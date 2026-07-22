@@ -1,34 +1,36 @@
-# Dataset access — do this FIRST (M1)
+# Dataset access
 
-Access is the long pole of this project: one dataset requires an application with unknown lead time.
-Start both processes before writing any code.
+## MVTec AD 2 — primary benchmark
 
-## Real-IAD / Real-IAD Variety  ⚠️ application required
+1. Download from the official MVTec research page (registration + CC BY-NC-SA 4.0 research license).
+2. Register for the evaluation server at https://benchmark.mvtec.com/ — the private test split is
+   scored only there.
+3. Download the official PyTorch dataset class and utils bundle from the same page. It carries the
+   authoritative split names, the submission format, and runtime/memory measurement helpers.
 
-1. Go to the official Real-IAD project page (github.com/Tencent → Real-IAD, or the project site
-   linked from the CVPR 2024 paper) and locate the dataset application form.
-2. Apply with academic/research purpose; mention the published survey (Zenodo DOI) as context.
-3. Record here: date sent, contact, response. **If no response in 2 weeks, follow up and consider
-   the paper's scope-B fallback: MVTec AD 2 + VisA-challenge splits only.**
+Record on download (these are unverified until then, by design):
 
-Status: ☐ not sent · sent on: ____ · approved on: ____
+- Download size: ____
+- Dataset version / date: ____
+- Split directory names, read from the official dataset class: ____
+- Official metric names, read from the server submission docs: ____
 
-## MVTec AD 2
+## VisA + MVTec AD (classic) — sanity only
 
-1. Download from the official MVTec research page (registration + research license).
-2. Note the license terms: no redistribution; cite their paper; check whether test GT is public or
-   evaluation-server based — this changes our tooling (see protocol TODO).
-3. Verify checksums and record dataset version here.
+Public downloads, used solely to validate our implementations against published numbers
+(±1.0 I-AUROC, protocol §2).
 
-Status: ☐ not downloaded · version/date: ____
+## Real-IAD / Real-IAD Variety — out of scope
 
-## VisA + MVTec AD (classic)
+Correction to the v0.1 assumption: **no application is required.** The dataset is publicly
+accessible at https://huggingface.co/datasets/Real-IAD/Real-IAD under research-only terms.
 
-Public downloads; used for reproduction sanity checks only. Standard sources (AWS mirror for VisA,
-MVTec page for AD classic).
+It is out of scope for compute reasons, not access reasons: 622 GB for the full release, ~53 GB for
+the 1024px variant, and Real-IAD Variety comprises 198,950 images across 160 categories. None fits
+the Colab budget. Revisit only with a different compute platform (spec §Scope).
 
-## Auxiliary-training data (for AnomalyCLIP / AdaCLIP)
+## Auxiliary-training data (AnomalyCLIP / AdaCLIP)
 
-These methods train prompts on auxiliary AD data. Record exactly which auxiliary dataset each
-official checkpoint used, and verify zero overlap with our test datasets. This table goes in the
-paper (§3.1) — it is a common credibility hole in this literature.
+Record exactly which auxiliary dataset each official checkpoint was trained on, and verify zero
+overlap with MVTec AD 2. This table goes in the paper (§3.1) — it is a common credibility hole in
+this literature.

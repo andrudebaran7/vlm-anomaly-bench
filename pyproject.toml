@@ -1,7 +1,7 @@
 [project]
 name = "vlmab"
 version = "0.0.1"
-description = "Zero-shot & VLM anomaly detection benchmark on MVTec AD 2 and Real-IAD Variety"
+description = "Zero-shot & VLM anomaly detection benchmark on MVTec AD 2"
 requires-python = ">=3.10"
 
 [tool.setuptools.packages.find]

@@ -5,3 +5,5 @@ data/
 results/*.parquet
 .cache/
 checkpoints/
+.superpowers/
+*.egg-info/
