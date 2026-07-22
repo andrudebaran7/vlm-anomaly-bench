@@ -12,10 +12,17 @@ from sklearn import metrics as skm
 def _flatten(masks: Sequence[np.ndarray], amaps: Sequence[np.ndarray]):
     if len(masks) != len(amaps):
         raise ValueError(f"masks/amaps length mismatch: {len(masks)} vs {len(amaps)}")
+    for i, (m, a) in enumerate(zip(masks, amaps)):
+        m_shape = np.asarray(m).shape
+        a_shape = np.asarray(a).shape
+        if m_shape != a_shape:
+            raise ValueError(
+                f"mask/amap shape mismatch at index {i}: {m_shape} vs {a_shape}"
+            )
     y = np.concatenate([(np.asarray(m) > 0).ravel() for m in masks])
-    s = np.concatenate([np.asarray(a, dtype=np.float64).ravel() for a in amaps])
-    if y.shape != s.shape:
-        raise ValueError("mask and anomaly map shapes differ")
+    # float32 keeps peak memory bounded on ~5MP MVTec AD 2 images (Colab-class RAM);
+    # both roc_auc_score and precision_recall_curve accept float32 inputs.
+    s = np.concatenate([np.asarray(a, dtype=np.float32).ravel() for a in amaps])
     return y, s
 
 
@@ -27,9 +34,17 @@ def p_auroc(masks: Sequence[np.ndarray], amaps: Sequence[np.ndarray]) -> float:
 def seg_f1max(
     masks: Sequence[np.ndarray],
     amaps: Sequence[np.ndarray],
-    num_thresholds: int = 200,
 ) -> float:
     """Best achievable pixel F1 over thresholds.
+
+    Vectorized the same way as `i_f1max` in `image_level.py`: sklearn's
+    `precision_recall_curve` sorts the pooled pixel scores once and returns
+    precision/recall at every unique score value, which we turn into F1 and
+    take the max. This replaces a Python loop over a fixed 200-point
+    threshold grid with a single sort — one pass instead of 200 full-array
+    boolean passes over the pooled pixel arrays — and it evaluates every
+    achievable threshold rather than a 200-point approximation of them, so
+    it is strictly more precise, not an approximation.
 
     Not yet mapped onto the official MVTec AD 2 SegF1 definition — that mapping waits on the
     server's submission documentation (docs/datasets-access.md).
@@ -37,16 +52,6 @@ def seg_f1max(
     y, s = _flatten(masks, amaps)
     if not y.any():
         return 0.0
-    lo, hi = float(s.min()), float(s.max())
-    if lo == hi:
-        return 0.0
-    best = 0.0
-    for t in np.linspace(lo, hi, num_thresholds + 1)[1:]:
-        p = s >= t
-        tp = int(np.count_nonzero(p & y))
-        fp = int(np.count_nonzero(p & ~y))
-        fn = int(np.count_nonzero(~p & y))
-        denom = 2 * tp + fp + fn
-        if denom:
-            best = max(best, 2 * tp / denom)
-    return float(best)
+    prec, rec, _ = skm.precision_recall_curve(y, s)
+    f1 = 2 * prec * rec / np.clip(prec + rec, 1e-12, None)
+    return float(np.nanmax(f1))

@@ -1,3 +1,5 @@
+import builtins
+
 import numpy as np
 import pytest
 
@@ -87,8 +89,20 @@ def test_reset_peak_vram_is_a_noop_without_cuda(monkeypatch):
     reset_peak_vram()
 
 
-def test_cuda_probe_returns_none_without_torch():
-    """CI has no torch installed; the probe must swallow the ImportError."""
+def test_cuda_probe_returns_none_without_torch(monkeypatch):
+    """Force the `import torch` inside `_cuda` to fail deterministically (regardless of
+    whether torch happens to be installed in the environment running this test) and
+    verify the probe swallows the ImportError and returns None, rather than merely
+    asserting some branch or another fired."""
     from vlmab.metrics.efficiency import _cuda
 
-    assert _cuda() is None or hasattr(_cuda(), "max_memory_allocated")
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "torch":
+            raise ImportError("torch is unavailable (patched for test)")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    assert _cuda() is None
