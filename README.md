@@ -1,10 +1,10 @@
 # vlm-anomaly-bench
 
-**Zero-shot & vision-language anomaly detection, evaluated where nobody has looked yet: MVTec AD 2 and Real-IAD Variety.**
+**Zero-shot & vision-language anomaly detection, evaluated where nobody has looked yet: MVTec AD 2.**
 
 > Our [survey of industrial visual anomaly detection (2020–2026)](https://doi.org/10.5281/zenodo.XXXXXXX) found that
 > top methods report >99% I-AUROC on MVTec AD — and that **not a single surveyed method reports results on the
-> 2025 frontier benchmarks** MVTec AD 2 and Real-IAD Variety. This repository closes that gap for the
+> 2025 frontier benchmark** MVTec AD 2. This repository closes that gap for the
 > zero-shot / VLM family, with a reproducible protocol and honest, efficiency-aware metrics.
 
 **Status:** scaffolding — protocol frozen before any results are computed (see [`docs/protocol.md`](docs/protocol.md)).
@@ -27,20 +27,23 @@
 | AnomalyCLIP | learned object-agnostic prompts | 0 (aux-trained) | ICLR 2024 |
 | AdaCLIP | hybrid learnable prompts | 0 (aux-trained) | ECCV 2024 |
 | SAA+ | GroundingDINO + SAM cascade | 0 | 2023 |
-| MLLM baseline (Qwen2.5-VL) | generalist multimodal LLM, structured prompting | 0 | 2025 |
+| MLLM baseline (Qwen2.5-VL-3B) | generalist multimodal LLM, structured prompting | 0 | 2025 |
 | PatchCore *(reference anchor)* | memory bank (full-shot) | full | CVPR 2022 |
 
 The full-shot PatchCore anchor calibrates every table: it answers "how far is zero-shot from the
-classical ceiling *on the same frontier data*?"
+classical ceiling *on the same frontier data*?" The MLLM baseline runs the 3B variant: 7B in fp16
+does not fit the 16 GB evaluation budget. Conclusions about MLLM capability are scoped to a 3B
+generalist.
 
 ## Datasets
 
 | Dataset | Role | Access |
 |---|---|---|
 | MVTec AD 2 | primary frontier benchmark (lighting shifts) | public download, research license — see [`docs/datasets-access.md`](docs/datasets-access.md) |
-| Real-IAD Variety | primary frontier benchmark (scale/variety) | requires application — start early |
 | VisA | sanity check vs published numbers | public |
 | MVTec AD (classic) | calibration vs literature | public |
+
+Real-IAD Variety is out of scope on compute grounds — see [docs/datasets-access.md](docs/datasets-access.md).
 
 Raw data is **never** committed. `scripts/prepare_data.py` verifies checksums and folder layout.
 
@@ -77,11 +80,11 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 ## Roadmap
 
-- [ ] M1 — protocol frozen + dataset access secured (Real-IAD application sent)
-- [ ] M2 — metrics module tested; PatchCore anchor + WinCLIP on VisA reproduce published numbers (±1pt)
-- [ ] M3 — full grid on MVTec AD 2
-- [ ] M4 — full grid on Real-IAD Variety
-- [ ] M5 — efficiency pass on fixed hardware; tables + figures frozen
+- [ ] M1 — protocol v0.2 frozen; MVTec AD 2 downloaded; split names, metric set and size verified
+- [ ] M2 — pixel metrics tested; loader; resumable runner; PatchCore + WinCLIP reproduce VisA (±1pt)
+- [ ] M3 — full grid on the MVTec AD 2 public test split
+- [ ] M4 — one evaluation-server submission per method; leaderboard numbers recorded
+- [ ] M5 — efficiency pass on the rented fixed instance; tables + figures frozen
 - [ ] M6 — preprint on arXiv/Zenodo; submission (target: CVPR VAND workshop / EAAI)
 
 ## Companion paper

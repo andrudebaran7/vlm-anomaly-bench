@@ -1,4 +1,4 @@
 name: mvtec_ad2
 root: data/mvtec_ad2
-splits: TODO_M1_verify_official   # see docs/protocol.md §2
+splits: UNVERIFIED_read_from_official_dataset_class   # docs/datasets-access.md
 image_size: 448

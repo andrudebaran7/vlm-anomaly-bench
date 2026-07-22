@@ -13,11 +13,16 @@ overlap table required in the paper).
 
 ## 2. Datasets & splits
 
-- **MVTec AD 2** — official test protocol, including the lighting-variation test sets. Report
-  per-category and mean. *(TODO before M1: verify official split names and the evaluation-server
-  submission rules from the official MVTec page; do not rely on memory.)*
-- **Real-IAD Variety** — official protocol. *(TODO before M1: confirm access terms and exact subset
-  definitions once the application is approved.)*
+- **MVTec AD 2** — 8 scenarios, >8,000 high-resolution images. Defect-free train and validation
+  sets; the test set is split into a public part with pixel-precise ground truth and a private part
+  whose ground truth is withheld. Local metrics are computed on the public part only. The private
+  part is scored solely through the official evaluation server (benchmark.mvtec.com).
+  Licensed CC BY-NC-SA 4.0. *(Exact split directory names are read from the official PyTorch dataset
+  class at download time — see docs/datasets-access.md, not reproduced from memory.)*
+- **Real-IAD Variety** — out of scope for this study. The dataset is publicly available (no
+  application required), but its scale (198,950 images; the parent Real-IAD release is 622 GB, 53 GB
+  for the 1024px variant) is incompatible with the Colab compute budget. Recorded as a stated
+  limitation, not an omission.
 - **VisA + MVTec AD (classic)** — used only to validate our re-implementations against published
   numbers (tolerance ±1.0 I-AUROC). If we can't reproduce a method's published VisA/MVTec numbers,
   its frontier results are flagged as such in every table.
@@ -36,12 +41,17 @@ engineering.
 - Pixel level: P-AUROC, AU-PRO@0.3, AU-PRO@0.05, and the MVTec AD 2 official metric set.
 - Efficiency: median and p95 latency per image at batch size 1 on the fixed hardware below,
   parameter count, peak VRAM. API-based baselines report tokens + cost instead of VRAM.
+- The official MVTec AD 2 metric set is adopted as the evaluation server defines it. *(Exact metric
+  names and definitions are read from the server's submission documentation at download time.)*
 
 ## 5. Hardware & software
 
-One fixed environment for all latency numbers (single GPU machine or a rented fixed instance —
-documented exactly in `results/ENVIRONMENT.md` with driver/library versions). Accuracy metrics may
-be computed anywhere; latency only on the reference machine.
+Accuracy metrics are computed on Google Colab (free tier, single T4, fp16). The assigned GPU varies
+between sessions, so **no latency number is ever reported from a Colab session**. The efficiency
+table is measured in M5 in a single session on one rented fixed instance, using the official MVTec
+AD 2 runtime and memory-footprint utilities, documented in `results/ENVIRONMENT.md` with driver and
+library versions. Every accuracy row records the GPU Colab assigned, so runs stay auditable despite
+varying hardware.
 
 ## 6. Statistical hygiene
 
@@ -54,7 +64,16 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
 - No per-dataset prompt tuning after seeing test results.
 - No "best of N runs".
 - No mixing of our PatchCore anchor numbers with published numbers in the same column without marking.
+- **No iteration against the evaluation server.** One submission per method, final, made only after
+  that method's configuration is frozen. The private test split has hidden ground truth; repeated
+  submissions with selection of the best outcome is the same "best of N" forbidden above. Submission
+  date and returned scores are recorded in `results/`.
 
 ## Changelog
 
 - 2026-07-11 — v0.1 initial frozen draft.
+- 2026-07-22 — v0.2. Scope corrected after verifying dataset facts that v0.1 assumed:
+  Real-IAD requires no application and is 622 GB (removed from scope); MVTec AD 2 private test
+  ground truth is evaluation-server only (§2, §4); Colab has no fixed hardware (§5); added the
+  one-submission-per-method rule (§7). MLLM baseline pinned to Qwen2.5-VL-3B-Instruct to fit 16 GB.
+  Rationale: docs/superpowers/specs/2026-07-22-scope-v0.2-colab-design.md
