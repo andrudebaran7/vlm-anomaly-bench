@@ -60,6 +60,27 @@ def test_p_auroc_rejects_per_image_shape_mismatch_even_with_matching_total_lengt
         p_auroc(masks, amaps)
 
 
+def test_p_auroc_rejects_all_normal_category():
+    """roc_auc_score returns nan (with only a warning) when one class is absent.
+
+    A nan then propagates silently into any mean over categories, so a whole
+    published column would read nan -- or, worse, be quietly dropped by a nan-skipping
+    aggregation and reported as if it were a real average. seg_f1max already guards
+    this; p_auroc must fail loudly too.
+    """
+    rng = np.random.default_rng(0)
+    empty = np.zeros((20, 20), dtype=np.uint8)
+    with pytest.raises(ValueError, match="single-class"):
+        p_auroc([empty], [rng.random((20, 20)).astype(np.float32)])
+
+
+def test_p_auroc_rejects_all_anomalous_category():
+    rng = np.random.default_rng(0)
+    full = np.ones((20, 20), dtype=np.uint8)
+    with pytest.raises(ValueError, match="single-class"):
+        p_auroc([full], [rng.random((20, 20)).astype(np.float32)])
+
+
 def test_seg_f1max_beats_threshold_noise():
     mask = _one_region()
     rng = np.random.default_rng(0)

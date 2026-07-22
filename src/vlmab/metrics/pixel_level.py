@@ -28,7 +28,22 @@ def _flatten(masks: Sequence[np.ndarray], amaps: Sequence[np.ndarray]):
 
 
 def p_auroc(masks: Sequence[np.ndarray], amaps: Sequence[np.ndarray]) -> float:
+    """Pooled pixel AUROC.
+
+    Raises on a single-class category rather than returning nan. `roc_auc_score`
+    only warns and returns nan when one class is absent, and that nan propagates
+    silently into any mean over categories -- a published column would end up nan,
+    or be quietly dropped by a nan-skipping aggregation and reported as a real
+    average over fewer categories than it claims.
+    """
     y, s = _flatten(masks, amaps)
+    n_anomalous = int(y.sum())
+    if n_anomalous == 0 or n_anomalous == y.size:
+        kind = "all-normal" if n_anomalous == 0 else "all-anomalous"
+        raise ValueError(
+            f"p_auroc is undefined for a single-class category: masks are {kind} "
+            f"({n_anomalous} anomalous of {y.size} pooled pixels)"
+        )
     return float(skm.roc_auc_score(y.astype(np.uint8), s))
 
 
