@@ -62,6 +62,70 @@ def seg_f1max(
 _trapezoid = getattr(np, "trapezoid", None) or np.trapz
 
 
+def pro_thresholds(
+    normal_sorted: np.ndarray,
+    score_min: float,
+    fpr_limit: float,
+    num_thresholds: int,
+) -> np.ndarray:
+    """Thresholds spaced uniformly in FPR across `[0, fpr_limit]`.
+
+    This is a metric-definition decision, so it is stated here in full rather than
+    left implicit in the code.
+
+    AU-PRO integrates PRO over FPR, so the grid's job is to resolve the interval
+    `[0, fpr_limit]` in *FPR*. Spacing thresholds uniformly in *score* (the obvious
+    `np.linspace(score_min, score_max, n)`) does not do that, because score is not
+    linear in FPR: anomaly maps are heavy-tailed, and a single bright outlier
+    stretches `score_max` far beyond where any meaningful mass of normal pixels
+    sits. On a weak-separation fixture with such an outlier, a 200-point uniform
+    score grid puts only about six points inside FPR in (0, 0.05] and reports
+    AU-PRO@0.05 = 0.7369 where the converged value is 0.8324 -- 9.6 points of
+    discretisation error, roughly ten times the protocol's +-1.0 tolerance, and
+    biased *downward* (the curve is concave, so a coarse left-heavy grid
+    under-integrates).
+
+    FPR at threshold `t` is just the tail fraction of the pooled normal-pixel
+    values, so the threshold achieving a target FPR `f` is the corresponding
+    quantile of `normal_sorted`: keep the `k = floor(f * N)` largest normal values
+    above the threshold by taking `normal_sorted[N - k]`. That makes every grid
+    point land at a known, evenly-spaced FPR, and the achieved FPR differs from the
+    target by at most one pixel (1/N) plus whatever ties force.
+
+    The alternative -- sweeping every distinct score value -- is exact rather than
+    merely convergent, but its cost scales with the number of distinct scores. A
+    single 5MP MVTec AD 2 image with float32 maps yields millions of them, and PRO
+    is evaluated per region at every threshold, so the sweep would be several orders
+    of magnitude more expensive than the fixed 200-point grid the protocol assumes,
+    while moving the result by at most ~2e-3 (0.2 AU-PRO points) on the hardest
+    fixture in the suite and by exactly 0.0 on every other one. Quantile sampling is
+    chosen for that reason.
+
+    Two deliberate properties are preserved:
+
+    * `f = 0` maps to a threshold strictly above every normal pixel
+      (`nextafter(max_normal)`) rather than to `score_max`, which anchors the curve
+      at exactly FPR 0 without assuming anything about where the maximum sits.
+    * Thresholds at or below the global score minimum are dropped, so a degenerate
+      all-positive prediction never enters the curve.
+    """
+    n = normal_sorted.size
+    if n == 0:
+        return np.empty(0, dtype=np.float64)
+    targets = np.linspace(0.0, float(fpr_limit), int(num_thresholds) + 1)
+    # k = how many normal pixels are allowed to sit above the threshold at this FPR.
+    k = np.floor(targets * n).astype(np.int64)
+    idx = n - k
+
+    thresholds = np.empty(idx.size, dtype=np.float64)
+    above_all = idx >= n  # k == 0: the threshold must exceed every normal pixel
+    thresholds[above_all] = np.nextafter(float(normal_sorted[-1]), np.inf)
+    thresholds[~above_all] = normal_sorted[np.clip(idx[~above_all], 0, n - 1)]
+
+    thresholds = np.unique(thresholds)
+    return thresholds[thresholds > score_min]
+
+
 def au_pro(
     masks: Sequence[np.ndarray],
     amaps: Sequence[np.ndarray],
@@ -81,9 +145,13 @@ def au_pro(
     split a single diagonal scratch into many one-pixel "regions" that each get equal
     weight in PRO — a real distortion of the metric, not a cosmetic difference.
 
-    The threshold sweep excludes the minimum anomaly value, so a degenerate all-positive
-    prediction never enters the curve. When the curve never reaches `fpr_limit`, its last
-    PRO value is extended flat to the limit.
+    Thresholds are spaced uniformly in FPR across `[0, fpr_limit]`, not uniformly in
+    score -- see `pro_thresholds` for why that choice is forced by what AU-PRO
+    integrates over, and `test_au_pro_has_converged_at_the_default_threshold_count`
+    for the convergence it buys. The sweep still excludes any threshold at or below
+    the minimum anomaly value, so a degenerate all-positive prediction never enters
+    the curve. When the curve never reaches `fpr_limit`, its last PRO value is
+    extended flat to the limit.
 
     Implementation note (performance): rather than recomputing `amap >= t` over full
     images for every threshold and every region (O(n_regions * n_thresholds *
@@ -134,15 +202,19 @@ def au_pro(
         else np.empty(0, dtype=np.float32)
     )
 
-    thresholds = np.linspace(lo, hi, num_thresholds + 1)[1:]
+    thresholds = pro_thresholds(normal_sorted, lo, fpr_limit, num_thresholds)
+    if thresholds.size == 0:
+        return 0.0
 
-    pros = np.empty(thresholds.size, dtype=np.float64)
-    for j, t in enumerate(thresholds):
-        fracs = [
-            (v.size - np.searchsorted(v, t, side="left")) / v.size
-            for v in region_sorted_values
-        ]
-        pros[j] = np.mean(fracs)
+    # Same per-region searchsorted formulation as before ("count >= t" is a lookup in
+    # the region's sorted values, not a pass over the image), evaluated for the whole
+    # threshold vector at once. Peak memory stays O(n_thresholds), not
+    # O(n_regions * n_thresholds), which matters now that num_thresholds is a knob the
+    # convergence test drives to 50k.
+    pros = np.zeros(thresholds.size, dtype=np.float64)
+    for v in region_sorted_values:
+        pros += (v.size - np.searchsorted(v, thresholds, side="left")) / v.size
+    pros /= len(region_sorted_values)
 
     fp_counts = normal_sorted.size - np.searchsorted(
         normal_sorted, thresholds, side="left"

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from vlmab.metrics.pixel_level import _trapezoid, p_auroc, seg_f1max
+from vlmab.metrics.pixel_level import _trapezoid, p_auroc, pro_thresholds, seg_f1max
 
 
 def _one_region(size=100, region=40, top_left=10):
@@ -114,6 +114,55 @@ def test_au_pro_rejects_length_mismatch():
         au_pro([mask, mask], [mask.astype(np.float32)])
 
 
+def _weak_separation_fixture(seed=7, size=128):
+    """The case that exposes a score-uniform threshold grid.
+
+    Background U(0, 0.6); anomalous regions get a +U(0.3, 0.7) bump, so the two
+    distributions overlap heavily and the whole FPR in (0, 0.05] window lives in a
+    narrow slice of score space near 0.6. One bright outlier pixel stretches the
+    score range to 1.5, which is exactly what a real anomaly map does. A grid
+    uniform in *score* then spends almost all of its points on scores nothing
+    reaches and lands only a handful inside the window being integrated.
+    """
+    rng = np.random.default_rng(seed)
+    mask = np.zeros((size, size), dtype=np.uint8)
+    mask[20:40, 20:40] = 1
+    mask[80:88, 80:88] = 1
+    amap = rng.uniform(0.0, 0.6, size=(size, size)).astype(np.float32)
+    bump = rng.uniform(0.3, 0.7, size=(size, size)).astype(np.float32)
+    amap[mask > 0] += bump[mask > 0]
+    amap[0, 0] = 1.5
+    return [mask], [amap]
+
+
+@pytest.mark.parametrize("fpr_limit, tol", [(0.05, 1e-3), (0.3, 3e-3)])
+def test_au_pro_has_converged_at_the_default_threshold_count(fpr_limit, tol):
+    """The reported number must not depend on `num_thresholds`.
+
+    This is the gate on threshold *selection*. The naive-reference equivalence test
+    shares `pro_thresholds` with production, so it can only catch a wrong sweep, not
+    a biased grid; nothing else in this file would notice one.
+
+    Against the old score-uniform `np.linspace(lo, hi, n + 1)[1:]` grid both cases
+    fail badly: @0.05 gives 0.7369 (n=200) vs 0.8324 (n=50000), and @0.3 gives 0.8854
+    vs 0.9016 -- 9.6 and 1.6 AU-PRO points of discretisation error against a protocol
+    tolerance of +-1.0 point (0.01 in these units).
+
+    With the FPR-uniform grid the residuals are 1.2e-05 (@0.05) and 1.7e-03 (@0.3),
+    i.e. 0.001 and 0.17 points. The looser tolerance at @0.3 is not slack in the
+    implementation: PRO(FPR) is concave with essentially all of its curvature in the
+    knee just above FPR 0, and the trapezoid rule under-integrates a concave curve, so
+    a grid spread evenly over the six-times-wider [0, 0.3] interval resolves that knee
+    six times less finely. The residual is still 6x inside the protocol tolerance and
+    ~60x smaller than what the old grid produced. Every other fixture in this file
+    converges exactly (residual 0.0) at both limits.
+    """
+    masks, amaps = _weak_separation_fixture()
+    coarse = au_pro(masks, amaps, fpr_limit=fpr_limit)
+    fine = au_pro(masks, amaps, fpr_limit=fpr_limit, num_thresholds=50_000)
+    assert coarse == pytest.approx(fine, abs=tol)
+
+
 # --- Naive reference implementation -----------------------------------------------
 #
 # This is the straightforward, pre-optimisation formulation of AU-PRO: recompute
@@ -124,6 +173,13 @@ def test_au_pro_rejects_length_mismatch():
 # checked against it. `structure` defaults to 8-connectivity to match the fixed
 # production behaviour; the connectivity test below overrides it to demonstrate the
 # old 4-connectivity bug.
+#
+# NOTE: threshold *selection* is deliberately shared with production
+# (`pro_thresholds`), because the point of this reference is to validate the
+# searchsorted reformulation of the sweep against a full-image recomputation, not to
+# second-guess where the thresholds sit. It therefore does NOT independently validate
+# threshold selection -- `test_au_pro_has_converged_at_the_default_threshold_count` is
+# what covers that.
 def _naive_au_pro(
     masks,
     amaps,
@@ -149,8 +205,13 @@ def _naive_au_pro(
     if lo == hi:
         return 0.0
 
+    normal_sorted = np.sort(np.concatenate([a[~m] for m, a in zip(masks, amaps) if (~m).any()]))
+    thresholds = pro_thresholds(normal_sorted, lo, fpr_limit, num_thresholds)
+    if thresholds.size == 0:
+        return 0.0
+
     pros, fprs = [], []
-    for t in np.linspace(lo, hi, num_thresholds + 1)[1:]:
+    for t in thresholds:
         binaries = [a >= t for a in amaps]
         pros.append(
             float(np.mean([
