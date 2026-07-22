@@ -64,3 +64,50 @@ def test_seg_f1max_beats_threshold_noise():
     rng = np.random.default_rng(0)
     amap = mask.astype(np.float32) + 0.4 * rng.random(mask.shape).astype(np.float32)
     assert seg_f1max([mask], [amap]) == pytest.approx(1.0)
+
+
+from vlmab.metrics.pixel_level import au_pro
+
+
+def test_au_pro_perfect_prediction_is_one():
+    mask = _one_region()
+    assert au_pro([mask], [mask.astype(np.float32)]) == pytest.approx(1.0)
+
+
+def test_au_pro_weights_regions_equally_not_by_area():
+    """A big region found and a tiny region missed is PRO 0.5, not ~0.99.
+
+    Pixel-overlap scoring would give 1600/1616 here. PRO must not.
+    """
+    big = _one_region(size=100, region=40, top_left=10)
+    tiny = _one_region(size=100, region=4, top_left=10)
+    found = big.astype(np.float32)
+    missed = np.zeros((100, 100), dtype=np.float32)
+    assert au_pro([big, tiny], [found, missed]) == pytest.approx(0.5, abs=1e-6)
+
+
+def test_au_pro_constant_map_is_zero():
+    mask = _one_region()
+    assert au_pro([mask], [np.full(mask.shape, 0.5, dtype=np.float32)]) == 0.0
+
+
+def test_au_pro_signal_beats_noise():
+    mask = _one_region()
+    rng = np.random.default_rng(0)
+    signal = mask.astype(np.float32) + 0.4 * rng.random(mask.shape).astype(np.float32)
+    noise = rng.random(mask.shape).astype(np.float32)
+    assert au_pro([mask], [signal]) > 0.8
+    assert au_pro([mask], [noise]) < 0.35
+
+
+def test_au_pro_tighter_fpr_limit_is_not_higher():
+    mask = _one_region()
+    rng = np.random.default_rng(1)
+    amap = mask.astype(np.float32) + 0.4 * rng.random(mask.shape).astype(np.float32)
+    assert au_pro([mask], [amap], fpr_limit=0.05) <= au_pro([mask], [amap], fpr_limit=0.3) + 1e-9
+
+
+def test_au_pro_rejects_length_mismatch():
+    mask = _one_region()
+    with pytest.raises(ValueError):
+        au_pro([mask, mask], [mask.astype(np.float32)])

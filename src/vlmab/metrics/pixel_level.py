@@ -6,6 +6,7 @@ sequences of HxW arrays: `masks` where nonzero means anomalous, `amaps` float sc
 from typing import Sequence
 
 import numpy as np
+from scipy import ndimage
 from sklearn import metrics as skm
 
 
@@ -55,3 +56,75 @@ def seg_f1max(
     prec, rec, _ = skm.precision_recall_curve(y, s)
     f1 = 2 * prec * rec / np.clip(prec + rec, 1e-12, None)
     return float(np.nanmax(f1))
+
+
+# np.trapz is deprecated in numpy 2.x, np.trapezoid does not exist in 1.x.
+_trapezoid = getattr(np, "trapezoid", None) or np.trapz
+
+
+def au_pro(
+    masks: Sequence[np.ndarray],
+    amaps: Sequence[np.ndarray],
+    fpr_limit: float = 0.3,
+    num_thresholds: int = 200,
+) -> float:
+    """Area under the per-region-overlap curve, integrated to `fpr_limit` and normalised.
+
+    Every connected ground-truth region contributes equally to PRO regardless of its area,
+    which is the whole point of the metric: it refuses to let one large defect mask the
+    failure to find several small ones.
+
+    The threshold sweep excludes the minimum anomaly value, so a degenerate all-positive
+    prediction never enters the curve. When the curve never reaches `fpr_limit`, its last
+    PRO value is extended flat to the limit.
+    """
+    if len(masks) != len(amaps):
+        raise ValueError(f"masks/amaps length mismatch: {len(masks)} vs {len(amaps)}")
+
+    masks = [np.asarray(m) > 0 for m in masks]
+    amaps = [np.asarray(a, dtype=np.float64) for a in amaps]
+
+    regions: list[tuple[int, np.ndarray]] = []
+    for i, m in enumerate(masks):
+        labelled, n = ndimage.label(m)
+        for r in range(1, n + 1):
+            regions.append((i, labelled == r))
+
+    n_normal = int(sum((~m).sum() for m in masks))
+    if not regions or n_normal == 0:
+        return 0.0
+
+    all_values = np.concatenate([a.ravel() for a in amaps])
+    lo, hi = float(all_values.min()), float(all_values.max())
+    if lo == hi:
+        return 0.0
+
+    pros, fprs = [], []
+    for t in np.linspace(lo, hi, num_thresholds + 1)[1:]:
+        binaries = [a >= t for a in amaps]
+        pros.append(
+            float(np.mean([
+                np.count_nonzero(binaries[i] & reg) / np.count_nonzero(reg)
+                for i, reg in regions
+            ]))
+        )
+        fp = sum(int(np.count_nonzero(binaries[i] & ~masks[i])) for i in range(len(masks)))
+        fprs.append(fp / n_normal)
+
+    fpr = np.asarray(fprs, dtype=np.float64)
+    pro = np.asarray(pros, dtype=np.float64)
+    order = np.argsort(fpr, kind="stable")
+    fpr, pro = fpr[order], pro[order]
+
+    keep = fpr <= fpr_limit
+    x, y = fpr[keep], pro[keep]
+    if x.size == 0:
+        return 0.0
+    if x[0] > 0.0:
+        x = np.concatenate([[0.0], x])
+        y = np.concatenate([[y[0]], y])
+    if x[-1] < fpr_limit:
+        x = np.concatenate([x, [fpr_limit]])
+        y = np.concatenate([y, [y[-1]]])
+
+    return float(_trapezoid(y, x) / fpr_limit)
