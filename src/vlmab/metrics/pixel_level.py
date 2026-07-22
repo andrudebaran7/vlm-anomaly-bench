@@ -74,45 +74,83 @@ def au_pro(
     which is the whole point of the metric: it refuses to let one large defect mask the
     failure to find several small ones.
 
+    Connectivity: regions are labelled with 8-connectivity (`ndimage.label` with a full
+    3x3 structuring element), matching the AU-PRO literature and reference
+    implementations (e.g. skimage's `measure.label`, whose 2D default is full
+    connectivity). Plain `ndimage.label(m)` defaults to 4-connectivity, which would
+    split a single diagonal scratch into many one-pixel "regions" that each get equal
+    weight in PRO — a real distortion of the metric, not a cosmetic difference.
+
     The threshold sweep excludes the minimum anomaly value, so a degenerate all-positive
     prediction never enters the curve. When the curve never reaches `fpr_limit`, its last
     PRO value is extended flat to the limit.
+
+    Implementation note (performance): rather than recomputing `amap >= t` over full
+    images for every threshold and every region (O(n_regions * n_thresholds *
+    image_pixels)), we exploit the fact that "fraction of a fixed pixel set >= t" is
+    monotone in `t`. For each region we extract its anomaly values once and sort them;
+    "count >= t" is then a `searchsorted` lookup, O(log n) per threshold instead of
+    O(image_pixels). The same trick applies to the pooled normal-pixel values used for
+    FPR. This is an exact reformulation, not an approximation — see
+    `test_au_pro_matches_naive_reference` for a proof against a naive per-threshold
+    implementation.
     """
     if len(masks) != len(amaps):
         raise ValueError(f"masks/amaps length mismatch: {len(masks)} vs {len(amaps)}")
 
     masks = [np.asarray(m) > 0 for m in masks]
-    amaps = [np.asarray(a, dtype=np.float64) for a in amaps]
+    amaps = [np.asarray(a, dtype=np.float32) for a in amaps]
 
-    regions: list[tuple[int, np.ndarray]] = []
-    for i, m in enumerate(masks):
-        labelled, n = ndimage.label(m)
+    struct8 = np.ones((3, 3), dtype=int)
+    region_sorted_values: list[np.ndarray] = []
+    lo = np.inf
+    hi = -np.inf
+    normal_chunks: list[np.ndarray] = []
+    n_normal = 0
+    for m, a in zip(masks, amaps):
+        labelled, n = ndimage.label(m, structure=struct8)
         for r in range(1, n + 1):
-            regions.append((i, labelled == r))
+            region_sorted_values.append(np.sort(a[labelled == r]))
+        normal_vals = a[~m]
+        if normal_vals.size:
+            normal_chunks.append(normal_vals)
+        n_normal += int((~m).sum())
+        if a.size:
+            a_min = float(a.min())
+            a_max = float(a.max())
+            if a_min < lo:
+                lo = a_min
+            if a_max > hi:
+                hi = a_max
 
-    n_normal = int(sum((~m).sum() for m in masks))
-    if not regions or n_normal == 0:
+    if not region_sorted_values or n_normal == 0:
         return 0.0
-
-    all_values = np.concatenate([a.ravel() for a in amaps])
-    lo, hi = float(all_values.min()), float(all_values.max())
     if lo == hi:
         return 0.0
 
-    pros, fprs = [], []
-    for t in np.linspace(lo, hi, num_thresholds + 1)[1:]:
-        binaries = [a >= t for a in amaps]
-        pros.append(
-            float(np.mean([
-                np.count_nonzero(binaries[i] & reg) / np.count_nonzero(reg)
-                for i, reg in regions
-            ]))
-        )
-        fp = sum(int(np.count_nonzero(binaries[i] & ~masks[i])) for i in range(len(masks)))
-        fprs.append(fp / n_normal)
+    normal_sorted = (
+        np.sort(np.concatenate(normal_chunks))
+        if normal_chunks
+        else np.empty(0, dtype=np.float32)
+    )
+
+    thresholds = np.linspace(lo, hi, num_thresholds + 1)[1:]
+
+    pros = np.empty(thresholds.size, dtype=np.float64)
+    for j, t in enumerate(thresholds):
+        fracs = [
+            (v.size - np.searchsorted(v, t, side="left")) / v.size
+            for v in region_sorted_values
+        ]
+        pros[j] = np.mean(fracs)
+
+    fp_counts = normal_sorted.size - np.searchsorted(
+        normal_sorted, thresholds, side="left"
+    )
+    fprs = fp_counts / n_normal
 
     fpr = np.asarray(fprs, dtype=np.float64)
-    pro = np.asarray(pros, dtype=np.float64)
+    pro = pros
     order = np.argsort(fpr, kind="stable")
     fpr, pro = fpr[order], pro[order]
 

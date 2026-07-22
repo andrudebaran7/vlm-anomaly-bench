@@ -1,7 +1,8 @@
 import numpy as np
 import pytest
+from scipy import ndimage
 
-from vlmab.metrics.pixel_level import p_auroc, seg_f1max
+from vlmab.metrics.pixel_level import _trapezoid, p_auroc, seg_f1max
 
 
 def _one_region(size=100, region=40, top_left=10):
@@ -111,3 +112,150 @@ def test_au_pro_rejects_length_mismatch():
     mask = _one_region()
     with pytest.raises(ValueError):
         au_pro([mask, mask], [mask.astype(np.float32)])
+
+
+# --- Naive reference implementation -----------------------------------------------
+#
+# This is the straightforward, pre-optimisation formulation of AU-PRO: recompute
+# `amap >= t` over the full image for every threshold and AND it against every
+# region's full-size boolean mask. It is deliberately O(n_regions * n_thresholds *
+# image_pixels) -- exactly the cost the real `au_pro` was rewritten to avoid -- and is
+# kept here, independent of the production code path, so the optimised version can be
+# checked against it. `structure` defaults to 8-connectivity to match the fixed
+# production behaviour; the connectivity test below overrides it to demonstrate the
+# old 4-connectivity bug.
+def _naive_au_pro(
+    masks,
+    amaps,
+    fpr_limit: float = 0.3,
+    num_thresholds: int = 200,
+    structure=np.ones((3, 3), dtype=int),
+) -> float:
+    masks = [np.asarray(m) > 0 for m in masks]
+    amaps = [np.asarray(a, dtype=np.float32) for a in amaps]
+
+    regions = []
+    for i, m in enumerate(masks):
+        labelled, n = ndimage.label(m, structure=structure)
+        for r in range(1, n + 1):
+            regions.append((i, labelled == r))
+
+    n_normal = int(sum((~m).sum() for m in masks))
+    if not regions or n_normal == 0:
+        return 0.0
+
+    all_values = np.concatenate([a.ravel() for a in amaps])
+    lo, hi = float(all_values.min()), float(all_values.max())
+    if lo == hi:
+        return 0.0
+
+    pros, fprs = [], []
+    for t in np.linspace(lo, hi, num_thresholds + 1)[1:]:
+        binaries = [a >= t for a in amaps]
+        pros.append(
+            float(np.mean([
+                np.count_nonzero(binaries[i] & reg) / np.count_nonzero(reg)
+                for i, reg in regions
+            ]))
+        )
+        fp = sum(int(np.count_nonzero(binaries[i] & ~masks[i])) for i in range(len(masks)))
+        fprs.append(fp / n_normal)
+
+    fpr = np.asarray(fprs, dtype=np.float64)
+    pro = np.asarray(pros, dtype=np.float64)
+    order = np.argsort(fpr, kind="stable")
+    fpr, pro = fpr[order], pro[order]
+
+    keep = fpr <= fpr_limit
+    x, y = fpr[keep], pro[keep]
+    if x.size == 0:
+        return 0.0
+    if x[0] > 0.0:
+        x = np.concatenate([[0.0], x])
+        y = np.concatenate([[y[0]], y])
+    if x[-1] < fpr_limit:
+        x = np.concatenate([x, [fpr_limit]])
+        y = np.concatenate([y, [y[-1]]])
+
+    return float(_trapezoid(y, x) / fpr_limit)
+
+
+def test_au_pro_diagonal_pixels_form_one_region_not_two():
+    """Two diagonally-touching anomalous pixels must be ONE region (8-connectivity).
+
+    The fixture is built so that treating them as one region (correct) vs. two
+    (the old buggy 4-connectivity default of `ndimage.label`) yields two different
+    overall AU-PRO numbers -- 0.75 vs 2/3 -- computed independently below. If
+    `structure=np.ones((3, 3))` is ever dropped from `au_pro`, this test fails.
+
+    Construction: one big, perfectly-detected 40x40 region, plus two diagonally
+    adjacent single pixels where one has the same anomaly value as the big region and
+    the other has none. Every relevant threshold sits at FPR == 0 (the only anomalous
+    pixel not fully detected still scores below every positive threshold, and all
+    background pixels score exactly 0), so the whole PRO curve is flat and the
+    AU-PRO value reduces to a single, easily-hand-checked region-average.
+    """
+    mask = _one_region(size=100, region=40, top_left=10)
+    mask[80, 80] = 1
+    mask[81, 81] = 1
+    amap = mask.astype(np.float32).copy()
+    amap[81, 81] = 0.0
+
+    correct_8conn = _naive_au_pro([mask], [amap], structure=np.ones((3, 3), dtype=int))
+    wrong_4conn = _naive_au_pro([mask], [amap], structure=None)
+
+    # Sanity-check the fixture actually distinguishes the two connectivities.
+    assert correct_8conn == pytest.approx(0.75)
+    assert wrong_4conn == pytest.approx(2 / 3)
+    assert correct_8conn != pytest.approx(wrong_4conn)
+
+    got = au_pro([mask], [amap])
+    assert got == pytest.approx(correct_8conn)
+    assert got != pytest.approx(wrong_4conn)
+
+
+def _random_au_pro_fixture(rng, n_images, size, n_regions_per_image, region_size_range=(2, 15)):
+    """Multiple images, multiple regions per image, varied region sizes."""
+    masks, amaps = [], []
+    for _ in range(n_images):
+        mask = np.zeros((size, size), dtype=np.uint8)
+        amap = (rng.random((size, size)).astype(np.float32)) * 0.5
+        for _ in range(n_regions_per_image):
+            h = int(rng.integers(region_size_range[0], region_size_range[1] + 1))
+            w = int(rng.integers(region_size_range[0], region_size_range[1] + 1))
+            h, w = min(h, size), min(w, size)
+            top = int(rng.integers(0, size - h + 1))
+            left = int(rng.integers(0, size - w + 1))
+            mask[top:top + h, left:left + w] = 1
+            amap[top:top + h, left:left + w] += (
+                rng.random((h, w)).astype(np.float32) * 0.5 + 0.5
+            )
+        masks.append(mask)
+        amaps.append(amap.astype(np.float32))
+    return masks, amaps
+
+
+@pytest.mark.parametrize("fpr_limit", [0.3, 0.05])
+def test_au_pro_matches_naive_reference(fpr_limit):
+    """The optimised au_pro must exactly reproduce the naive O(regions*thresholds*pixels)
+    reference (same connectivity, same thresholds) on varied random fixtures.
+
+    This is what makes the performance rewrite trustworthy: it is a reformulation
+    proof, not a vibe check on one trivial case.
+    """
+    rng = np.random.default_rng(20260722)
+    fixtures = [
+        _random_au_pro_fixture(rng, n_images=1, size=32, n_regions_per_image=1),
+        _random_au_pro_fixture(rng, n_images=3, size=48, n_regions_per_image=4),
+        _random_au_pro_fixture(
+            rng, n_images=5, size=64, n_regions_per_image=6, region_size_range=(1, 4)
+        ),
+        _random_au_pro_fixture(
+            rng, n_images=2, size=96, n_regions_per_image=3, region_size_range=(10, 40)
+        ),
+        _random_au_pro_fixture(rng, n_images=4, size=40, n_regions_per_image=8, region_size_range=(1, 3)),
+    ]
+    for masks, amaps in fixtures:
+        got = au_pro(masks, amaps, fpr_limit=fpr_limit)
+        want = _naive_au_pro(masks, amaps, fpr_limit=fpr_limit)
+        assert got == pytest.approx(want, abs=1e-9)
