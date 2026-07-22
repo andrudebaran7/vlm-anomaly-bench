@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
+# src/vlmab/eval/provenance.py -> src/vlmab/eval -> src/vlmab -> src -> repo root.
+# Provenance must describe the code that ran, which lives here, not whatever the
+# process happens to be chdir'd into (on Colab that is /content, not the clone).
+PACKAGE_REPO_ROOT = Path(__file__).resolve().parents[3]
+
+
 def config_hash(cfg: Mapping[str, Any]) -> str:
     """Stable 12-char hash of a config. Key order does not matter; values are stringified."""
     payload = json.dumps(dict(cfg), sort_keys=True, separators=(",", ":"), default=str)
@@ -44,10 +50,17 @@ def gpu_name() -> str:
 
 
 def run_meta(cfg: Mapping[str, Any], seed: int) -> dict[str, Any]:
-    """The provenance columns stamped onto every result row."""
+    """The provenance columns stamped onto every result row.
+
+    The commit is resolved from `PACKAGE_REPO_ROOT`, not from the process cwd: a Colab
+    notebook runs in /content while the clone sits elsewhere, so reading cwd would
+    stamp "unknown" onto every row -- or, if cwd happened to be some other checkout, a
+    completely unrelated repository's SHA. Either defeats the auditability the
+    protocol commits to, on the exact platform this is built for.
+    """
     return {
         "config_hash": config_hash(cfg),
-        "commit": git_commit(),
+        "commit": git_commit(PACKAGE_REPO_ROOT),
         "seed": int(seed),
         "gpu": gpu_name(),
     }

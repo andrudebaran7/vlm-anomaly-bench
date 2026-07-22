@@ -1,6 +1,7 @@
 import re
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -90,3 +91,27 @@ def test_run_meta_carries_all_provenance_fields():
     meta = run_meta({"method": "winclip"}, seed=0)
     assert set(meta) == {"config_hash", "commit", "seed", "gpu"}
     assert meta["seed"] == 0
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git binary not available")
+def test_run_meta_records_this_repo_head_regardless_of_cwd(monkeypatch, tmp_path):
+    """The Colab case: the notebook's cwd is /content, not the clone.
+
+    Resolving the commit from the process cwd records "unknown" there, or -- worse --
+    a different repository's SHA if the cwd happens to be one. It must come from the
+    package's own location instead.
+    """
+    repo_root = Path(provenance.__file__).resolve().parents[3]
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    if result.returncode != 0:
+        pytest.skip("package is not inside a git checkout")
+    expected = result.stdout.strip()
+
+    monkeypatch.chdir(tmp_path)
+    assert run_meta({"method": "winclip"}, seed=0)["commit"] == expected
