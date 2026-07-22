@@ -1,5 +1,69 @@
-"""Evaluation runner: (dataset x method) -> per-sample parquet in results/.
+"""Evaluation runner: (dataset x method) -> per-sample parquet shards in results/.
 
-TODO(M2): iterate samples, call method.predict, persist scores/maps refs, then compute
-metrics per category and aggregate. Every output row carries config hash + seed + commit.
+Built for a platform that disconnects: work is committed one category at a time, and a
+restart skips every category already on disk. The method is only prepared (weights loaded)
+if there is actually something left to compute — resuming a finished run must not pay for
+a model load.
+
+Pixel metrics are not computed here. The runner persists scores and, optionally, anomaly
+maps; aggregation into metrics is a separate step so a long grid never holds every map in
+memory at once.
 """
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
+import numpy as np
+
+from vlmab.datasets.base import AnomalyDataset
+from vlmab.eval.store import ResultStore
+from vlmab.methods.base import AnomalyMethod
+
+
+def run_evaluation(
+    dataset: AnomalyDataset,
+    method: AnomalyMethod,
+    store: ResultStore,
+    meta: Mapping[str, Any],
+    categories: Iterable[str] | None = None,
+    split: str = "test",
+    maps_dir: Path | None = None,
+    device: str = "cuda",
+) -> list[Path]:
+    """Evaluate `method` on `dataset`, writing one shard per category. Returns new shards."""
+    wanted = list(categories) if categories is not None else dataset.categories()
+    todo = [c for c in wanted if not store.is_done(dataset.name, method.name, c)]
+    if not todo:
+        return []
+
+    method.prepare(device=device)
+
+    written: list[Path] = []
+    for category in todo:
+        rows: list[dict[str, Any]] = []
+        category_maps = None
+        if maps_dir is not None:
+            category_maps = Path(maps_dir) / f"{dataset.name}__{method.name}__{category}"
+            category_maps.mkdir(parents=True, exist_ok=True)
+
+        for sample in dataset.samples(split, category):
+            image = dataset.load_image(sample)
+            prediction = method.predict(image, category)
+
+            row: dict[str, Any] = {
+                "image_path": str(sample.image_path),
+                "label": int(sample.label),
+                "image_score": float(prediction.image_score),
+                "split": split,
+            }
+            row.update({f"meta_{k}": v for k, v in sample.meta.items() if k != "split"})
+
+            if category_maps is not None:
+                map_path = category_maps / f"{sample.image_path.stem}.npy"
+                np.save(map_path, prediction.anomaly_map.astype(np.float16))
+                row["map_path"] = str(map_path)
+
+            rows.append(row)
+
+        written.append(store.write(dataset.name, method.name, category, rows, meta))
+
+    return written

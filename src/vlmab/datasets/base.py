@@ -31,3 +31,8 @@ class AnomalyDataset:
 
     def load_mask(self, sample: Sample) -> np.ndarray | None:
         raise NotImplementedError
+
+    def load_image(self, sample: Sample) -> np.ndarray:
+        """Load the image as HxWx3 uint8. Kept on the dataset so decoding stays
+        dataset-specific and the runner needs no image library of its own."""
+        raise NotImplementedError

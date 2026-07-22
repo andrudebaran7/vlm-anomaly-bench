@@ -1,0 +1,67 @@
+import numpy as np
+import pandas as pd
+
+from vlmab.eval.runner import run_evaluation
+from vlmab.eval.store import ResultStore
+
+
+def test_runner_writes_one_shard_per_category(tmp_path, fake_dataset, counting_method):
+    store = ResultStore(tmp_path)
+    written = run_evaluation(fake_dataset, counting_method, store, {"seed": 0})
+    assert len(written) == 2
+    assert store.is_done("fake", "counting", "alpha")
+    assert store.is_done("fake", "counting", "beta")
+
+
+def test_runner_records_every_sample(tmp_path, fake_dataset, counting_method):
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {"seed": 0})
+    df = store.load_all()
+    assert len(df) == 6
+    assert set(df.columns) >= {"image_path", "label", "image_score", "category", "method", "seed"}
+
+
+def test_runner_prepares_the_method_once(tmp_path, fake_dataset, counting_method):
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {"seed": 0})
+    assert counting_method.prepare_calls == 1
+
+
+def test_runner_skips_completed_categories_on_resume(tmp_path, fake_dataset, counting_method):
+    """The Colab disconnection case: a second run must not recompute finished work."""
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {"seed": 0}, categories=["alpha"])
+    assert counting_method.seen == ["alpha"] * 3
+
+    resumed = run_evaluation(fake_dataset, counting_method, store, {"seed": 0})
+    assert counting_method.seen == ["alpha"] * 3 + ["beta"] * 3
+    assert [p.name for p in resumed] == ["fake__counting__beta.parquet"]
+
+
+def test_runner_does_not_prepare_when_everything_is_done(tmp_path, fake_dataset, counting_method):
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {"seed": 0})
+    counting_method.prepare_calls = 0
+    assert run_evaluation(fake_dataset, counting_method, store, {"seed": 0}) == []
+    assert counting_method.prepare_calls == 0
+
+
+def test_runner_saves_maps_when_asked(tmp_path, fake_dataset, counting_method):
+    store = ResultStore(tmp_path / "results")
+    maps = tmp_path / "maps"
+    run_evaluation(
+        fake_dataset, counting_method, store, {"seed": 0}, categories=["alpha"], maps_dir=maps
+    )
+    saved = sorted((maps / "fake__counting__alpha").glob("*.npy"))
+    assert len(saved) == 3
+    assert np.load(saved[0]).dtype == np.float16
+
+    df = pd.read_parquet(store.path_for("fake", "counting", "alpha"))
+    assert df["map_path"].notna().all()
+
+
+def test_runner_omits_map_path_when_not_saving(tmp_path, fake_dataset, counting_method):
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {"seed": 0}, categories=["alpha"])
+    df = pd.read_parquet(store.path_for("fake", "counting", "alpha"))
+    assert "map_path" not in df.columns
