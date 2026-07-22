@@ -10,6 +10,10 @@ from typing import Any, Mapping, Sequence
 import pandas as pd
 
 
+#: Columns a shard owns. They must match the shard's filename, so meta may not set them.
+IDENTITY_COLUMNS = ("dataset", "method", "category")
+
+
 class ResultStore:
     def __init__(self, root: Path):
         self.root = Path(root)
@@ -31,6 +35,17 @@ class ResultStore:
     ) -> Path:
         if not rows:
             raise ValueError(f"refusing to write an empty shard for {dataset}/{method}/{category}")
+
+        # meta used to be applied last, so a meta key named "category" (or
+        # dataset/method) silently relabelled every row: the filename still said
+        # `can` while the column said something else, and load_all() would group the
+        # results under the wrong category with nothing to flag it.
+        shadowed = [k for k in IDENTITY_COLUMNS if k in meta]
+        if shadowed:
+            raise ValueError(
+                f"meta keys {shadowed} would overwrite the shard's identity columns "
+                f"for {dataset}/{method}/{category}; rename them"
+            )
 
         df = pd.DataFrame(list(rows))
         df["dataset"] = dataset

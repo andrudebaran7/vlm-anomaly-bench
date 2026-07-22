@@ -136,3 +136,22 @@ def test_load_all_empty_store_returns_empty_frame(tmp_path):
 def test_write_rejects_empty_rows(tmp_path):
     with pytest.raises(ValueError):
         ResultStore(tmp_path).write("mvtec_ad2", "winclip", "can", [], {"seed": 0})
+
+
+@pytest.mark.parametrize("key", ["dataset", "method", "category"])
+def test_write_rejects_meta_keys_that_shadow_identity_columns(tmp_path, key):
+    """meta was applied after the identity columns, so a meta key named `category`
+    silently relabelled every row of the shard — the file name still said `can`
+    while the column said something else, and load_all() would then group results
+    under the wrong category with nothing to flag it."""
+    store = ResultStore(tmp_path)
+    with pytest.raises(ValueError, match=key):
+        store.write("mvtec_ad2", "winclip", "can", _rows(), {"seed": 0, key: "wrong"})
+
+
+def test_write_still_accepts_non_colliding_meta(tmp_path):
+    store = ResultStore(tmp_path)
+    path = store.write("mvtec_ad2", "winclip", "can", _rows(), {"seed": 0, "commit": "abc"})
+    df = pd.read_parquet(path)
+    assert list(df["category"]) == ["can", "can"]
+    assert list(df["commit"]) == ["abc", "abc"]
