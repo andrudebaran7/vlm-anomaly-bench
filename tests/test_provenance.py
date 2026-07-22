@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 import subprocess
@@ -115,3 +116,40 @@ def test_run_meta_records_this_repo_head_regardless_of_cwd(monkeypatch, tmp_path
 
     monkeypatch.chdir(tmp_path)
     assert run_meta({"method": "winclip"}, seed=0)["commit"] == expected
+
+
+def test_package_commit_is_unknown_when_root_has_no_git(monkeypatch, tmp_path):
+    """Installed non-editably, PACKAGE_REPO_ROOT lands inside the venv -- and git walks
+    UP from there, so it would return some unrelated ancestor repository's SHA.
+    Stamping a wrong commit is worse than stamping none: it makes a run look
+    reproducible when it is not.
+
+    The fixture reproduces exactly that: a directory with no `.git` of its own, nested
+    inside a repository that does have one. Reading it naively yields the outer repo's
+    real SHA, so this test has no power unless the outer repo exists.
+    """
+    import subprocess
+
+    from vlmab.eval import provenance
+
+    outer = tmp_path / "outer"
+    nested = outer / "lib" / "python3.13" / "site-packages"
+    nested.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=outer, check=True)
+    subprocess.run(["git", "commit", "-q", "--allow-empty", "-m", "x"], cwd=outer,
+                   check=True, env={"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                                    "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t",
+                                    "PATH": os.environ["PATH"], "HOME": str(tmp_path)})
+    assert re.fullmatch(r"[0-9a-f]{40}", git_commit(nested)), "fixture has no power"
+
+    monkeypatch.setattr(provenance, "PACKAGE_REPO_ROOT", nested)
+    assert provenance.package_commit() == "unknown"
+    assert provenance.run_meta({"a": 1}, seed=0)["commit"] == "unknown"
+
+
+def test_run_meta_reads_this_repo_even_when_cwd_is_elsewhere(monkeypatch, tmp_path):
+    """On Colab the notebook cwd is /content, not the clone."""
+    monkeypatch.chdir(tmp_path)
+    commit = run_meta({"a": 1}, seed=0)["commit"]
+    assert commit == "unknown" or re.fullmatch(r"[0-9a-f]{40}", commit)
+    assert commit == git_commit(Path(__file__).resolve().parents[1])

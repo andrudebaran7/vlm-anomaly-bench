@@ -5,9 +5,10 @@ import pandas as pd
 import pytest
 
 from vlmab.datasets.base import AnomalyDataset, Sample
-from vlmab.eval.runner import run_evaluation
+from vlmab.eval.runner import map_filename, run_evaluation, run_id
 from vlmab.eval.store import ResultStore
 from vlmab.methods.base import AnomalyMethod, Prediction
+
 
 
 class _LitDataset(AnomalyDataset):
@@ -115,7 +116,7 @@ def test_runner_pairs_every_row_with_its_own_map_despite_colliding_stems(tmp_pat
     maps = tmp_path / "maps"
     run_evaluation(_MVTecLayoutDataset(), _EchoMethod(), store, {"seed": 0}, maps_dir=maps)
 
-    saved = sorted((maps / "mvt__echo__can").glob("*.npy"))
+    saved = sorted((maps / f"mvt__echo__{run_id({'seed': 0})}__can").glob("*.npy"))
     assert len(saved) == 2, f"expected one map per sample, got {[p.name for p in saved]}"
 
     df = pd.read_parquet(store.path_for("mvt", "echo", "can"))
@@ -137,25 +138,28 @@ def test_runner_refuses_to_overwrite_an_existing_map(tmp_path):
         run_evaluation(_DuplicatePathDataset(), _EchoMethod(), store, {"seed": 0}, maps_dir=maps)
 
 
-def test_runner_clears_orphaned_maps_before_recomputing_a_category(tmp_path):
-    """Resume-after-mid-category-crash must still work with maps enabled.
+def test_runner_leaves_another_runs_maps_alone_when_recomputing(tmp_path):
+    """Resume-after-crash must work WITHOUT deleting anything.
 
-    A category with no shard on disk is recomputed from scratch, so any .npy left
-    in its map directory is orphaned by construction: no result row references it.
-    Those must be cleared, otherwise the overwrite guard would turn every resumed
-    run into a crash.
+    An earlier version cleared a category's map directory before recomputing, arguing
+    that a category with no shard has no rows referencing its maps. That argument only
+    holds within one store: the directory name did not identify the run, so a second
+    run sharing `maps_dir` deleted a *finished* run's maps out from under its shard.
+    The run id in the directory name now separates runs, and resume works by
+    overwriting the names it is about to write rather than by clearing.
     """
     store = ResultStore(tmp_path / "results")
     maps = tmp_path / "maps"
-    category_maps = maps / "mvt__echo__can"
+    category_maps = maps / f"mvt__echo__{run_id({'seed': 0})}__can"
     category_maps.mkdir(parents=True)
     orphan = category_maps / "left__over__from__a__dead__run.npy"
     np.save(orphan, np.zeros((4, 4), dtype=np.float16))
 
     run_evaluation(_MVTecLayoutDataset(), _EchoMethod(), store, {"seed": 0}, maps_dir=maps)
 
-    assert not orphan.exists()
-    assert len(sorted(category_maps.glob("*.npy"))) == 2
+    assert store.is_done("mvt", "echo", "can")
+    assert orphan.exists(), "the runner must not delete files it does not own"
+    assert len(sorted(category_maps.glob("*.npy"))) == 3  # 2 recomputed + the orphan
 
 
 def test_runner_writes_one_shard_per_category(tmp_path, fake_dataset, counting_method):
@@ -205,7 +209,7 @@ def test_runner_saves_maps_when_asked(tmp_path, fake_dataset, counting_method):
     run_evaluation(
         fake_dataset, counting_method, store, {"seed": 0}, categories=["alpha"], maps_dir=maps
     )
-    saved = sorted((maps / "fake__counting__alpha").glob("*.npy"))
+    saved = sorted((maps / f"fake__counting__{run_id({'seed': 0})}__alpha").glob("*.npy"))
     assert len(saved) == 3
     assert np.load(saved[0]).dtype == np.float16
 
@@ -228,3 +232,79 @@ def test_runner_prefixes_non_split_meta_and_excludes_split(tmp_path, counting_me
     df = pd.read_parquet(store.path_for("lit", "counting", "alpha"))
     assert (df["meta_lighting"] == "low").all()
     assert "meta_split" not in df.columns
+
+
+def test_a_second_run_sharing_maps_dir_cannot_destroy_a_finished_run(
+    tmp_path, fake_dataset, counting_method
+):
+    """Two configs of one method write the same shard path, so they need separate store
+    roots -- and then they share `maps_dir`. Clearing a category's maps up front
+    deleted the other run's data while its shard still pointed at it.
+
+    The second run must produce DISTINGUISHABLE maps, or "was not overwritten" passes
+    trivially because both runs wrote identical arrays.
+    """
+    class _OtherConfigMethod(type(counting_method)):
+        def predict(self, image, category):
+            p = super().predict(image, category)
+            return Prediction(image_score=p.image_score,
+                              anomaly_map=np.full((8, 8), 0.99, dtype=np.float32))
+
+    maps = tmp_path / "maps"
+    store_a = ResultStore(tmp_path / "a")
+    run_evaluation(fake_dataset, counting_method, store_a, {"config_hash": "cfgA"},
+                   categories=["alpha"], maps_dir=maps)
+    df_a = pd.read_parquet(store_a.path_for("fake", "counting", "alpha"))
+    before = {path: np.load(path).copy() for path in df_a["map_path"]}
+    assert before and not np.allclose(list(before.values())[0], 0.99)
+
+    store_b = ResultStore(tmp_path / "b")
+    run_evaluation(type(fake_dataset)(), _OtherConfigMethod(), store_b,
+                   {"config_hash": "cfgB"}, categories=["alpha"], maps_dir=maps)
+
+    for path, data in before.items():
+        assert Path(path).exists(), "the second run deleted a finished run's maps"
+        assert np.array_equal(np.load(path), data), "the second run overwrote them"
+
+
+def test_resume_overwrites_orphaned_maps_from_a_crashed_attempt(
+    tmp_path, fake_dataset, counting_method
+):
+    """Maps left by a run that died mid-category are referenced by no shard, so the
+    resumed run must be free to overwrite them rather than refusing."""
+    maps = tmp_path / "maps"
+    store = ResultStore(tmp_path / "results")
+    meta = {"config_hash": "cfg"}
+    orphan_dir = maps / f"fake__counting__{run_id(meta)}__alpha"
+    orphan_dir.mkdir(parents=True)
+    orphan = orphan_dir / map_filename(Path("/fake/alpha/0.png"))
+    np.save(orphan, np.zeros((2, 2), dtype=np.float16))
+
+    run_evaluation(fake_dataset, counting_method, store, meta,
+                   categories=["alpha"], maps_dir=maps)
+
+    assert store.is_done("fake", "counting", "alpha")
+    assert np.load(orphan).shape == (8, 8), "orphan was not recomputed over"
+
+
+def test_empty_category_does_not_create_a_map_directory(tmp_path, counting_method):
+    """store.write() rejects an empty shard; the map directory must not have been
+    created on the way to that rejection."""
+    maps = tmp_path / "maps"
+    store = ResultStore(tmp_path / "results")
+
+    class _Empty(AnomalyDataset):
+        name = "empty"
+
+        def categories(self):
+            return ["alpha"]
+
+        def samples(self, split, category=None):
+            return iter(())
+
+        def load_image(self, sample):
+            raise AssertionError("no samples to load")
+
+    with pytest.raises(ValueError):
+        run_evaluation(_Empty(), counting_method, store, {"seed": 0}, maps_dir=maps)
+    assert not maps.exists() or not list(maps.rglob("*.npy"))

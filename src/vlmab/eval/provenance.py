@@ -16,6 +16,20 @@ from typing import Any, Mapping
 PACKAGE_REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
+def package_commit() -> str:
+    """HEAD of the repository this package was loaded from, or "unknown".
+
+    `PACKAGE_REPO_ROOT` only points at a checkout under an editable install. Installed
+    normally, it lands inside the venv — and `git rev-parse` walks *up* from there, so
+    it would happily return some unrelated ancestor repository's SHA. Stamping a wrong
+    commit onto results is worse than recording none: it makes a run look reproducible
+    when it is not. So we only trust the path when it actually contains a `.git`.
+    """
+    if not (PACKAGE_REPO_ROOT / ".git").exists():
+        return "unknown"
+    return git_commit(PACKAGE_REPO_ROOT)
+
+
 def config_hash(cfg: Mapping[str, Any]) -> str:
     """Stable 12-char hash of a config. Key order does not matter; values are stringified."""
     payload = json.dumps(dict(cfg), sort_keys=True, separators=(",", ":"), default=str)
@@ -60,7 +74,7 @@ def run_meta(cfg: Mapping[str, Any], seed: int) -> dict[str, Any]:
     """
     return {
         "config_hash": config_hash(cfg),
-        "commit": git_commit(PACKAGE_REPO_ROOT),
+        "commit": package_commit(),
         "seed": int(seed),
         "gpu": gpu_name(),
     }

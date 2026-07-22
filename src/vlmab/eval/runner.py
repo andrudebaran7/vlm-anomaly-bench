@@ -10,8 +10,8 @@ process dies partway through a category, every row computed so far for that cate
 lost, including samples already predicted — the resumed run recomputes the whole category
 from scratch. Any anomaly maps already written to `maps_dir` for that partial category are
 orphaned: they are never referenced by any result row (the shard that would reference them
-was never written). The resumed run clears that category's map directory before
-recomputing it, so orphans do not accumulate across restarts. Size categories against your
+was never written). The resumed run overwrites them as it recomputes the category. Size
+categories against your
 session budget (e.g. Colab's ~12-hour cap) with this in mind: a category that alone takes
 longer than the remaining session time will repeatedly fail to checkpoint.
 
@@ -30,10 +30,31 @@ from typing import Any, Iterable, Mapping
 import numpy as np
 
 from vlmab.datasets.base import AnomalyDataset
+from vlmab.eval.provenance import config_hash
 from vlmab.eval.store import ResultStore
 from vlmab.methods.base import AnomalyMethod
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+def run_id(meta: Mapping[str, Any]) -> str:
+    """Short identifier for the run that owns a set of anomaly maps.
+
+    Map directories are keyed on this in addition to dataset/method/category, because
+    those three do NOT identify a run. Two runs of the same method with different
+    configs write the same shard path, so they must use different store roots — and
+    then they would share one map directory, where each would silently overwrite the
+    other's maps while the first run's completed shard still pointed at them.
+
+    `run_meta()` supplies `config_hash`, which is exactly the right key. When `meta`
+    carries no `config_hash` (bare dicts in tests, or a caller assembling meta by
+    hand) we hash the whole `meta` mapping instead: any two runs that differ in
+    anything recorded about them get different directories, and two runs that are
+    identical in every recorded respect are genuinely interchangeable. What we must
+    not do is fall back to a constant, which would reintroduce the collision.
+    """
+    existing = meta.get("config_hash")
+    return str(existing) if existing else config_hash(meta)
 
 
 def map_filename(image_path: Path) -> str:
@@ -96,15 +117,20 @@ def run_evaluation(
         rows: list[dict[str, Any]] = []
         category_maps = None
         if maps_dir is not None:
-            category_maps = Path(maps_dir) / f"{dataset.name}__{method.name}__{category}"
-            category_maps.mkdir(parents=True, exist_ok=True)
-            # Every category in `todo` has no shard on disk, so nothing references any
-            # .npy already sitting here: it is orphaned output from a run that died
-            # mid-category, and this category is about to be recomputed from scratch.
-            # Clearing it keeps resume working while letting the write below treat any
-            # pre-existing file as what it now can only be — a genuine name collision.
-            for stale in category_maps.glob("*.npy"):
-                stale.unlink()
+            category_maps = (
+                Path(maps_dir)
+                / f"{dataset.name}__{method.name}__{run_id(meta)}__{category}"
+            )
+        # Created lazily on first write: a category that yields no samples must not
+        # touch the filesystem before store.write() rejects it as empty.
+        maps_dir_ready = False
+        # Paths this run has written for this category. Only a repeat within one run is
+        # a genuine filename collision (two samples deriving one name, which would make
+        # their rows point at the same map). A file left by an earlier crashed run is
+        # not: no shard references it, so overwriting it is how resume works. Deleting
+        # such files up front would be unsafe — another run sharing `maps_dir` could
+        # own them.
+        written_maps: set[Path] = set()
 
         for sample in dataset.samples(split, category):
             image = dataset.load_image(sample)
@@ -120,13 +146,18 @@ def run_evaluation(
 
             if category_maps is not None:
                 map_path = category_maps / map_filename(sample.image_path)
-                if map_path.exists():
+                if map_path in written_maps:
                     raise FileExistsError(
-                        f"anomaly map {map_path} already exists for {sample.image_path}; "
-                        "refusing to overwrite — two samples derived the same map "
-                        "filename, so their result rows would point at the same map"
+                        f"anomaly map {map_path} was already written by this run for a "
+                        f"different sample than {sample.image_path}; refusing to "
+                        "overwrite — two samples derived the same map filename, so "
+                        "their result rows would point at the same map"
                     )
+                if not maps_dir_ready:
+                    category_maps.mkdir(parents=True, exist_ok=True)
+                    maps_dir_ready = True
                 np.save(map_path, prediction.anomaly_map.astype(np.float16))
+                written_maps.add(map_path)
                 row["map_path"] = str(map_path)
 
             rows.append(row)
