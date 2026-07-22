@@ -1,9 +1,21 @@
 """Evaluation runner: (dataset x method) -> per-sample parquet shards in results/.
 
-Built for a platform that disconnects: work is committed one category at a time, and a
-restart skips every category already on disk. The method is only prepared (weights loaded)
-if there is actually something left to compute — resuming a finished run must not pay for
-a model load.
+Built for a platform that disconnects: checkpointing is per CATEGORY, not per sample. Rows
+for a category are only accumulated in memory as samples are predicted; the shard for that
+category is written to disk once, only after its whole sample loop finishes. A restart skips
+every category whose shard already exists on disk.
+
+This means the granularity a user is protected at is a full category, not a sample: if the
+process dies partway through a category, every row computed so far for that category is
+lost, including samples already predicted — the resumed run recomputes the whole category
+from scratch. Any anomaly maps already written to `maps_dir` for that partial category are
+orphaned: they are never referenced by any result row (the shard that would reference them
+was never written), and this runner does not clean them up. Size categories against your
+session budget (e.g. Colab's ~12-hour cap) with this in mind: a category that alone takes
+longer than the remaining session time will repeatedly fail to checkpoint.
+
+The method is only prepared (weights loaded) if there is actually something left to compute
+— resuming a finished run must not pay for a model load.
 
 Pixel metrics are not computed here. The runner persists scores and, optionally, anomaly
 maps; aggregation into metrics is a separate step so a long grid never holds every map in
@@ -39,6 +51,8 @@ def run_evaluation(
 
     written: list[Path] = []
     for category in todo:
+        # Accumulates in memory for this whole category; nothing here reaches disk (and
+        # nothing is resumable) until the sample loop below completes and store.write() runs.
         rows: list[dict[str, Any]] = []
         category_maps = None
         if maps_dir is not None:
