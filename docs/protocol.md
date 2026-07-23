@@ -71,6 +71,20 @@ engineering.
   parameter count, peak VRAM. API-based baselines report tokens + cost instead of VRAM.
 - The official MVTec AD 2 metric set is adopted as the evaluation server defines it. *(Exact metric
   names and definitions are read from the server's submission documentation at download time.)*
+- **Evaluation resolution.** Pixel metrics are computed at the dataset's native resolution
+  (1400x1900 for Vial), against unmodified ground-truth masks. Methods may run inference at
+  whatever internal resolution they were designed for, but every adapter returns its anomaly map
+  upsampled to native resolution; nothing downsamples a mask. Downsampling masks would be cheaper,
+  but it shrinks small defect regions and AU-PRO weights every connected region equally — a tiny
+  defect can vanish entirely and take its equal share of the score with it. Since AU-PRO is the
+  metric this benchmark rests on, that cost is not acceptable to save memory.
+- **Aggregation granularity.** Pixel metrics are aggregated **per lighting condition**, not over a
+  whole category at once. This is what the study wants scientifically — MVTec AD 2 exists to
+  measure robustness to lighting shift — and it is also what makes native-resolution evaluation
+  possible on the reference platform: one condition is 20 images (about 53 Mpx, ~3.4 GB peak),
+  where a whole category is 140 images (372 Mpx, ~23.8 GB) and does not fit. Per-category means are
+  composed from the per-condition results rather than computed in one pass. `pixel_metrics`
+  enforces this with a memory budget that refuses the whole-category case.
 
 ## 5. Hardware & software
 
@@ -122,3 +136,10 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   because it is the same class of decision as the RGB conversion already recorded there: a
   preprocessing choice that touches every reported pixel-level number. The downcast itself is
   unchanged and predates this entry. No evaluation rule changed.
+- 2026-07-23 — v0.2.4. Records the evaluation resolution and aggregation granularity in §4, both
+  decided before any result was computed. Pixel metrics run at native resolution against
+  unmodified masks (adapters upsample; masks are never downsampled, because shrinking regions
+  distorts AU-PRO, which weights every region equally). Aggregation is per lighting condition,
+  which the study wants anyway and which is what makes native resolution fit the reference
+  platform's memory. This constrains how numbers are produced, so unlike v0.2.1-v0.2.3 it is not
+  documentation-only.
