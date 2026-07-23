@@ -48,8 +48,48 @@ on the public split remain fully available either way.
 
 ## VisA + MVTec AD (classic) — sanity only
 
-Public downloads, used solely to validate our implementations against published numbers
-(±1.0 I-AUROC, protocol §2).
+Used solely to validate our implementations against published numbers (±1.0 I-AUROC,
+protocol §2). VisA stays in this role deliberately: it is the least-friction dataset here, but
+published methods already score high on it, so promoting it to a primary benchmark would
+reintroduce exactly the saturation this study exists to escape.
+
+**VisA** — verified 2026-07-23:
+
+- Size: **1.80 GiB** (`VisA_20220922.tar`, 1,929,840,640 bytes, measured by HTTP HEAD).
+- License: **CC BY 4.0** — the most permissive of any dataset here (attribution only, no
+  NonCommercial clause).
+- Access: AWS Open Data Registry, **no AWS account and no form**:
+  `aws s3 cp --no-sign-request s3://amazon-visual-anomaly/VisA_20220922.tar .`
+  (bucket `amazon-visual-anomaly`, region `us-west-2`; published 2022-09-22).
+- Content: 10,821 images (9,621 normal, 1,200 anomalous), 12 classes across 3 domains.
+
+**MVTec AD (classic)** — >5,000 images, 15 object and texture categories, from the MVTec
+research page (form + license). Download size not published; record it here on download.
+
+## Other freely-accessible AD benchmarks — candidates, not committed
+
+Surveyed 2026-07-23 while the MVTec AD 2 evaluation-server registration was blocked. None of
+these is adopted; they are recorded so the option is documented rather than re-researched.
+
+| Dataset | Size | License | Access | Verified |
+|---|---|---|---|---|
+| MVTec LOCO AD | not published | CC BY-NC-SA 4.0 | form on mvtec.com | license yes, size no |
+| KolektorSDD2 | not published | CC BY-NC-SA 4.0 | direct, vicos.si | license yes, size no |
+| BTAD | 2,540 images, 3 products | unverified | — | no |
+| MPDD | unverified | unverified | github.com/stepanje/MPDD | no |
+| DAGM | 10 texture classes | unverified | — | no |
+
+**MVTec LOCO AD is the one worth a second look**, and not as an access fallback. It carries
+*logical* anomalies (violations of count and composition constraints) alongside structural
+ones — an axis CLIP-based methods are structurally poor at, since their prompts describe
+appearance rather than constraint violations, and one where an MLLM baseline has a plausible
+path to winning rather than only losing. Before considering it, check whether any zero-shot/VLM
+method already reports on it; the contribution claim depends on that being unanswered.
+
+**Not candidates:** DocVQA, TextVQA and VQAv2 were raised and rejected. They are visual
+question answering benchmarks with no normal/anomalous labels and no pixel ground truth, so
+every image- and pixel-level metric in `src/vlmab/metrics/` is inapplicable to them. Swapping
+them in would not narrow this study's scope; it would replace it with a different one.
 
 ## Real-IAD / Real-IAD Variety — out of scope
 
