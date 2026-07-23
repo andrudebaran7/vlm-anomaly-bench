@@ -9,6 +9,8 @@ from PIL import Image
 
 from vlmab.datasets.mvtec_ad2 import LABEL_UNKNOWN
 from vlmab.eval.aggregate import BYTES_PER_PIXEL, aggregate, image_metrics, pixel_metrics
+from vlmab.metrics.image_level import i_ap, i_auroc, i_f1max
+from vlmab.metrics.pixel_level import au_pro, p_auroc, seg_f1max
 
 
 def _shard(tmp_path, n=4, separable=True, with_pixels=True):
@@ -39,6 +41,164 @@ def _shard(tmp_path, n=4, separable=True, with_pixels=True):
             row["map_path"] = str(map_path)
         rows.append(row)
     return pd.DataFrame(rows)
+
+
+def _imperfect_shard(tmp_path):
+    """A shard on which every metric takes a *different*, hand-checkable value.
+
+    `_shard` is perfectly separable, so all six metrics evaluate to 1.0 on it and no test
+    built on it can tell one metric column from another: swapping i_auroc with i_ap, or the
+    two AU-PRO FPR limits, or the mask/map arguments to p_auroc, leaves 1.0 == 1.0 everywhere.
+    This fixture is deliberately imperfect instead.
+
+    Image level (4 images, labels 0,1,0,1): scores 0.10, 0.90, 0.60, 0.40. One anomalous image
+    (0.40) is ranked below one normal image (0.60), so separation is partial.
+
+    Pixel level (4 images of 4x4 = 64 pooled pixels), with deliberately unequal regions:
+      * image 1 (anomalous): a 2x2 region, 4 pixels, all scored 0.9 -- found easily;
+      * image 3 (anomalous): a single-pixel region scored 0.5 -- found only at a threshold
+        that already admits false positives;
+      * images 0 and 2 (normal, no mask file): 4 pixels at 0.7 and 4 pixels at 0.45
+        respectively, which are the false positives that sit between the two regions;
+      * every other pixel is 0.1.
+    So the pooled pixels are 4 anomalous @0.9, 1 anomalous @0.5, and 59 normal: 4 @0.7,
+    4 @0.45, 51 @0.1. Region sizes differ by 4x, which is what makes AU-PRO (equal weight per
+    region) differ from the pixel-pooled metrics.
+
+    Returns (df, masks, amaps) so a test can recompute the expected numbers by calling the
+    metric functions directly on the same arrays, independently of what `pixel_metrics` did.
+    """
+    scores = [0.10, 0.90, 0.60, 0.40]
+    amaps_f16, masks = [], []
+    for i in range(4):
+        amap = np.full((4, 4), 0.1, dtype=np.float16)
+        mask = np.zeros((4, 4), dtype=np.uint8)
+        if i == 0:
+            amap[0, :] = 0.7  # 4 normal pixels above the weak region's score
+        elif i == 1:
+            amap[0:2, 0:2] = 0.9  # 4-pixel region, strongly detected
+            mask[0:2, 0:2] = 1
+        elif i == 2:
+            amap[0, :] = 0.45  # 4 normal pixels just below the weak region's score
+        else:
+            amap[0, 0] = 0.5  # 1-pixel region, weakly detected
+            mask[0, 0] = 1
+        amaps_f16.append(amap)
+        masks.append(mask)
+
+    rows = []
+    for i, (amap, mask) in enumerate(zip(amaps_f16, masks)):
+        map_path = tmp_path / f"imperfect_{i}.npy"
+        np.save(map_path, amap)
+        row = {
+            "image_path": f"/fake/{i:03d}_regular.png",
+            "label": int(mask.any()),
+            "image_score": scores[i],
+            "split": "test_public",
+            "meta_lighting": "regular",
+            "mask_path": None,
+            "map_path": str(map_path),
+        }
+        if mask.any():
+            mask_path = tmp_path / f"imperfect_{i}_mask.png"
+            Image.fromarray(mask * 255, mode="L").save(mask_path)
+            row["mask_path"] = str(mask_path)
+        rows.append(row)
+    # float32 is what _load_pair hands the metrics, so the independent recomputation must use
+    # the same dtype rather than the float16 on disk.
+    return pd.DataFrame(rows), masks, [a.astype(np.float32) for a in amaps_f16]
+
+
+def test_image_metrics_are_not_interchangeable_columns(tmp_path):
+    """Each image-level column must carry its own metric, checked against a hand derivation.
+
+    Ranking on `_imperfect_shard` is, descending: 0.90 (anomalous), 0.60 (normal),
+    0.40 (anomalous), 0.10 (normal).
+
+    * I-AUROC counts concordant (anomalous, normal) pairs: (0.9>0.1), (0.9>0.6), (0.4>0.1)
+      concordant, (0.4>0.6) not -> 3/4 = 0.75.
+    * I-AP averages precision at each anomalous rank: 1/1 at rank 1 and 2/3 at rank 3
+      -> (1 + 2/3)/2 = 5/6.
+    * I-F1max is the best F1 over thresholds: at 0.40 -> TP=2, FP=1, FN=0, so P=2/3, R=1,
+      F1=0.8, which beats 0.667 at 0.90, 0.5 at 0.60 and 0.667 at 0.10.
+
+    The three values are distinct by construction, so swapping two of these computations in
+    `image_metrics` cannot go unnoticed.
+    """
+    df, _, _ = _imperfect_shard(tmp_path)
+    out = image_metrics(df)
+
+    assert out["i_auroc"] == pytest.approx(0.75)
+    assert out["i_ap"] == pytest.approx(5 / 6)
+    assert out["i_f1max"] == pytest.approx(0.8)
+    assert out["n"] == 4
+
+    # Recomputed independently of the implementation's own wiring.
+    labels = df["label"].to_numpy()
+    scores = df["image_score"].to_numpy()
+    assert out["i_auroc"] == pytest.approx(i_auroc(labels, scores))
+    assert out["i_ap"] == pytest.approx(i_ap(labels, scores))
+    assert out["i_f1max"] == pytest.approx(i_f1max(labels, scores))
+    assert len({round(out[k], 6) for k in ("i_auroc", "i_ap", "i_f1max")}) == 3
+
+
+def test_pixel_metrics_are_not_interchangeable_columns(tmp_path):
+    """Each pixel-level column must carry its own metric, at its own FPR limit.
+
+    Hand derivation on `_imperfect_shard` (4 anomalous pixels @0.9 and 1 @0.5; 59 normal:
+    4 @0.7, 4 @0.45, 51 @0.1):
+
+    * P-AUROC over the 5x59 = 295 (anomalous, normal) pairs: each 0.9 pixel beats all 59
+      normals (236 pairs), the 0.5 pixel beats the 51 @0.1 and the 4 @0.45 but loses to the
+      4 @0.7 (55 pairs), no ties -> 291/295 = 0.98644.
+    * SegF1max over the achievable thresholds: 0.9 -> P=1, R=4/5, F1=8/9; 0.7 -> 0.615;
+      0.5 -> 10/14; 0.45 -> 10/18; 0.1 -> 10/69. Max = 8/9 = 0.88889.
+    * AU-PRO@0.3: PRO is the mean over the two regions regardless of their 4:1 size
+      difference. Thresholds land at FPR 0 (above every normal pixel; PRO 0.5, only the big
+      region found), 4/59 (t=0.7; PRO still 0.5) and 8/59 (t=0.45; PRO 1.0, the single-pixel
+      region is finally caught), then flat to 0.3. Trapezoid area = 0.5*(4/59) +
+      0.75*(4/59) + 1*(0.3 - 8/59) = 0.3 - 3/59, normalised by 0.3 -> 0.83051.
+    * AU-PRO@0.05: 8/59 = 0.136 is outside the window, so the weak region is never caught
+      inside it; the curve is flat at PRO 0.5 across [0, 0.05] -> 0.5.
+
+    All four values are distinct, so transposing two columns -- or swapping the 0.3 and 0.05
+    limits, or passing (amaps, masks) to p_auroc instead of (masks, amaps) -- fails here.
+    """
+    df, masks, amaps = _imperfect_shard(tmp_path)
+    out = pixel_metrics(df)
+
+    assert out["p_auroc"] == pytest.approx(291 / 295)
+    assert out["seg_f1max"] == pytest.approx(8 / 9)
+    assert out["au_pro_030"] == pytest.approx((0.3 - 3 / 59) / 0.3)
+    assert out["au_pro_005"] == pytest.approx(0.5)
+    assert out["n"] == 4
+
+    # Recomputed independently of the implementation's own wiring: same arrays, metric
+    # functions called directly, argument order and fpr_limit spelled out here.
+    assert out["p_auroc"] == pytest.approx(p_auroc(masks, amaps))
+    assert out["seg_f1max"] == pytest.approx(seg_f1max(masks, amaps))
+    assert out["au_pro_030"] == pytest.approx(au_pro(masks, amaps, fpr_limit=0.3))
+    assert out["au_pro_005"] == pytest.approx(au_pro(masks, amaps, fpr_limit=0.05))
+
+    values = [out[k] for k in ("p_auroc", "seg_f1max", "au_pro_030", "au_pro_005")]
+    assert len({round(v, 6) for v in values}) == 4
+
+
+def test_aggregate_carries_the_imperfect_values_into_the_table_row(tmp_path):
+    """The columns `aggregate` emits are the paper's table columns; check them by value."""
+    df, _, _ = _imperfect_shard(tmp_path)
+    out = aggregate(df)
+    assert len(out) == 1
+    row = out.iloc[0]
+    assert row["i_auroc"] == pytest.approx(0.75)
+    assert row["i_ap"] == pytest.approx(5 / 6)
+    assert row["i_f1max"] == pytest.approx(0.8)
+    assert row["p_auroc"] == pytest.approx(291 / 295)
+    assert row["seg_f1max"] == pytest.approx(8 / 9)
+    assert row["au_pro_030"] == pytest.approx((0.3 - 3 / 59) / 0.3)
+    assert row["au_pro_005"] == pytest.approx(0.5)
+    assert row["n"] == 4
+    assert row["n_pixel_rows"] == 4
 
 
 def test_image_metrics_on_perfect_separation(tmp_path):
