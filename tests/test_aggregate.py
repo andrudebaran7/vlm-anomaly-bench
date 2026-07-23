@@ -75,6 +75,11 @@ def test_pixel_metrics_treats_a_missing_mask_as_all_normal(tmp_path):
     assert df["mask_path"].isna().any()
     out = pixel_metrics(df)
     assert out["n"] == 4
+    # If a missing mask were instead treated as all-anomalous, these `good` rows' pixels
+    # (which anomaly maps correctly score as clean) would look like missed detections,
+    # dragging p_auroc/seg_f1max well below 1.0 instead of leaving the perfect score intact.
+    assert out["p_auroc"] == pytest.approx(1.0)
+    assert out["seg_f1max"] == pytest.approx(1.0)
 
 
 def test_pixel_metrics_skips_rows_without_a_map(tmp_path):
