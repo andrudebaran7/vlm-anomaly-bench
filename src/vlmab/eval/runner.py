@@ -141,6 +141,9 @@ def run_evaluation(
                 "label": int(sample.label),
                 "image_score": float(prediction.image_score),
                 "split": split,
+                # Where the ground truth lives, so aggregation can compute pixel metrics from
+                # the shard alone instead of re-walking the dataset for a second time.
+                "mask_path": str(sample.mask_path) if sample.mask_path is not None else None,
             }
             row.update({f"meta_{k}": v for k, v in sample.meta.items() if k != "split"})
 

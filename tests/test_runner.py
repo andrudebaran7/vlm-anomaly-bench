@@ -287,6 +287,36 @@ def test_resume_overwrites_orphaned_maps_from_a_crashed_attempt(
     assert np.load(orphan).shape == (8, 8), "orphan was not recomputed over"
 
 
+def test_runner_records_the_mask_path_when_the_sample_has_one(tmp_path, counting_method):
+    """Pixel metrics are computed from the shard later, so the shard must say where the
+    ground truth is; re-walking the dataset to find it would be a second source of truth."""
+    class _WithMasks(AnomalyDataset):
+        name = "masked"
+
+        def categories(self):
+            return ["alpha"]
+
+        def samples(self, split, category=None):
+            yield Sample(image_path=Path("/fake/alpha/bad/000_regular.png"), label=1,
+                         category="alpha", mask_path=Path("/fake/gt/000_regular_mask.png"),
+                         meta={})
+            yield Sample(image_path=Path("/fake/alpha/good/000_regular.png"), label=0,
+                         category="alpha", mask_path=None, meta={})
+
+        def load_image(self, sample):
+            return np.zeros((4, 4, 3), dtype=np.uint8)
+
+    store = ResultStore(tmp_path)
+    run_evaluation(_WithMasks(), counting_method, store, {"seed": 0})
+    # pandas>=3 defaults to a NaN-backed "str" dtype for object columns, which turns a
+    # missing string entry into float NaN on read instead of the None the column
+    # actually holds (verified: the parquet file itself stores a proper null either
+    # way). Scope the legacy behaviour to this read so None round-trips as None.
+    with pd.option_context("future.infer_string", False):
+        df = pd.read_parquet(store.path_for("masked", "counting", "alpha"))
+    assert list(df["mask_path"]) == ["/fake/gt/000_regular_mask.png", None]
+
+
 def test_empty_category_does_not_create_a_map_directory(tmp_path, counting_method):
     """store.write() rejects an empty shard; the map directory must not have been
     created on the way to that rejection."""
