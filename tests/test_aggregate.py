@@ -424,6 +424,25 @@ def test_aggregate_groups_by_lighting_condition(tmp_path):
     assert len(out) == 2
 
 
+def test_aggregate_names_the_group_whose_maps_are_degenerate(tmp_path):
+    """A constant anomaly map now fails loudly instead of reporting au_pro = 0.0.
+
+    0.0 is a plausible AU-PRO value, so a shard of broken (constant) maps used to produce a
+    complete-looking metrics row that could go straight into a table. `au_pro` refuses such
+    input, and `aggregate` treats it like any other per-group failure: the group is named,
+    the underlying reason survives, and no row is emitted for the whole frame.
+    """
+    df = _shard(tmp_path)
+    for path in df["map_path"]:
+        np.save(path, np.full((6, 8), 0.5, dtype=np.float16))
+    with pytest.raises(ValueError) as exc_info:
+        aggregate(df, by="meta_lighting")
+    message = str(exc_info.value)
+    assert "meta_lighting" in message
+    assert "constant anomaly map" in message
+    assert exc_info.value.__cause__ is not None
+
+
 def test_aggregate_rejects_a_missing_group_column(tmp_path):
     with pytest.raises(KeyError):
         aggregate(_shard(tmp_path), by="meta_nope")

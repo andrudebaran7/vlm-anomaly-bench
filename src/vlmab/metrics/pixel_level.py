@@ -153,6 +153,24 @@ def au_pro(
     which is the whole point of the metric: it refuses to let one large defect mask the
     failure to find several small ones.
 
+    Degenerate input raises, identically at both FPR limits. These cases used to return
+    0.0, which is indistinguishable from a genuine score of zero — a real Vial run reported
+    `au_pro_005 = 0.0` for every lighting group and the number could not say whether the
+    metric had been computed or abandoned. Refused, with the reason named:
+
+    * no anomalous regions (PRO averages over regions; there are none) or no normal pixels
+      (FPR is a fraction of them) — the same class of undefined input `p_auroc` refuses for
+      a single-class category;
+    * a constant anomaly map, where the whole curve collapses and the 0.0 that came out was
+      an artifact of extending a single point flat to `fpr_limit`, not a measurement.
+
+    Raising rather than returning nan is deliberate, for the reason spelled out in
+    `p_auroc`: nan is silently dropped by any nan-skipping aggregation (`DataFrame.mean()`),
+    so a published column would quietly become an average over fewer categories than it
+    claims. In `aggregate`, this surfaces as a `ValueError` naming the group that failed
+    (`group meta_lighting='regular': au_pro is undefined ...`), the same way a single-class
+    or unlabelled group already does — no row is emitted with a fabricated 0.0.
+
     Connectivity: regions are labelled with 8-connectivity (`ndimage.label` with a full
     3x3 structuring element), matching the AU-PRO literature and reference
     implementations (e.g. skimage's `measure.label`, whose 2D default is full
@@ -206,10 +224,24 @@ def au_pro(
             if a_max > hi:
                 hi = a_max
 
-    if not region_sorted_values or n_normal == 0:
-        return 0.0
+    if not region_sorted_values:
+        raise ValueError(
+            "au_pro is undefined for a category with no anomalous regions: PRO is a mean "
+            f"over ground-truth regions and these {len(masks)} mask(s) contain none. A "
+            "shard of only `good` images cannot be localised."
+        )
+    if n_normal == 0:
+        raise ValueError(
+            "au_pro is undefined for a category with no normal pixels: FPR is a fraction "
+            f"of them and all {sum(int(m.size) for m in masks)} pooled pixels are anomalous."
+        )
     if lo == hi:
-        return 0.0
+        raise ValueError(
+            f"au_pro is undefined for a constant anomaly map: every one of the "
+            f"{sum(int(a.size) for a in amaps)} pooled scores is {lo}, so no threshold "
+            "separates anything and the curve has no operating points. This is a broken "
+            "prediction, not a score of zero."
+        )
 
     normal_sorted = (
         np.sort(np.concatenate(normal_chunks))
@@ -219,7 +251,11 @@ def au_pro(
 
     thresholds = pro_thresholds(normal_sorted, lo, fpr_limit, num_thresholds)
     if thresholds.size == 0:
-        return 0.0
+        raise ValueError(
+            f"au_pro found no usable threshold at fpr_limit={fpr_limit}: every candidate "
+            "sits at or below the anomaly maps' minimum value, so the PRO curve has no "
+            "points to integrate."
+        )
 
     # Same per-region searchsorted formulation as before ("count >= t" is a lookup in
     # the region's sorted values, not a pass over the image), evaluated for the whole
@@ -244,7 +280,10 @@ def au_pro(
     keep = fpr <= fpr_limit
     x, y = fpr[keep], pro[keep]
     if x.size == 0:
-        return 0.0
+        raise ValueError(
+            f"au_pro found no operating point at or below fpr_limit={fpr_limit}: there is "
+            "no curve to integrate, so no area can be reported."
+        )
     if x[0] > 0.0:
         x = np.concatenate([[0.0], x])
         y = np.concatenate([[y[0]], y])
