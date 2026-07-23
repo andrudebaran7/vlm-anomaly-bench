@@ -338,3 +338,27 @@ def test_empty_category_does_not_create_a_map_directory(tmp_path, counting_metho
     with pytest.raises(ValueError):
         run_evaluation(_Empty(), counting_method, store, {"seed": 0}, maps_dir=maps)
     assert not maps.exists() or not list(maps.rglob("*.npy"))
+
+
+def test_default_split_is_a_real_mvtec_ad2_split(tmp_path, counting_method):
+    """`split="test"` is not one of MVTec AD 2's five splits.
+
+    Any caller relying on the default got a ValueError out of the loader before a single
+    sample was read, so the default was not merely unhelpful — it could not work at all.
+    The default has to be `test_public`: it is the only split with pixel ground truth and
+    the only one every local metric is computed on.
+    """
+    from mvtec_tree import build_category
+
+    from vlmab.datasets.mvtec_ad2 import MVTecAD2
+
+    build_category(tmp_path / "data", "vial", conditions=("regular",), n_good=1, n_bad=1)
+    dataset = MVTecAD2(tmp_path / "data")
+    store = ResultStore(tmp_path / "results")
+
+    written = run_evaluation(dataset, counting_method, store, {"seed": 0})
+
+    assert len(written) == 1
+    df = pd.read_parquet(written[0])
+    assert set(df["split"]) == {"test_public"}
+    assert sorted(df["label"]) == [0, 1]  # one good, one bad, i.e. the public test split

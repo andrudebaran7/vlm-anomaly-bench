@@ -98,7 +98,10 @@ def run_evaluation(
     store: ResultStore,
     meta: Mapping[str, Any],
     categories: Iterable[str] | None = None,
-    split: str = "test",
+    # MVTec AD 2 has no split called "test"; the previous default raised out of the loader
+    # for every caller that took it. test_public is the split with pixel ground truth, i.e.
+    # the one every locally computed metric in this study is defined on.
+    split: str = "test_public",
     maps_dir: Path | None = None,
     device: str = "cuda",
 ) -> list[Path]:
