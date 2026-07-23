@@ -308,13 +308,13 @@ def test_runner_records_the_mask_path_when_the_sample_has_one(tmp_path, counting
 
     store = ResultStore(tmp_path)
     run_evaluation(_WithMasks(), counting_method, store, {"seed": 0})
-    # pandas>=3 defaults to a NaN-backed "str" dtype for object columns, which turns a
-    # missing string entry into float NaN on read instead of the None the column
-    # actually holds (verified: the parquet file itself stores a proper null either
-    # way). Scope the legacy behaviour to this read so None round-trips as None.
-    with pd.option_context("future.infer_string", False):
-        df = pd.read_parquet(store.path_for("masked", "counting", "alpha"))
-    assert list(df["mask_path"]) == ["/fake/gt/000_regular_mask.png", None]
+    # pandas>=3 defaults to a NaN-backed "str" dtype for object columns, so a missing
+    # string entry reads back as NaN rather than None even though the column (and the
+    # parquet file itself) stores a proper null. Real consumers read under this
+    # default, so assert against it rather than opting into legacy behaviour.
+    df = pd.read_parquet(store.path_for("masked", "counting", "alpha"))
+    assert df["mask_path"][0] == "/fake/gt/000_regular_mask.png"
+    assert pd.isna(df["mask_path"][1])
 
 
 def test_empty_category_does_not_create_a_map_directory(tmp_path, counting_method):
