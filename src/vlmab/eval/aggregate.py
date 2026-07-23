@@ -54,11 +54,17 @@ def _load_pair(row: Any) -> tuple[np.ndarray, np.ndarray]:
     return mask, amap
 
 
-def pixel_metrics(df: pd.DataFrame, max_pixels: int = 400_000_000) -> dict[str, float]:
+def pixel_metrics(df: pd.DataFrame, max_bytes: int = 2_000_000_000) -> dict[str, float]:
     """P-AUROC, SegF1max and AU-PRO at both FPR limits, over rows that saved a map.
 
-    `max_pixels` is a guard, not a tuning knob: exceeding it raises rather than letting the
-    session get OOM-killed with no diagnostic. Raise it deliberately if the machine can take it.
+    `max_bytes` is a guard, not a tuning knob: exceeding it raises rather than letting the
+    session get OOM-killed with no diagnostic. It counts what the loop below actually holds in
+    memory at once for every row: a float32 anomaly map (4 bytes/pixel, `_load_pair` upcasts on
+    load) *and* a uint8 mask (1 byte/pixel, real or synthesised for a missing mask file) — 5
+    bytes per pixel, not the map alone. Because it is a byte count, it can be sized directly
+    against a machine's free RAM (e.g. leave headroom below Colab's ~12.7 GB free-tier ceiling
+    for the interpreter, pandas/pyarrow, and everything else in the process). Raise it
+    deliberately if the machine can take it.
     """
     if "map_path" not in df.columns:
         return {"n": 0}
@@ -66,14 +72,17 @@ def pixel_metrics(df: pd.DataFrame, max_pixels: int = 400_000_000) -> dict[str, 
     if with_maps.empty:
         return {"n": 0}
 
-    total = 0
+    total_bytes = 0
     for path in with_maps["map_path"]:
         shape = np.load(path, mmap_mode="r").shape
-        total += int(np.prod(shape))
-    if total > max_pixels:
+        pixels = int(np.prod(shape))
+        total_bytes += pixels * 4  # amap, resident as float32 after _load_pair's upcast
+        total_bytes += pixels * 1  # mask, resident as uint8 (real or a missing-mask np.zeros)
+    if total_bytes > max_bytes:
         raise ValueError(
-            f"{total:,} pixels exceeds max_pixels={max_pixels:,}. Aggregate a smaller group "
-            "(e.g. one lighting condition at a time) or raise the budget if this machine "
+            f"{total_bytes:,} bytes ({total_bytes / 1e9:.2f} GB) of masks+maps held at once "
+            f"exceeds max_bytes={max_bytes:,} ({max_bytes / 1e9:.2f} GB). Aggregate a smaller "
+            "group (e.g. one lighting condition at a time) or raise the budget if this machine "
             "genuinely has the memory."
         )
 
@@ -95,7 +104,7 @@ def pixel_metrics(df: pd.DataFrame, max_pixels: int = 400_000_000) -> dict[str, 
 def aggregate(
     df: pd.DataFrame,
     by: str | None = None,
-    max_pixels: int = 400_000_000,
+    max_bytes: int = 2_000_000_000,
 ) -> pd.DataFrame:
     """One metrics row per group, or a single row when `by` is None.
 
@@ -111,7 +120,7 @@ def aggregate(
     for key, group in groups:
         record: dict[str, Any] = {} if key is None else {by: key}
         record.update(image_metrics(group))
-        pixels = pixel_metrics(group, max_pixels=max_pixels)
+        pixels = pixel_metrics(group, max_bytes=max_bytes)
         record.update({k: v for k, v in pixels.items() if k != "n"})
         record["n_pixel_rows"] = pixels["n"]
         records.append(record)

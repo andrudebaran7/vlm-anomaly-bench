@@ -92,8 +92,20 @@ def test_pixel_metrics_returns_nothing_when_no_maps_were_saved(tmp_path):
 def test_pixel_metrics_refuses_to_exceed_the_pixel_budget(tmp_path):
     """Colab has ~12.7 GB of RAM. Failing with a number beats being OOM-killed silently."""
     df = _shard(tmp_path)
-    with pytest.raises(ValueError, match="max_pixels"):
-        pixel_metrics(df, max_pixels=10)
+    with pytest.raises(ValueError, match="max_bytes"):
+        pixel_metrics(df, max_bytes=10)
+
+
+def test_pixel_metrics_guard_counts_bytes_actually_held_not_just_the_map(tmp_path):
+    """The loop holds both the mask (uint8) and the amap (float32, upcast on load) at once.
+
+    2 rows of a 6x8 map = 96 amap elements, which the old guard compared straight against
+    `max_pixels` -- 96 <= 100 would pass. The real resident footprint once both arrays are
+    held is 96 * (4 + 1) = 480 bytes, which must trip a budget of 100.
+    """
+    df = _shard(tmp_path, n=2)
+    with pytest.raises(ValueError, match="max_bytes"):
+        pixel_metrics(df, max_bytes=100)
 
 
 def test_aggregate_returns_one_row_with_both_metric_families(tmp_path):
