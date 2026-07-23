@@ -52,6 +52,17 @@ engineering.
   it cannot advantage one method over another. It is recorded here because it is a
   preprocessing decision that touches every reported number.
 
+- **Anomaly-map storage precision.** The runner persists each anomaly map to disk as
+  **float16** (`runner.run_evaluation`); aggregation reads it back and upcasts to float32
+  before any metric sees it. This halves the map footprint, which is what makes a category of
+  2.66 MP maps fit a Colab session's disk and memory at all. Measured effect on the reported
+  numbers, comparing every pixel metric computed from float32 maps against the same maps
+  round-tripped through float16 (5 random fixtures, 6 images of 256x256, multiple regions per
+  image): P-AUROC 1.4e-06, AU-PRO@0.3 3.9e-05, AU-PRO@0.05 2.4e-05, SegF1max 8.0e-04 — worst
+  case an order of magnitude inside the ±1.0-point (0.01) tolerance this protocol uses
+  elsewhere, and applied identically to every method and category. Recorded here, like the
+  colour-channel rule above, because it is a decision that touches every pixel-level number.
+
 ## 4. Metrics
 
 - Image level: I-AUROC, I-AP, I-F1max.
@@ -106,3 +117,8 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   rules that touch every number: grayscale images are converted to 3-channel RGB (§3), and
   withheld-label samples are marked -1 and excluded from accuracy metrics (§2). Official metric
   names still unverified. No evaluation rule changed.
+- 2026-07-23 — v0.2.3. Documentation only. Records the float16 anomaly-map storage precision
+  in §3, with the measured effect on every pixel metric (worst case 8.0e-04, on SegF1max),
+  because it is the same class of decision as the RGB conversion already recorded there: a
+  preprocessing choice that touches every reported pixel-level number. The downcast itself is
+  unchanged and predates this entry. No evaluation rule changed.
