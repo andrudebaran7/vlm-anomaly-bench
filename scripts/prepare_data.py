@@ -32,6 +32,21 @@ def _image_dirs(category_root: Path, split: str) -> list[Path]:
     return [category_root / split / s for s in subdirs] if subdirs else [category_root / split]
 
 
+def _png_size(path: Path) -> tuple[int, int] | None:
+    """(width, height) if the file is a readable, intact PNG, else None.
+
+    `size` comes from the header, so it is read before `verify()` invalidates the object.
+    `verify()` itself checks the PNG chunk CRCs, which is what catches a truncated file.
+    """
+    try:
+        with Image.open(path) as im:
+            size = im.size
+            im.verify()
+    except (UnidentifiedImageError, OSError):
+        return None
+    return size
+
+
 def check_category(root: Path, category: str) -> list[str]:
     """Problems found in one category. Empty list means the layout is sound."""
     category_root = Path(root) / category
@@ -61,12 +76,35 @@ def check_category(root: Path, category: str) -> list[str]:
     if not ground_truth.is_dir():
         problems.append(f"{category}/test_public: missing directory {ground_truth}")
     elif bad.is_dir():
-        bad_stems = {p.stem for p in bad.glob("*.png")}
-        mask_stems = {p.stem[: -len("_mask")] for p in ground_truth.glob("*_mask.png")}
-        for stem in sorted(bad_stems - mask_stems):
+        bad_images = {p.stem: p for p in bad.glob("*.png")}
+        masks = {p.stem[: -len("_mask")]: p for p in ground_truth.glob("*_mask.png")}
+        for stem in sorted(set(bad_images) - set(masks)):
             problems.append(f"{category}/test_public: no mask for bad image {stem}.png")
-        for stem in sorted(mask_stems - bad_stems):
+        for stem in sorted(set(masks) - set(bad_images)):
             problems.append(f"{category}/test_public: orphan mask {stem}_mask.png has no image")
+
+        # Matching stems is not enough. A truncated mask, or one whose dimensions differ
+        # from its image, passes stem matching and then kills the run hours later inside
+        # `aggregate._load_pair`, which compares mask.shape against the anomaly map's (i.e.
+        # the image's) shape. Both are cheap to catch here: the sizes come from the PNG
+        # headers, and `verify()` checks the chunk CRCs without decoding pixels.
+        for stem in sorted(set(masks) & set(bad_images)):
+            mask_path, image_path = masks[stem], bad_images[stem]
+            mask_size = _png_size(mask_path)
+            if mask_size is None:
+                problems.append(
+                    f"{category}/test_public: mask {mask_path} is not a readable PNG"
+                )
+                continue
+            image_size = _png_size(image_path)
+            if image_size is None:
+                continue  # already reported by the image loop above
+            if mask_size != image_size:
+                problems.append(
+                    f"{category}/test_public: mask {mask_path} is "
+                    f"{mask_size[0]}x{mask_size[1]} but its image {image_path} is "
+                    f"{image_size[0]}x{image_size[1]}"
+                )
 
     return problems
 

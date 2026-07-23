@@ -36,6 +36,49 @@ def test_a_missing_mask_is_reported(tmp_path):
     assert any("mask" in p.lower() for p in problems)
 
 
+def test_a_truncated_mask_is_reported(tmp_path):
+    """Masks were only matched by stem, so a mask that cannot be opened passed as OK.
+
+    That failure then surfaced hours later inside `aggregate._load_pair`, which is exactly
+    the mid-run death this script exists to prevent.
+    """
+    cat = build_category(tmp_path, "vial")
+    mask = next((cat / "test_public" / "ground_truth" / "bad").glob("*.png"))
+    mask.write_bytes(mask.read_bytes()[: len(mask.read_bytes()) // 2])
+    problems = check_category(tmp_path, "vial")
+    assert any(mask.name in p for p in problems), problems
+
+
+def test_a_mask_that_is_not_a_png_at_all_is_reported(tmp_path):
+    cat = build_category(tmp_path, "vial")
+    mask = next((cat / "test_public" / "ground_truth" / "bad").glob("*.png"))
+    mask.write_bytes(b"not a real png")
+    problems = check_category(tmp_path, "vial")
+    assert any(mask.name in p for p in problems), problems
+
+
+def test_a_mask_whose_dimensions_differ_from_its_image_is_reported(tmp_path):
+    """`_load_pair` raises when mask.shape != amap.shape, and the amap has the image's shape.
+
+    A mask of the wrong size is therefore a guaranteed mid-run failure, and stem matching
+    alone cannot see it.
+    """
+    cat = build_category(tmp_path, "vial")
+    mask = next((cat / "test_public" / "ground_truth" / "bad").glob("*.png"))
+    Image.fromarray(np.zeros((3, 4), dtype=np.uint8), mode="L").save(mask)  # images are 6x8
+    problems = check_category(tmp_path, "vial")
+    assert any(mask.name in p for p in problems), problems
+    assert any("4x3" in p or "(3, 4)" in p for p in problems), problems
+
+
+def test_main_returns_nonzero_for_a_mask_that_does_not_match_its_image(tmp_path, capsys):
+    cat = build_category(tmp_path, "vial")
+    mask = next((cat / "test_public" / "ground_truth" / "bad").glob("*.png"))
+    Image.fromarray(np.zeros((3, 4), dtype=np.uint8), mode="L").save(mask)
+    assert main(["--root", str(tmp_path)]) == 1
+    assert mask.name in capsys.readouterr().out
+
+
 def test_a_corrupt_image_is_reported(tmp_path):
     cat = build_category(tmp_path, "vial")
     corrupt = next((cat / "train" / "good").glob("*.png"))
