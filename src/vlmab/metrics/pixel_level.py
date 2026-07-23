@@ -111,10 +111,26 @@ def pro_thresholds(
     merely convergent, but its cost scales with the number of distinct scores. A
     single 5MP MVTec AD 2 image with float32 maps yields millions of them, and PRO
     is evaluated per region at every threshold, so the sweep would be several orders
-    of magnitude more expensive than the fixed 200-point grid the protocol assumes,
-    while moving the result by at most ~2e-3 (0.2 AU-PRO points) on the hardest
-    fixture in the suite and by exactly 0.0 on every other one. Quantile sampling is
-    chosen for that reason.
+    of magnitude more expensive than the fixed 200-point grid the protocol assumes.
+    Quantile sampling is chosen for that reason.
+
+    What quantile sampling costs, stated precisely because an earlier version of
+    this docstring understated it. Grid points can only ever land *on* normal-pixel
+    values, so a threshold that falls strictly between two adjacent normal order
+    statistics is unreachable at any `num_thresholds`. Where a region's scores sit
+    in such a gap, the difference from an exact sweep does not shrink as the grid
+    is refined: it is structural, not coarseness. On the deliberately small,
+    hand-built fixture in `tests/test_aggregate.py` the gap is 5.65 AU-PRO points
+    (0.8305 here against 0.8870 exact), identical at `num_thresholds` of 200,
+    2_000, 50_000 and 500_000.
+
+    That fixture is a worst case by construction -- a handful of pixels, so
+    adjacent normal order statistics are far apart. On real data the error is
+    bounded by the anomalous score mass lying between adjacent normal values, and
+    with tens of millions of normal pixels those gaps are around one float16 ULP,
+    so no reported number is affected. The bound to remember is therefore about the
+    density of normal pixels, not about `num_thresholds`: this approximation is
+    safe on full-resolution categories and unsafe on toy inputs.
 
     Two deliberate properties are preserved:
 

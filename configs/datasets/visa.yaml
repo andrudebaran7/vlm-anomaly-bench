@@ -1,4 +1,5 @@
 name: visa
 root: data/visa
 role: reproduction_sanity_check   # protocol §2
-image_size: 448
+inference_size: 448
+evaluation_resolution: native   # protocol §4: masks are never downsampled

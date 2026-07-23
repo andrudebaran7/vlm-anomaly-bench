@@ -133,7 +133,9 @@ def test_image_metrics_are_not_interchangeable_columns(tmp_path):
     assert out["i_f1max"] == pytest.approx(0.8)
     assert out["n"] == 4
 
-    # Recomputed independently of the implementation's own wiring.
+    # Cross-check of WIRING only: this calls the same metric functions that
+    # pixel_metrics/image_metrics call, so it catches a transposed or misrouted
+    # column, not a wrong metric. The closed-form literals above carry correctness.
     labels = df["label"].to_numpy()
     scores = df["image_score"].to_numpy()
     assert out["i_auroc"] == pytest.approx(i_auroc(labels, scores))
@@ -173,7 +175,7 @@ def test_pixel_metrics_are_not_interchangeable_columns(tmp_path):
     assert out["au_pro_005"] == pytest.approx(0.5)
     assert out["n"] == 4
 
-    # Recomputed independently of the implementation's own wiring: same arrays, metric
+    # Cross-check of WIRING only (same metric functions the module calls): same arrays, metric
     # functions called directly, argument order and fpr_limit spelled out here.
     assert out["p_auroc"] == pytest.approx(p_auroc(masks, amaps))
     assert out["seg_f1max"] == pytest.approx(seg_f1max(masks, amaps))
