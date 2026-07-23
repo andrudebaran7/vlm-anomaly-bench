@@ -1,4 +1,9 @@
 name: mvtec_ad2
 root: data/mvtec_ad2
-splits: UNVERIFIED_read_from_official_dataset_class   # docs/datasets-access.md
+splits:                    # verified from the official download page, 2026-07-23
+  train: train                          # defect-free
+  validation: validation                # defect-free
+  test_public: test_public              # all lighting conditions, pixel GT available
+  test_private: test_private            # regular lighting, GT withheld (eval server only)
+  test_private_mixed: test_private_mixed  # same scenes as test_private, varied lighting
 image_size: 448
