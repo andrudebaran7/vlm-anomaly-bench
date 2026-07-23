@@ -54,17 +54,57 @@ def _load_pair(row: Any) -> tuple[np.ndarray, np.ndarray]:
     return mask, amap
 
 
-def pixel_metrics(df: pd.DataFrame, max_bytes: int = 2_000_000_000) -> dict[str, float]:
+#: Peak process memory, in bytes per pooled pixel, that one `pixel_metrics` call costs.
+#
+# NOT the size of the arrays this module holds: those are only 5 B/px (a float32 anomaly map,
+# 4 B/px after `_load_pair`'s upcast, plus a uint8 mask, 1 B/px, real or synthesised). The
+# metrics themselves allocate an order of magnitude more on top, and that memory is resident
+# at the same time as the maps, so a guard that ignores it does not guard anything:
+#
+#   * `_flatten` (used by `p_auroc` and `seg_f1max`) builds *pooled copies* of everything it
+#     was handed — a bool array over all pixels and a fresh float32 concatenation of every
+#     map — while the per-image lists stay alive in the caller;
+#   * sklearn then sorts the pooled scores with an int64 `argsort` (8 B/px for the indices
+#     plus a permuted copy of the scores) and accumulates float64 cumulative sums (8 B/px
+#     each) inside `_binary_clf_curve`.
+#
+# Measured on this machine (peak RSS above baseline via /proc VmHWM, one clean interpreter per
+# point, float16 maps on disk as the runner writes them, 8 images per workload):
+#
+#   whole pixel_metrics call: 64.6 B/px @0.5 Mpx, 62.7 @1, 62.5 @2, 60.9 @4, 60.8 @6, 60.7 @8
+#   per metric, on top of the resident arrays: p_auroc 56.4, seg_f1max 36.9, au_pro 17.0
+#
+# The total tracks p_auroc's peak (5 + 56) because the metrics run one after another; the
+# slow drift with size is fixed interpreter cost being amortised. 64 is the measured worst
+# case rounded up, with ~5% margin over the asymptote. `test_bytes_per_pixel_covers_the_
+# measured_peak` re-measures it, so an implementation change that raises the real cost fails.
+BYTES_PER_PIXEL = 64
+
+
+def pixel_metrics(df: pd.DataFrame, max_bytes: int = 6_000_000_000) -> dict[str, float]:
     """P-AUROC, SegF1max and AU-PRO at both FPR limits, over rows that saved a map.
 
     `max_bytes` is a guard, not a tuning knob: exceeding it raises rather than letting the
-    session get OOM-killed with no diagnostic. It counts what the loop below actually holds in
-    memory at once for every row: a float32 anomaly map (4 bytes/pixel, `_load_pair` upcasts on
-    load) *and* a uint8 mask (1 byte/pixel, real or synthesised for a missing mask file) — 5
-    bytes per pixel, not the map alone. Because it is a byte count, it can be sized directly
-    against a machine's free RAM (e.g. leave headroom below Colab's ~12.7 GB free-tier ceiling
-    for the interpreter, pandas/pyarrow, and everything else in the process). Raise it
-    deliberately if the machine can take it.
+    session get OOM-killed with no diagnostic.
+
+    What it means, precisely: an estimate of this call's **peak resident memory above the
+    caller's own baseline**, computed as `BYTES_PER_PIXEL` (64, measured — see the constant)
+    times the number of pooled pixels across every map in `df`. It is not the size of the
+    maps on disk (float16, 2 B/px) and not the size of the arrays this function holds
+    (5 B/px); the metrics' own working set dominates both.
+
+    How to size it: take the machine's *free* RAM, subtract what the rest of the process needs
+    (interpreter, pandas/pyarrow, the shard being aggregated, whatever the notebook already
+    holds), and leave a margin — this is an estimate of a peak, not a hard allocator limit. On
+    Colab's free tier (~12.7 GB total, ~2 GB already gone before aggregation starts) anything
+    above ~8 GB is a number the machine cannot honour.
+
+    The 6 GB default is chosen against the real target rather than as a round number. Vial's
+    `test_public` is 140 images of 1400x1900 = 372 Mpx = 23.8 GB, which cannot run on Colab at
+    all and must be refused; one lighting condition of it is ~20 images = 53 Mpx = 3.4 GB,
+    which is exactly the per-condition aggregation this module exists to do and must be
+    allowed. 6 GB separates the two with room on both sides while staying under half of
+    Colab's ceiling. Raise it deliberately, against measured free RAM, if a machine can take it.
     """
     if "map_path" not in df.columns:
         return {"n": 0}
@@ -72,18 +112,18 @@ def pixel_metrics(df: pd.DataFrame, max_bytes: int = 2_000_000_000) -> dict[str,
     if with_maps.empty:
         return {"n": 0}
 
-    total_bytes = 0
+    total_pixels = 0
     for path in with_maps["map_path"]:
-        shape = np.load(path, mmap_mode="r").shape
-        pixels = int(np.prod(shape))
-        total_bytes += pixels * 4  # amap, resident as float32 after _load_pair's upcast
-        total_bytes += pixels * 1  # mask, resident as uint8 (real or a missing-mask np.zeros)
+        total_pixels += int(np.prod(np.load(path, mmap_mode="r").shape))
+    total_bytes = total_pixels * BYTES_PER_PIXEL
     if total_bytes > max_bytes:
         raise ValueError(
-            f"{total_bytes:,} bytes ({total_bytes / 1e9:.2f} GB) of masks+maps held at once "
-            f"exceeds max_bytes={max_bytes:,} ({max_bytes / 1e9:.2f} GB). Aggregate a smaller "
-            "group (e.g. one lighting condition at a time) or raise the budget if this machine "
-            "genuinely has the memory."
+            f"{total_pixels:,} pooled pixels need about {total_bytes:,} bytes "
+            f"({total_bytes / 1e9:.1f} GB) at peak ({BYTES_PER_PIXEL} bytes/pixel: the masks "
+            f"and maps held at once, plus the pooled copies and int64/float64 working arrays "
+            f"the metrics allocate on top of them), which exceeds max_bytes={max_bytes:,} "
+            f"({max_bytes / 1e9:.1f} GB). Aggregate a smaller group (e.g. one lighting "
+            "condition at a time) or raise the budget if this machine genuinely has the memory."
         )
 
     masks, amaps = [], []
@@ -104,7 +144,7 @@ def pixel_metrics(df: pd.DataFrame, max_bytes: int = 2_000_000_000) -> dict[str,
 def aggregate(
     df: pd.DataFrame,
     by: str | None = None,
-    max_bytes: int = 2_000_000_000,
+    max_bytes: int = 6_000_000_000,
 ) -> pd.DataFrame:
     """One metrics row per group, or a single row when `by` is None.
 
