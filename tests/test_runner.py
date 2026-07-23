@@ -287,6 +287,36 @@ def test_resume_overwrites_orphaned_maps_from_a_crashed_attempt(
     assert np.load(orphan).shape == (8, 8), "orphan was not recomputed over"
 
 
+def test_runner_records_the_mask_path_when_the_sample_has_one(tmp_path, counting_method):
+    """Pixel metrics are computed from the shard later, so the shard must say where the
+    ground truth is; re-walking the dataset to find it would be a second source of truth."""
+    class _WithMasks(AnomalyDataset):
+        name = "masked"
+
+        def categories(self):
+            return ["alpha"]
+
+        def samples(self, split, category=None):
+            yield Sample(image_path=Path("/fake/alpha/bad/000_regular.png"), label=1,
+                         category="alpha", mask_path=Path("/fake/gt/000_regular_mask.png"),
+                         meta={})
+            yield Sample(image_path=Path("/fake/alpha/good/000_regular.png"), label=0,
+                         category="alpha", mask_path=None, meta={})
+
+        def load_image(self, sample):
+            return np.zeros((4, 4, 3), dtype=np.uint8)
+
+    store = ResultStore(tmp_path)
+    run_evaluation(_WithMasks(), counting_method, store, {"seed": 0})
+    # pandas>=3 defaults to a NaN-backed "str" dtype for object columns, so a missing
+    # string entry reads back as NaN rather than None even though the column (and the
+    # parquet file itself) stores a proper null. Real consumers read under this
+    # default, so assert against it rather than opting into legacy behaviour.
+    df = pd.read_parquet(store.path_for("masked", "counting", "alpha"))
+    assert df["mask_path"][0] == "/fake/gt/000_regular_mask.png"
+    assert pd.isna(df["mask_path"][1])
+
+
 def test_empty_category_does_not_create_a_map_directory(tmp_path, counting_method):
     """store.write() rejects an empty shard; the map directory must not have been
     created on the way to that rejection."""
@@ -308,3 +338,27 @@ def test_empty_category_does_not_create_a_map_directory(tmp_path, counting_metho
     with pytest.raises(ValueError):
         run_evaluation(_Empty(), counting_method, store, {"seed": 0}, maps_dir=maps)
     assert not maps.exists() or not list(maps.rglob("*.npy"))
+
+
+def test_default_split_is_a_real_mvtec_ad2_split(tmp_path, counting_method):
+    """`split="test"` is not one of MVTec AD 2's five splits.
+
+    Any caller relying on the default got a ValueError out of the loader before a single
+    sample was read, so the default was not merely unhelpful — it could not work at all.
+    The default has to be `test_public`: it is the only split with pixel ground truth and
+    the only one every local metric is computed on.
+    """
+    from mvtec_tree import build_category
+
+    from vlmab.datasets.mvtec_ad2 import MVTecAD2
+
+    build_category(tmp_path / "data", "vial", conditions=("regular",), n_good=1, n_bad=1)
+    dataset = MVTecAD2(tmp_path / "data")
+    store = ResultStore(tmp_path / "results")
+
+    written = run_evaluation(dataset, counting_method, store, {"seed": 0})
+
+    assert len(written) == 1
+    df = pd.read_parquet(written[0])
+    assert set(df["split"]) == {"test_public"}
+    assert sorted(df["label"]) == [0, 1]  # one good, one bad, i.e. the public test split

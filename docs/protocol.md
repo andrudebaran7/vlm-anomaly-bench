@@ -25,6 +25,10 @@ overlap table required in the paper).
   `test_private_mixed` (the same scenes under varied lighting) are a controlled paired
   comparison whose ground truth is withheld; they are reported only if server access is
   obtained. Their absence narrows the lighting result, it does not remove it.
+
+  Samples from `test_private` and `test_private_mixed` carry no label, since their ground truth
+  is withheld. The loader marks them `label = -1` and every accuracy metric refuses to run on
+  them rather than silently treating unknown as normal.
 - **Real-IAD Variety** — out of scope for this study. The dataset is publicly available (no
   application required), but its scale (198,950 images; the parent Real-IAD release is 622 GB, 53 GB
   for the 1024px variant) is incompatible with the Colab compute budget. Recorded as a stated
@@ -41,6 +45,24 @@ from the original papers. The MLLM baseline uses one fixed structured prompt + o
 rubric for all datasets, published in `configs/methods/mllm_qwen.yaml` — no per-category prompt
 engineering.
 
+- **Colour channels.** MVTec AD 2 images are grayscale in at least one category (Vial: 8-bit,
+  1400x1900). Every method in this study expects 3-channel RGB input, so the loader converts
+  with PIL's `convert("RGB")`, which replicates the single channel and passes an already-RGB
+  image through unchanged. This is applied identically to every method and every category, so
+  it cannot advantage one method over another. It is recorded here because it is a
+  preprocessing decision that touches every reported number.
+
+- **Anomaly-map storage precision.** The runner persists each anomaly map to disk as
+  **float16** (`runner.run_evaluation`); aggregation reads it back and upcasts to float32
+  before any metric sees it. This halves the map footprint, which is what makes a category of
+  2.66 MP maps fit a Colab session's disk and memory at all. Measured effect on the reported
+  numbers, comparing every pixel metric computed from float32 maps against the same maps
+  round-tripped through float16 (5 random fixtures, 6 images of 256x256, multiple regions per
+  image): P-AUROC 1.4e-06, AU-PRO@0.3 3.9e-05, AU-PRO@0.05 2.4e-05, SegF1max 8.0e-04 — worst
+  case an order of magnitude inside the ±1.0-point (0.01) tolerance this protocol uses
+  elsewhere, and applied identically to every method and category. Recorded here, like the
+  colour-channel rule above, because it is a decision that touches every pixel-level number.
+
 ## 4. Metrics
 
 - Image level: I-AUROC, I-AP, I-F1max.
@@ -49,6 +71,20 @@ engineering.
   parameter count, peak VRAM. API-based baselines report tokens + cost instead of VRAM.
 - The official MVTec AD 2 metric set is adopted as the evaluation server defines it. *(Exact metric
   names and definitions are read from the server's submission documentation at download time.)*
+- **Evaluation resolution.** Pixel metrics are computed at the dataset's native resolution
+  (1400x1900 for Vial), against unmodified ground-truth masks. Methods may run inference at
+  whatever internal resolution they were designed for, but every adapter returns its anomaly map
+  upsampled to native resolution; nothing downsamples a mask. Downsampling masks would be cheaper,
+  but it shrinks small defect regions and AU-PRO weights every connected region equally — a tiny
+  defect can vanish entirely and take its equal share of the score with it. Since AU-PRO is the
+  metric this benchmark rests on, that cost is not acceptable to save memory.
+- **Aggregation granularity.** Pixel metrics are aggregated **per lighting condition**, not over a
+  whole category at once. This is what the study wants scientifically — MVTec AD 2 exists to
+  measure robustness to lighting shift — and it is also what makes native-resolution evaluation
+  possible on the reference platform: one condition is 20 images (about 53 Mpx, ~3.4 GB peak),
+  where a whole category is 140 images (372 Mpx, ~23.8 GB) and does not fit. Per-category means are
+  composed from the per-condition results rather than computed in one pass. `pixel_metrics`
+  enforces this with a memory budget that refuses the whole-category case.
 
 ## 5. Hardware & software
 
@@ -89,3 +125,21 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   pixel ground truth, so the lighting-shift analysis does not depend on evaluation-server
   access. Official metric names remain unverified pending the server's submission
   documentation. No evaluation rule changed.
+- 2026-07-23 — v0.2.2. Layout verified against the real archive rather than the download page:
+  five splits with the subdirectory structure recorded in docs/datasets-access.md, lighting
+  condition encoded in every filename, masks named `{stem}_mask.png`. Adds two preprocessing
+  rules that touch every number: grayscale images are converted to 3-channel RGB (§3), and
+  withheld-label samples are marked -1 and excluded from accuracy metrics (§2). Official metric
+  names still unverified. No evaluation rule changed.
+- 2026-07-23 — v0.2.3. Documentation only. Records the float16 anomaly-map storage precision
+  in §3, with the measured effect on every pixel metric (worst case 8.0e-04, on SegF1max),
+  because it is the same class of decision as the RGB conversion already recorded there: a
+  preprocessing choice that touches every reported pixel-level number. The downcast itself is
+  unchanged and predates this entry. No evaluation rule changed.
+- 2026-07-23 — v0.2.4. Records the evaluation resolution and aggregation granularity in §4, both
+  decided before any result was computed. Pixel metrics run at native resolution against
+  unmodified masks (adapters upsample; masks are never downsampled, because shrinking regions
+  distorts AU-PRO, which weights every region equally). Aggregation is per lighting condition,
+  which the study wants anyway and which is what makes native resolution fit the reference
+  platform's memory. This constrains how numbers are produced, so unlike v0.2.1-v0.2.3 it is not
+  documentation-only.

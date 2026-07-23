@@ -7,6 +7,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
-      - run: pip install numpy scipy scikit-learn pandas pyarrow pytest
+      - run: pip install numpy scipy scikit-learn pandas pyarrow pillow pytest
       - run: pip install -e . --no-deps
       - run: pytest -q

@@ -6,4 +6,9 @@ splits:                    # verified from the official download page, 2026-07-2
   test_public: test_public              # all lighting conditions, pixel GT available
   test_private: test_private            # regular lighting, GT withheld (eval server only)
   test_private_mixed: test_private_mixed  # same scenes as test_private, varied lighting
-image_size: 448
+# Inference resolution is a per-method concern; adapters may resize internally.
+# Anomaly maps are ALWAYS returned at native resolution — protocol §4 forbids
+# downsampling ground-truth masks, so a 448x448 map would fail shape validation
+# in vlmab.eval.aggregate._load_pair.
+inference_size: 448
+evaluation_resolution: native

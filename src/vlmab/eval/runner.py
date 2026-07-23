@@ -98,7 +98,10 @@ def run_evaluation(
     store: ResultStore,
     meta: Mapping[str, Any],
     categories: Iterable[str] | None = None,
-    split: str = "test",
+    # MVTec AD 2 has no split called "test"; the previous default raised out of the loader
+    # for every caller that took it. test_public is the split with pixel ground truth, i.e.
+    # the one every locally computed metric in this study is defined on.
+    split: str = "test_public",
     maps_dir: Path | None = None,
     device: str = "cuda",
 ) -> list[Path]:
@@ -141,6 +144,9 @@ def run_evaluation(
                 "label": int(sample.label),
                 "image_score": float(prediction.image_score),
                 "split": split,
+                # Where the ground truth lives, so aggregation can compute pixel metrics from
+                # the shard alone instead of re-walking the dataset for a second time.
+                "mask_path": str(sample.mask_path) if sample.mask_path is not None else None,
             }
             row.update({f"meta_{k}": v for k, v in sample.meta.items() if k != "split"})
 

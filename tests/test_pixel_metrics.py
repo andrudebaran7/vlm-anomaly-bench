@@ -108,11 +108,6 @@ def test_au_pro_weights_regions_equally_not_by_area():
     assert au_pro([big, tiny], [found, missed]) == pytest.approx(0.5, abs=1e-6)
 
 
-def test_au_pro_constant_map_is_zero():
-    mask = _one_region()
-    assert au_pro([mask], [np.full(mask.shape, 0.5, dtype=np.float32)]) == 0.0
-
-
 def test_au_pro_signal_beats_noise():
     mask = _one_region()
     rng = np.random.default_rng(0)
@@ -341,3 +336,70 @@ def test_au_pro_matches_naive_reference(fpr_limit):
         got = au_pro(masks, amaps, fpr_limit=fpr_limit)
         want = _naive_au_pro(masks, amaps, fpr_limit=fpr_limit)
         assert got == pytest.approx(want, abs=1e-9)
+
+
+# --- Degenerate inputs must be distinguishable from a real score -------------------
+#
+# Every one of these used to return 0.0, which is a perfectly plausible AU-PRO value: in
+# the reviewer's real Vial run every lighting group reported au_pro_005 = 0.0 and nothing
+# in the number said whether the metric had been computed or abandoned. They now raise,
+# matching what p_auroc already does for a single-class category and for the same reason:
+# a nan would be silently skipped by any nan-skipping aggregation (df.mean()) and a 0.0 is
+# indistinguishable from a genuine result.
+
+
+@pytest.mark.parametrize("fpr_limit", [0.3, 0.05])
+def test_au_pro_refuses_an_all_normal_category(fpr_limit):
+    """PRO is a mean over ground-truth regions; with no regions there is nothing to average."""
+    rng = np.random.default_rng(0)
+    empty = np.zeros((20, 20), dtype=np.uint8)
+    with pytest.raises(ValueError, match="no anomalous regions"):
+        au_pro([empty], [rng.random((20, 20)).astype(np.float32)], fpr_limit=fpr_limit)
+
+
+@pytest.mark.parametrize("fpr_limit", [0.3, 0.05])
+def test_au_pro_refuses_an_all_anomalous_category(fpr_limit):
+    """FPR is a fraction of the normal pixels; with none, the x axis does not exist."""
+    rng = np.random.default_rng(0)
+    full = np.ones((20, 20), dtype=np.uint8)
+    with pytest.raises(ValueError, match="no normal pixels"):
+        au_pro([full], [rng.random((20, 20)).astype(np.float32)], fpr_limit=fpr_limit)
+
+
+@pytest.mark.parametrize("fpr_limit", [0.3, 0.05])
+def test_au_pro_refuses_a_constant_anomaly_map(fpr_limit):
+    """A map with one value has no operating points; 0.0 there was a convention, not a
+    measurement (it is what the flat extension to fpr_limit happens to produce)."""
+    mask = _one_region()
+    with pytest.raises(ValueError, match="constant"):
+        au_pro([mask], [np.full(mask.shape, 0.5, dtype=np.float32)], fpr_limit=fpr_limit)
+
+
+@pytest.mark.parametrize("fpr_limit", [0.3, 0.05])
+def test_au_pro_refuses_when_no_threshold_survives(fpr_limit, monkeypatch):
+    """Defensive branch, reached here by monkeypatching the grid away.
+
+    It is unreachable on real data: `pro_thresholds` always emits
+    `nextafter(max_normal)`, which is strictly greater than the global minimum, so at least
+    one threshold always survives the `> score_min` filter. It is kept (and now raises
+    rather than returning 0.0) so that a future change to threshold selection cannot make
+    "no curve at all" look like a measured zero.
+    """
+    monkeypatch.setattr(
+        "vlmab.metrics.pixel_level.pro_thresholds",
+        lambda *args, **kwargs: np.empty(0, dtype=np.float64),
+    )
+    mask = _one_region()
+    with pytest.raises(ValueError, match="no usable threshold"):
+        au_pro([mask], [mask.astype(np.float32)], fpr_limit=fpr_limit)
+
+
+@pytest.mark.parametrize("fpr_limit", [0.3, 0.05])
+def test_au_pro_still_computes_when_every_normal_pixel_sits_at_the_map_minimum(fpr_limit):
+    """Not degenerate, and must not be swept into the refusal: the curve is a single point
+    at FPR 0 with full region coverage, which is a real (perfect) result."""
+    mask = np.zeros((10, 10), dtype=np.uint8)
+    mask[0, 0] = 1
+    amap = np.zeros((10, 10), dtype=np.float32)
+    amap[0, 0] = 1.0
+    assert au_pro([mask], [amap], fpr_limit=fpr_limit) == pytest.approx(1.0)

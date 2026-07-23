@@ -1,0 +1,172 @@
+"""Turn result shards into metrics.
+
+Kept separate from the runner on purpose: the runner streams predictions to disk one category
+at a time and never holds a grid's worth of anomaly maps in memory. Aggregation is where maps
+are read back, so it is also where the memory ceiling has to be enforced — Colab's free tier has
+roughly 12.7 GB of host RAM, and a category of 2.66 MP images adds up fast.
+"""
+from typing import Any
+
+import numpy as np
+import pandas as pd
+
+from vlmab.datasets.mvtec_ad2 import LABEL_UNKNOWN
+from vlmab.metrics.image_level import i_ap, i_auroc, i_f1max
+from vlmab.metrics.pixel_level import au_pro, p_auroc, seg_f1max
+
+
+def image_metrics(df: pd.DataFrame) -> dict[str, float]:
+    """I-AUROC, I-AP and I-F1max over a shard's image scores."""
+    labels = df["label"].to_numpy()
+    if (labels == LABEL_UNKNOWN).any():
+        raise ValueError(
+            f"{int((labels == LABEL_UNKNOWN).sum())} unlabelled rows (label "
+            f"{LABEL_UNKNOWN}): these come from the private splits, whose ground truth is "
+            "withheld. Scoring them would mean treating unknown as normal."
+        )
+    if len(np.unique(labels)) < 2:
+        raise ValueError(
+            "image metrics need both normal and anomalous samples; this group has only "
+            f"label {int(labels[0])}"
+        )
+    scores = df["image_score"].to_numpy(dtype=np.float64)
+    return {
+        "i_auroc": i_auroc(labels, scores),
+        "i_ap": i_ap(labels, scores),
+        "i_f1max": i_f1max(labels, scores),
+        "n": int(len(df)),
+    }
+
+
+def _load_pair(row: Any) -> tuple[np.ndarray, np.ndarray]:
+    """One (mask, anomaly map) pair. A row with no mask file has no anomalous pixels."""
+    amap = np.load(row.map_path).astype(np.float32)
+    if row.mask_path is None or (isinstance(row.mask_path, float) and np.isnan(row.mask_path)):
+        return np.zeros(amap.shape, dtype=np.uint8), amap
+    from PIL import Image
+
+    with Image.open(row.mask_path) as im:
+        mask = (np.asarray(im.convert("L")) > 0).astype(np.uint8)
+    if mask.shape != amap.shape:
+        raise ValueError(
+            f"mask {row.mask_path} is {mask.shape} but its anomaly map is {amap.shape}"
+        )
+    return mask, amap
+
+
+#: Peak process memory, in bytes per pooled pixel, that one `pixel_metrics` call costs.
+#
+# NOT the size of the arrays this module holds: those are only 5 B/px (a float32 anomaly map,
+# 4 B/px after `_load_pair`'s upcast, plus a uint8 mask, 1 B/px, real or synthesised). The
+# metrics themselves allocate an order of magnitude more on top, and that memory is resident
+# at the same time as the maps, so a guard that ignores it does not guard anything:
+#
+#   * `_flatten` (used by `p_auroc` and `seg_f1max`) builds *pooled copies* of everything it
+#     was handed — a bool array over all pixels and a fresh float32 concatenation of every
+#     map — while the per-image lists stay alive in the caller;
+#   * sklearn then sorts the pooled scores with an int64 `argsort` (8 B/px for the indices
+#     plus a permuted copy of the scores) and accumulates float64 cumulative sums (8 B/px
+#     each) inside `_binary_clf_curve`.
+#
+# Measured on this machine (peak RSS above baseline via /proc VmHWM, one clean interpreter per
+# point, float16 maps on disk as the runner writes them, 8 images per workload):
+#
+#   whole pixel_metrics call: 64.6 B/px @0.5 Mpx, 62.7 @1, 62.5 @2, 60.9 @4, 60.8 @6, 60.7 @8
+#   per metric, on top of the resident arrays: p_auroc 56.4, seg_f1max 36.9, au_pro 17.0
+#
+# The total tracks p_auroc's peak (5 + 56) because the metrics run one after another; the
+# slow drift with size is fixed interpreter cost being amortised. 64 is the measured worst
+# case rounded up, with ~5% margin over the asymptote. `test_bytes_per_pixel_covers_the_
+# measured_peak` re-measures it, so an implementation change that raises the real cost fails.
+BYTES_PER_PIXEL = 64
+
+
+def pixel_metrics(df: pd.DataFrame, max_bytes: int = 6_000_000_000) -> dict[str, float]:
+    """P-AUROC, SegF1max and AU-PRO at both FPR limits, over rows that saved a map.
+
+    `max_bytes` is a guard, not a tuning knob: exceeding it raises rather than letting the
+    session get OOM-killed with no diagnostic.
+
+    What it means, precisely: an estimate of this call's **peak resident memory above the
+    caller's own baseline**, computed as `BYTES_PER_PIXEL` (64, measured — see the constant)
+    times the number of pooled pixels across every map in `df`. It is not the size of the
+    maps on disk (float16, 2 B/px) and not the size of the arrays this function holds
+    (5 B/px); the metrics' own working set dominates both.
+
+    How to size it: take the machine's *free* RAM, subtract what the rest of the process needs
+    (interpreter, pandas/pyarrow, the shard being aggregated, whatever the notebook already
+    holds), and leave a margin — this is an estimate of a peak, not a hard allocator limit. On
+    Colab's free tier (~12.7 GB total, ~2 GB already gone before aggregation starts) anything
+    above ~8 GB is a number the machine cannot honour.
+
+    The 6 GB default is chosen against the real target rather than as a round number. Vial's
+    `test_public` is 140 images of 1400x1900 = 372 Mpx = 23.8 GB, which cannot run on Colab at
+    all and must be refused; one lighting condition of it is ~20 images = 53 Mpx = 3.4 GB,
+    which is exactly the per-condition aggregation this module exists to do and must be
+    allowed. 6 GB separates the two with room on both sides while staying under half of
+    Colab's ceiling. Raise it deliberately, against measured free RAM, if a machine can take it.
+    """
+    if "map_path" not in df.columns:
+        return {"n": 0}
+    with_maps = df[df["map_path"].notna()]
+    if with_maps.empty:
+        return {"n": 0}
+
+    total_pixels = 0
+    for path in with_maps["map_path"]:
+        total_pixels += int(np.prod(np.load(path, mmap_mode="r").shape))
+    total_bytes = total_pixels * BYTES_PER_PIXEL
+    if total_bytes > max_bytes:
+        raise ValueError(
+            f"{total_pixels:,} pooled pixels need about {total_bytes:,} bytes "
+            f"({total_bytes / 1e9:.1f} GB) at peak ({BYTES_PER_PIXEL} bytes/pixel: the masks "
+            f"and maps held at once, plus the pooled copies and int64/float64 working arrays "
+            f"the metrics allocate on top of them), which exceeds max_bytes={max_bytes:,} "
+            f"({max_bytes / 1e9:.1f} GB). Aggregate a smaller group (e.g. one lighting "
+            "condition at a time) or raise the budget if this machine genuinely has the memory."
+        )
+
+    masks, amaps = [], []
+    for row in with_maps.itertuples():
+        mask, amap = _load_pair(row)
+        masks.append(mask)
+        amaps.append(amap)
+
+    return {
+        "p_auroc": p_auroc(masks, amaps),
+        "seg_f1max": seg_f1max(masks, amaps),
+        "au_pro_030": au_pro(masks, amaps, fpr_limit=0.3),
+        "au_pro_005": au_pro(masks, amaps, fpr_limit=0.05),
+        "n": int(len(with_maps)),
+    }
+
+
+def aggregate(
+    df: pd.DataFrame,
+    by: str | None = None,
+    max_bytes: int = 6_000_000_000,
+) -> pd.DataFrame:
+    """One metrics row per group, or a single row when `by` is None.
+
+    Grouping by `meta_lighting` is the headline use: MVTec AD 2 exists to measure robustness to
+    lighting shift, and that question is only answerable per condition.
+    """
+    if by is not None and by not in df.columns:
+        raise KeyError(f"no column {by!r} to group by; columns are {sorted(df.columns)}")
+
+    groups = [(None, df)] if by is None else sorted(df.groupby(by), key=lambda kv: kv[0])
+
+    records = []
+    for key, group in groups:
+        record: dict[str, Any] = {} if key is None else {by: key}
+        try:
+            record.update(image_metrics(group))
+            pixels = pixel_metrics(group, max_bytes=max_bytes)
+        except ValueError as exc:
+            if key is None:
+                raise
+            raise ValueError(f"group {by}={key!r}: {exc}") from exc
+        record.update({k: v for k, v in pixels.items() if k != "n"})
+        record["n_pixel_rows"] = pixels["n"]
+        records.append(record)
+    return pd.DataFrame(records)

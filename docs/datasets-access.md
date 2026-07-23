@@ -36,6 +36,44 @@ Verified from the official download page, 2026-07-23:
 | Fruit Jelly | 1.2 GB |
 | Vial | 0.77 GB |
 
+### Verified directory layout (read from `vial.tar.gz`, 2026-07-23)
+
+    <root>/<category>/
+      train/good/                  defect-free, lighting: regular only
+      validation/good/             defect-free, lighting: regular only
+      test_public/
+        good/                      normal, all 7 lighting conditions
+        bad/                       anomalous, all 7 lighting conditions
+        ground_truth/bad/          one mask per bad image
+      test_private/                flat, regular only, labels withheld
+      test_private_mixed/          flat, mixed only, labels withheld
+
+- Image filename: `{index:03d}_{condition}.png` (e.g. `000_shift_1.png`).
+- Mask filename: `{index:03d}_{condition}_mask.png`.
+- Lighting conditions: `regular`, `overexposed`, `underexposed`, `shift_1`..`shift_4`, and
+  `mixed` in `test_private_mixed`.
+- Vial counts: train 291, validation 41, test_public 35 good + 105 bad (+105 masks),
+  test_private 276, test_private_mixed 276.
+- **Vial images are 1400x1900, 8-bit grayscale (2.66 MP)** — not RGB. Verified for Vial only;
+  record per category as each is downloaded, since the loader must handle both.
+- `test_public/good/` and `test_public/bad/` reuse the same stems (`000_regular.png` exists in
+  both), so anomaly-map filenames must be derived from more than the stem.
+- The bundled `readme.txt` carries attribution and the CC BY-NC-SA 4.0 licence only. It does
+  **not** document the official metric definitions — those remain behind the evaluation server.
+
+Per-category image format (record on download):
+
+| Category | Resolution | Channels |
+|---|---|---|
+| Vial | 1400x1900 | 8-bit grayscale |
+| Can | ____ | ____ |
+| Fabric | ____ | ____ |
+| Fruit Jelly | ____ | ____ |
+| Rice | ____ | ____ |
+| Sheet Metal | ____ | ____ |
+| Wallplugs | ____ | ____ |
+| Walnuts | ____ | ____ |
+
 **This is why per-category downloads matter.** 30.4 GB does not fit Google Drive's free 15 GB
 tier, and re-fetching it whole every session is the dominant cost on a platform that
 disconnects. Fetching one category, evaluating every method on it, then discarding it caps peak
