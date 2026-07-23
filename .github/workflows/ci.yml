@@ -3,10 +3,14 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false            # a 3.11-only failure must not hide the 3.13 result, or vice versa
+      matrix:
+        python-version: ["3.11", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: "3.13"}
+        with: {python-version: "${{ matrix.python-version }}"}
       - run: pip install numpy scipy scikit-learn pandas pyarrow pillow pytest
       - run: pip install -e . --no-deps
       - run: pytest -q
