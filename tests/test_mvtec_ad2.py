@@ -1,3 +1,5 @@
+import re
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -75,6 +77,30 @@ def test_a_missing_mask_is_an_error_not_a_silent_none(tmp_path):
     next((cat / "test_public" / "ground_truth" / "bad").glob("*.png")).unlink()
     with pytest.raises(FileNotFoundError):
         list(MVTecAD2(tmp_path).samples("test_public", "vial"))
+
+
+def test_missing_validation_good_directory_is_an_error(tmp_path):
+    cat = build_category(tmp_path, "vial")
+    missing = cat / "validation" / "good"
+    shutil.rmtree(missing)
+    with pytest.raises(FileNotFoundError, match=re.escape(str(missing))):
+        list(MVTecAD2(tmp_path).samples("validation", "vial"))
+
+
+def test_missing_test_public_bad_directory_is_an_error(tmp_path):
+    cat = build_category(tmp_path, "vial")
+    missing = cat / "test_public" / "bad"
+    shutil.rmtree(missing)
+    with pytest.raises(FileNotFoundError, match=re.escape(str(missing))):
+        list(MVTecAD2(tmp_path).samples("test_public", "vial"))
+
+
+def test_missing_flat_private_split_directory_is_an_error(tmp_path):
+    cat = build_category(tmp_path, "vial")
+    missing = cat / "test_private"
+    shutil.rmtree(missing)
+    with pytest.raises(FileNotFoundError, match=re.escape(str(missing))):
+        list(MVTecAD2(tmp_path).samples("test_private", "vial"))
 
 
 def test_private_splits_are_unlabelled_and_flat(dataset):

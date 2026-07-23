@@ -82,6 +82,11 @@ class MVTecAD2(AnomalyDataset):
         label: int,
         ground_truth: Path | None = None,
     ) -> Iterator[Sample]:
+        if not directory.is_dir():
+            raise FileNotFoundError(
+                f"missing split directory {directory}: a complete MVTec AD 2 category always "
+                "has all five splits, so this means a partial download or interrupted extraction."
+            )
         for image_path in sorted(directory.glob("*.png")):
             mask_path = None
             if ground_truth is not None:
