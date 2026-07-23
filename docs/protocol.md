@@ -25,6 +25,10 @@ overlap table required in the paper).
   `test_private_mixed` (the same scenes under varied lighting) are a controlled paired
   comparison whose ground truth is withheld; they are reported only if server access is
   obtained. Their absence narrows the lighting result, it does not remove it.
+
+  Samples from `test_private` and `test_private_mixed` carry no label, since their ground truth
+  is withheld. The loader marks them `label = -1` and every accuracy metric refuses to run on
+  them rather than silently treating unknown as normal.
 - **Real-IAD Variety** — out of scope for this study. The dataset is publicly available (no
   application required), but its scale (198,950 images; the parent Real-IAD release is 622 GB, 53 GB
   for the 1024px variant) is incompatible with the Colab compute budget. Recorded as a stated
@@ -40,6 +44,13 @@ Priority order: (1) official code, pinned commit; (2) anomalib implementation, p
 from the original papers. The MLLM baseline uses one fixed structured prompt + one fixed scoring
 rubric for all datasets, published in `configs/methods/mllm_qwen.yaml` — no per-category prompt
 engineering.
+
+- **Colour channels.** MVTec AD 2 images are grayscale in at least one category (Vial: 8-bit,
+  1400x1900). Every method in this study expects 3-channel RGB input, so the loader converts
+  with PIL's `convert("RGB")`, which replicates the single channel and passes an already-RGB
+  image through unchanged. This is applied identically to every method and every category, so
+  it cannot advantage one method over another. It is recorded here because it is a
+  preprocessing decision that touches every reported number.
 
 ## 4. Metrics
 
@@ -89,3 +100,9 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   pixel ground truth, so the lighting-shift analysis does not depend on evaluation-server
   access. Official metric names remain unverified pending the server's submission
   documentation. No evaluation rule changed.
+- 2026-07-23 — v0.2.2. Layout verified against the real archive rather than the download page:
+  five splits with the subdirectory structure recorded in docs/datasets-access.md, lighting
+  condition encoded in every filename, masks named `{stem}_mask.png`. Adds two preprocessing
+  rules that touch every number: grayscale images are converted to 3-channel RGB (§3), and
+  withheld-label samples are marked -1 and excluded from accuracy metrics (§2). Official metric
+  names still unverified. No evaluation rule changed.
