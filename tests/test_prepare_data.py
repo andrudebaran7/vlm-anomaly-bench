@@ -80,3 +80,8 @@ def test_main_can_check_one_category(tmp_path):
     build_category(tmp_path, "vial")
     build_category(tmp_path, "can")
     assert main(["--root", str(tmp_path), "--category", "vial"]) == 0
+
+
+def test_main_reports_no_categories_found(tmp_path, capsys):
+    assert main(["--root", str(tmp_path)]) == 1
+    assert str(tmp_path) in capsys.readouterr().out
