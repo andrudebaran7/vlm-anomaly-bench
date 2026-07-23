@@ -20,7 +20,13 @@ def _write(path: Path, size: tuple[int, int], mode: str, value: int) -> None:
     if mode == "L":
         arr = np.full((h, w), value, dtype=np.uint8)
     else:
-        arr = np.full((h, w, 3), value, dtype=np.uint8)
+        # Distinct per-channel values (not np.full's uniform fill) so a loader bug that
+        # collapses, averages, or duplicates a single channel across all three is caught by
+        # a test reading back R, G, and B independently.
+        arr = np.empty((h, w, 3), dtype=np.uint8)
+        arr[..., 0] = value
+        arr[..., 1] = value + 1
+        arr[..., 2] = value + 2
     Image.fromarray(arr, mode=mode).save(path)
 
 
@@ -37,7 +43,11 @@ def build_category(
 
     Pixel values encode provenance so a test can tell which file it loaded: good images are
     filled with 10, bad with 200, private with 50, mixed with 60, train with 20, validation
-    with 30. Masks are 255 in a 2x2 corner block and 0 elsewhere.
+    with 30. In `mode="RGB"`, the three channels get distinct values `value`, `value + 1`,
+    `value + 2` (R, G, B respectively) instead of a uniform fill, so a test can verify each
+    channel is preserved independently rather than merely that some value survived. `mode="L"`
+    is unaffected: it keeps the single uniform `value`. Masks are 255 in a 2x2 corner block and
+    0 elsewhere.
     """
     cat = root / category
 

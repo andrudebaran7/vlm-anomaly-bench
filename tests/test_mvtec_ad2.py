@@ -133,7 +133,9 @@ def test_load_image_passes_rgb_through_unchanged(tmp_path):
     ds = MVTecAD2(tmp_path)
     sample = next(s for s in ds.samples("test_public", "rgbcat") if s.label == 0)
     img = ds.load_image(sample)
-    assert img.shape[2] == 3 and img[0, 0, 0] == 10
+    assert img.shape[2] == 3
+    # R, G, B are distinct in the fixture; a channel-collapsing bug would make these equal.
+    assert img[0, 0, 0] == 10 and img[0, 0, 1] == 11 and img[0, 0, 2] == 12
 
 
 def test_load_mask_is_binary_and_matches_the_image_shape(dataset):
