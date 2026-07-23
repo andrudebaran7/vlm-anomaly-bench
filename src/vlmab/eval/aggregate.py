@@ -75,10 +75,15 @@ def _load_pair(row: Any) -> tuple[np.ndarray, np.ndarray]:
 #   per metric, on top of the resident arrays: p_auroc 56.4, seg_f1max 36.9, au_pro 17.0
 #
 # The total tracks p_auroc's peak (5 + 56) because the metrics run one after another; the
-# slow drift with size is fixed interpreter cost being amortised. 64 is the measured worst
-# case rounded up, with ~5% margin over the asymptote. `test_bytes_per_pixel_covers_the_
-# measured_peak` re-measures it, so an implementation change that raises the real cost fails.
-BYTES_PER_PIXEL = 64
+# slow drift with size is fixed interpreter cost being amortised. Those figures are from the
+# dev machine (Python 3.13); the same measurement on the CI runner (Python 3.11) peaks at
+# ~66 B/px, because the transient set of sklearn's argsort/cumsum depends on the library
+# build. A guard must round the peak UP, never down, so the constant is set above the whole
+# observed spread with margin rather than at one machine's number. `test_bytes_per_pixel_
+# covers_the_measured_peak` re-measures it within a tolerance band that absorbs that spread,
+# so a real implementation change that raises the cost still fails while a 3.11-vs-3.13
+# difference does not.
+BYTES_PER_PIXEL = 80
 
 
 def pixel_metrics(df: pd.DataFrame, max_bytes: int = 6_000_000_000) -> dict[str, float]:
@@ -88,7 +93,7 @@ def pixel_metrics(df: pd.DataFrame, max_bytes: int = 6_000_000_000) -> dict[str,
     session get OOM-killed with no diagnostic.
 
     What it means, precisely: an estimate of this call's **peak resident memory above the
-    caller's own baseline**, computed as `BYTES_PER_PIXEL` (64, measured — see the constant)
+    caller's own baseline**, computed as `BYTES_PER_PIXEL` (80, measured — see the constant)
     times the number of pooled pixels across every map in `df`. It is not the size of the
     maps on disk (float16, 2 B/px) and not the size of the arrays this function holds
     (5 B/px); the metrics' own working set dominates both.
@@ -100,8 +105,8 @@ def pixel_metrics(df: pd.DataFrame, max_bytes: int = 6_000_000_000) -> dict[str,
     above ~8 GB is a number the machine cannot honour.
 
     The 6 GB default is chosen against the real target rather than as a round number. Vial's
-    `test_public` is 140 images of 1400x1900 = 372 Mpx = 23.8 GB, which cannot run on Colab at
-    all and must be refused; one lighting condition of it is ~20 images = 53 Mpx = 3.4 GB,
+    `test_public` is 140 images of 1400x1900 = 372 Mpx = 29.8 GB, which cannot run on Colab at
+    all and must be refused; one lighting condition of it is ~20 images = 53 Mpx = 4.2 GB,
     which is exactly the per-condition aggregation this module exists to do and must be
     allowed. 6 GB separates the two with room on both sides while staying under half of
     Colab's ceiling. Raise it deliberately, against measured free RAM, if a machine can take it.
