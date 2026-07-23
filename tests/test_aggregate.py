@@ -124,3 +124,15 @@ def test_aggregate_groups_by_lighting_condition(tmp_path):
 def test_aggregate_rejects_a_missing_group_column(tmp_path):
     with pytest.raises(KeyError):
         aggregate(_shard(tmp_path), by="meta_nope")
+
+
+def test_aggregate_names_the_failing_group_on_a_single_class_group(tmp_path):
+    """Seven lighting conditions in the real study; a bare error can't be traced back to one."""
+    df = _shard(tmp_path)
+    df.loc[df["meta_lighting"] == "regular", "label"] = 0
+    with pytest.raises(ValueError) as exc_info:
+        aggregate(df, by="meta_lighting")
+    message = str(exc_info.value)
+    assert "meta_lighting" in message and "regular" in message
+    assert "only label 0" in message  # the underlying reason must survive, not just the label
+    assert exc_info.value.__cause__ is not None  # original exception chained, not swallowed

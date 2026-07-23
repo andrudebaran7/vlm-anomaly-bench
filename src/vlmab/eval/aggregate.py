@@ -119,8 +119,13 @@ def aggregate(
     records = []
     for key, group in groups:
         record: dict[str, Any] = {} if key is None else {by: key}
-        record.update(image_metrics(group))
-        pixels = pixel_metrics(group, max_bytes=max_bytes)
+        try:
+            record.update(image_metrics(group))
+            pixels = pixel_metrics(group, max_bytes=max_bytes)
+        except ValueError as exc:
+            if key is None:
+                raise
+            raise ValueError(f"group {by}={key!r}: {exc}") from exc
         record.update({k: v for k, v in pixels.items() if k != "n"})
         record["n_pixel_rows"] = pixels["n"]
         records.append(record)
