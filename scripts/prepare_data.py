@@ -14,6 +14,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Sequence
 
+from PIL import Image, UnidentifiedImageError
+
 from vlmab.datasets.mvtec_ad2 import MVTecAD2, lighting_condition
 
 _EXPECTED_DIRS = {
@@ -48,6 +50,11 @@ def check_category(root: Path, category: str) -> list[str]:
                     lighting_condition(image)
                 except ValueError as exc:
                     problems.append(f"{category}/{split}: {exc}")
+                try:
+                    with Image.open(image) as im:
+                        im.verify()
+                except (UnidentifiedImageError, OSError) as exc:
+                    problems.append(f"{category}/{split}: {image} is not a readable PNG ({exc})")
 
     ground_truth = category_root / "test_public" / "ground_truth" / "bad"
     bad = category_root / "test_public" / "bad"

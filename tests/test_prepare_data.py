@@ -36,6 +36,14 @@ def test_a_missing_mask_is_reported(tmp_path):
     assert any("mask" in p.lower() for p in problems)
 
 
+def test_a_corrupt_image_is_reported(tmp_path):
+    cat = build_category(tmp_path, "vial")
+    corrupt = next((cat / "train" / "good").glob("*.png"))
+    corrupt.write_bytes(b"not a real png")
+    problems = check_category(tmp_path, "vial")
+    assert any(corrupt.name in p for p in problems)
+
+
 def test_an_empty_split_directory_is_reported(tmp_path):
     cat = build_category(tmp_path, "vial")
     for p in (cat / "test_private").glob("*.png"):
