@@ -13,6 +13,13 @@ import pandas as pd
 #: Columns a shard owns. They must match the shard's filename, so meta may not set them.
 IDENTITY_COLUMNS = ("dataset", "method", "category")
 
+#: Per-sample columns the runner writes. meta is stamped on afterwards and is one constant
+#: for the whole shard, so a meta key with one of these names would replace real per-sample
+#: data with that constant. Listed explicitly (rather than relying only on the keys the rows
+#: happen to carry) so the guard also covers a column a run legitimately omitted — a shard
+#: written without maps has no `map_path`, and a `map_path` in meta must still be refused.
+ROW_SCHEMA_COLUMNS = ("image_path", "label", "image_score", "split", "mask_path", "map_path")
+
 
 class ResultStore:
     def __init__(self, root: Path):
@@ -36,15 +43,22 @@ class ResultStore:
         if not rows:
             raise ValueError(f"refusing to write an empty shard for {dataset}/{method}/{category}")
 
-        # meta used to be applied last, so a meta key named "category" (or
-        # dataset/method) silently relabelled every row: the filename still said
-        # `can` while the column said something else, and load_all() would group the
-        # results under the wrong category with nothing to flag it.
-        shadowed = [k for k in IDENTITY_COLUMNS if k in meta]
+        # meta is applied last, so any meta key that names an existing column silently
+        # replaces that column with one constant. For the identity columns that means the
+        # filename still says `can` while the column says something else, and load_all()
+        # groups the results under the wrong category. For the per-sample columns it is
+        # worse: a meta key named `label` or `image_score` overwrites the ground truth or
+        # the predictions themselves with a constant, and the shard still aggregates
+        # cleanly into published metrics computed from that constant.
+        row_columns = {k for row in rows for k in row}
+        protected = set(IDENTITY_COLUMNS) | set(ROW_SCHEMA_COLUMNS) | row_columns
+        shadowed = sorted(k for k in meta if k in protected)
         if shadowed:
             raise ValueError(
-                f"meta keys {shadowed} would overwrite the shard's identity columns "
-                f"for {dataset}/{method}/{category}; rename them"
+                f"meta keys {shadowed} would overwrite columns the shard already owns "
+                f"for {dataset}/{method}/{category} (identity columns "
+                f"{list(IDENTITY_COLUMNS)}, per-sample columns "
+                f"{sorted(set(ROW_SCHEMA_COLUMNS) | row_columns)}); rename them"
             )
 
         df = pd.DataFrame(list(rows))

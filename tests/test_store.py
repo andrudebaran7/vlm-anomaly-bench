@@ -155,3 +155,26 @@ def test_write_still_accepts_non_colliding_meta(tmp_path):
     df = pd.read_parquet(path)
     assert list(df["category"]) == ["can", "can"]
     assert list(df["commit"]) == ["abc", "abc"]
+
+
+@pytest.mark.parametrize("key", ["label", "image_score", "mask_path", "map_path", "split"])
+def test_write_rejects_meta_keys_that_shadow_row_schema_columns(tmp_path, key):
+    """meta is stamped on after the rows, so a meta key named `label` (or image_score,
+    mask_path, map_path, split) silently overwrote real per-sample data with one constant.
+
+    That is worse than the identity-column case it already guarded: a shard whose `label`
+    column is all 0 still aggregates, and reports metrics computed against the wrong ground
+    truth, with nothing anywhere to flag it.
+    """
+    store = ResultStore(tmp_path)
+    with pytest.raises(ValueError, match=key):
+        store.write("mvtec_ad2", "winclip", "can", _rows(), {"seed": 0, key: "wrong"})
+
+
+def test_write_rejects_meta_keys_that_shadow_any_column_the_rows_carry(tmp_path):
+    """The guard must not be limited to a hard-coded list: rows also carry meta_* columns
+    (e.g. meta_lighting, the whole point of this dataset) and whatever a future Sample adds."""
+    store = ResultStore(tmp_path)
+    rows = [{"image_path": "a.png", "label": 0, "image_score": 0.1, "meta_lighting": "regular"}]
+    with pytest.raises(ValueError, match="meta_lighting"):
+        store.write("mvtec_ad2", "winclip", "can", rows, {"seed": 0, "meta_lighting": "wrong"})
