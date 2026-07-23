@@ -31,7 +31,13 @@ Routes being tried, in order:
 1. An institutional address (University of Luxembourg), if still active.
 2. A request to `webmaster@mvtec.com` explaining the independent academic research context.
 
-Status: ☐ not resolved · address used: ____ · registered on: ____
+Status: ☐ not resolved — route 2 request sent 2026-07-23, awaiting reply.
+If no response by **2026-08-06** (two weeks), follow up once; if that also goes unanswered,
+treat the private split as unavailable and open the protocol amendment described below rather
+than letting M4 sit blocked indefinitely.
+
+- Address the account was granted to: ____
+- Registered on: ____
 
 **If both routes fail**, the study is limited to the public test split. That is a second scope
 reduction and must be handled the same way as the first: a dated Changelog entry in
