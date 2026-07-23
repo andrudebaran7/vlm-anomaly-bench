@@ -5,7 +5,6 @@ at a time and never holds a grid's worth of anomaly maps in memory. Aggregation 
 are read back, so it is also where the memory ceiling has to be enforced — Colab's free tier has
 roughly 12.7 GB of host RAM, and a category of 2.66 MP images adds up fast.
 """
-from pathlib import Path
 from typing import Any
 
 import numpy as np
