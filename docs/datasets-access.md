@@ -15,6 +15,31 @@ Record on download (these are unverified until then, by design):
 - Split directory names, read from the official dataset class: ____
 - Official metric names, read from the server submission docs: ____
 
+### ⚠️ Open blocker — evaluation-server registration requires a company email address
+
+Observed on the benchmark login page (2026-07-23): registration asks for a username that is an
+email address, and states that **a company email address is required**. Free providers
+(gmail.com and similar) are therefore expected to be rejected. The page directs registration
+problems to `webmaster@mvtec.com`.
+
+This is a hard dependency, not a nuisance: the private test split is scored *only* on that
+server, so without an account the protocol's §2 private-split reporting, its §4 official metric
+set, and the §7 one-submission-per-method rule are all unexecutable, and M4 cannot happen.
+
+Routes being tried, in order:
+
+1. An institutional address (University of Luxembourg), if still active.
+2. A request to `webmaster@mvtec.com` explaining the independent academic research context.
+
+Status: ☐ not resolved · address used: ____ · registered on: ____
+
+**If both routes fail**, the study is limited to the public test split. That is a second scope
+reduction and must be handled the same way as the first: a dated Changelog entry in
+`docs/protocol.md` amending §2/§4/§7, plus corresponding changes to the paper's contributions —
+not a quiet omission. Note that this affects only the *evaluation server*; the dataset download
+itself is a separate registration under the CC BY-NC-SA 4.0 research license, and local metrics
+on the public split remain fully available either way.
+
 ## VisA + MVTec AD (classic) — sanity only
 
 Public downloads, used solely to validate our implementations against published numbers
