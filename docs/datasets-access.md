@@ -8,12 +8,56 @@
 3. Download the official PyTorch dataset class and utils bundle from the same page. It carries the
    authoritative split names, the submission format, and runtime/memory measurement helpers.
 
-Record on download (these are unverified until then, by design):
+Verified from the official download page, 2026-07-23:
 
-- Download size: ____
-- Dataset version / date: ____
-- Split directory names, read from the official dataset class: ____
-- Official metric names, read from the server submission docs: ____
+- **Download size: 30.4 GB** total. Also available per object category, which changes how it is
+  used on Colab — see below.
+- **Split directory names** (five folders per object):
+  - `train` — defect-free training images
+  - `validation` — defect-free validation images
+  - `test_public` — test images from **every lighting condition**, with pixel-precise ground
+    truth annotations
+  - `test_private` — test images under the regular lighting condition, ground truth withheld
+  - `test_private_mixed` — the **same scenes as `test_private`** under varied lighting, ground
+    truth withheld
+- Dataset version / date: ____ (record on download)
+- Official metric names, read from the server submission docs: ____ (still unverified)
+
+### Per-category download sizes
+
+| Category | Size |
+|---|---|
+| Fabric | 10 GB |
+| Rice | 6.29 GB |
+| Walnuts | 5.88 GB |
+| Can | 2.65 GB |
+| Wallplugs | 2.05 GB |
+| Sheet Metal | 1.53 GB |
+| Fruit Jelly | 1.2 GB |
+| Vial | 0.77 GB |
+
+**This is why per-category downloads matter.** 30.4 GB does not fit Google Drive's free 15 GB
+tier, and re-fetching it whole every session is the dominant cost on a platform that
+disconnects. Fetching one category, evaluating every method on it, then discarding it caps peak
+disk at the largest single category — **10 GB, not 30.4 GB** — and makes a session
+self-contained. This lines up exactly with the runner's per-category checkpoint granularity
+(`src/vlmab/eval/runner.py`): one category is simultaneously the download unit, the resume unit
+and the shard unit.
+
+### The lighting-shift analysis does NOT depend on the evaluation server
+
+`test_public` contains images from **every lighting condition together with pixel ground
+truth**. So the lighting-robustness question — the reason MVTec AD 2 exists and the core of the
+paper's §5.1 and Figure 2 — is answerable entirely offline.
+
+What the private split adds is narrower and more specific: `test_private` and
+`test_private_mixed` are the *same scenes* under regular versus varied lighting, i.e. a
+controlled paired comparison that removes scene as a confounder. That is a real strengthening,
+not the whole story.
+
+This materially reduces the damage of the evaluation-server blocker below: without server
+access the study loses the leaderboard entry and the paired same-scene contrast, but keeps the
+lighting-shift result, all pixel-level localisation metrics, and the full method comparison.
 
 ### ⚠️ Open blocker — evaluation-server registration requires a company email address
 
