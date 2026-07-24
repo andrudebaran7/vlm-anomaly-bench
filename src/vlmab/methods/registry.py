@@ -9,10 +9,12 @@ from typing import Callable
 from vlmab.methods.base import AnomalyMethod
 from vlmab.methods.baseline import IntensityBaseline
 from vlmab.methods.mllm import QwenMLLM
+from vlmab.methods.patchcore_ref import PatchCoreRef
 
 _REGISTRY: dict[str, Callable[[], AnomalyMethod]] = {
     "intensity_baseline": IntensityBaseline,
-    "mllm_qwen": QwenMLLM,   # CPU-usable only with an injected client; prepare() gates the rest
+    "mllm_qwen": QwenMLLM,          # CPU-usable only with an injected client; prepare() gates the rest
+    "patchcore_ref": PatchCoreRef,  # CPU-usable only with an injected backend; prepare() gates the rest
 }
 
 

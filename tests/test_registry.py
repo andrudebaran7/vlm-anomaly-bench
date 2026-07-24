@@ -17,3 +17,10 @@ def test_unknown_method_lists_the_known_ones():
 def test_available_is_sorted_and_nonempty():
     names = available()
     assert names == sorted(names) and "intensity_baseline" in names
+
+
+def test_builds_the_patchcore_anchor():
+    from vlmab.methods.patchcore_ref import PatchCoreRef
+
+    assert isinstance(build_method("patchcore_ref"), PatchCoreRef)
+    assert "patchcore_ref" in available()
