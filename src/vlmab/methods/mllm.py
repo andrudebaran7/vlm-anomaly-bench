@@ -32,6 +32,11 @@ _GRID = 7
 _CELL = re.compile(r"^([A-G])([1-7])$")
 _NO_INFO_SCORE = 0.5
 _DECODER = json.JSONDecoder()
+# A real response has a handful of JSON blocks; this is only a backstop against a degenerate
+# repetition-loop failure mode (thousands of stray `{`, each failing after scanning to the end of
+# an unclosed nested chain — see parse_mllm_response). Generous enough to never engage on any
+# realistic response, small enough to keep even a pathological input fast.
+_MAX_DECODE_ATTEMPTS = 2000
 
 PROMPT = (
     "You are an industrial quality inspector. Look at this image of a {category}.\n"
@@ -76,26 +81,51 @@ def parse_mllm_response(text: str) -> tuple[float, list[str], bool]:
     field that carries the score. `parse_ok=False` returns the no-information score and no cells.
 
     A response can contain more than one brace-delimited block — e.g. a model that shows a draft
-    then a corrected final answer. Every position where a `{` opens is tried with the real JSON
-    parser (`json.JSONDecoder.raw_decode`, quote- and nesting-aware by construction rather than a
-    regex approximation of JSON syntax), and the LAST candidate that both decodes and yields a
-    usable score wins: a draft-then-revision response puts its considered answer last, so reading
-    it that way (rather than taking the first candidate) recovers the model's corrected final
-    answer instead of discarding it.
+    then a corrected final answer. Only TOP-LEVEL blocks are candidates: every `{` is tried with
+    the real JSON parser (`json.JSONDecoder.raw_decode`, quote- and nesting-aware by construction
+    rather than a regex approximation of JSON syntax), but once one decodes successfully the scan
+    resumes right after its span instead of at the next `{`, so a nested object inside it (e.g. a
+    `location` sub-object that happens to carry its own `anomaly_probability`) is never revisited
+    as a separate candidate — it is already part of the object that just decoded. The LAST
+    top-level candidate that both decodes and yields a usable score wins: a draft-then-revision
+    response puts its considered answer last, so reading it that way (rather than taking the first
+    candidate) recovers the model's corrected final answer instead of a stray nested field or a
+    discarded draft.
+
+    A `{` that fails to decode (not valid JSON, or JSON but not an object) only advances the scan
+    by one character, same as before. That is fine for ordinary prose-with-JSON responses, but a
+    degenerate repetition-loop response — thousands of stray `{` forming one long unclosed nested
+    chain — makes every failed attempt scan to the end of the text, which is quadratic in the
+    number of braces. `_MAX_DECODE_ATTEMPTS` bounds the total number of `raw_decode` attempts so
+    that pathological input still completes in bounded time; real responses never come close to
+    the cap, so this never changes their result.
+
+    The same degenerate chain can also blow the interpreter's recursion limit inside a single
+    `raw_decode` call — the C-accelerated scanner still recurses one frame per unclosed nested
+    level, so a long-enough unbroken run of `{` (empirically ~10,000 on this interpreter, comfortably
+    reachable by a repetition-loop failure) raises `RecursionError` instead of `JSONDecodeError`.
+    That is a decode failure like any other, not a bug to propagate, so it is caught the same way.
     """
     best = None
-    for pos, ch in enumerate(text):
-        if ch != "{":
-            continue
+    pos = 0
+    attempts = 0
+    while True:
+        pos = text.find("{", pos)
+        if pos == -1:
+            break
+        attempts += 1
+        if attempts > _MAX_DECODE_ATTEMPTS:
+            break
         try:
-            obj, _end = _DECODER.raw_decode(text, pos)
-        except json.JSONDecodeError:
+            obj, end = _DECODER.raw_decode(text, pos)
+        except (json.JSONDecodeError, RecursionError):
+            pos += 1
             continue
-        if not isinstance(obj, dict):
-            continue
-        result = _score_from_object(obj)
-        if result is not None:
-            best = result
+        if isinstance(obj, dict):
+            result = _score_from_object(obj)
+            if result is not None:
+                best = result
+        pos = end  # skip the whole span just decoded — nested braces are not separate candidates
     if best is not None:
         score, cells = best
         return score, cells, True

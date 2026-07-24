@@ -109,6 +109,52 @@ def test_a_nested_json_object_in_the_response_does_not_derail_the_scan():
     assert cells == ["C4"]
 
 
+def test_a_nested_objects_own_anomaly_probability_does_not_beat_the_top_level_answer():
+    """A nested sub-object (e.g. a `meta` block) that happens to carry its own
+    `anomaly_probability` must never be preferred over the real top-level answer. Scanning every
+    `{` position independently visits the nested object's opening brace AFTER the top-level
+    object's, so naive "last candidate wins" picks the nested value instead of the genuine
+    top-level answer. Only top-level objects are candidates: once the top-level object decodes,
+    the scan must resume past its span, not descend into it looking for more `{`."""
+    text = (
+        '{"cells": ["C4"], "meta": {"anomaly_probability": 0.11}, "anomaly_probability": 0.75}'
+    )
+    score, cells, ok = parse_mllm_response(text)
+    assert ok is True
+    assert score == pytest.approx(0.75)
+    assert cells == ["C4"]
+
+
+def test_two_separate_top_level_objects_still_resolve_to_the_last_one():
+    """Span-skipping past a decoded top-level object must not prevent finding a second, genuinely
+    separate top-level object later in the text (draft then corrected final answer)."""
+    text = (
+        '{"anomaly_probability": 0.1, "cells": []}\n'
+        'Wait, let me reconsider.\n'
+        '{"anomaly_probability": 0.9, "cells": ["B3"]}'
+    )
+    score, cells, ok = parse_mllm_response(text)
+    assert ok is True
+    assert score == pytest.approx(0.9)
+    assert cells == ["B3"]
+
+
+def test_a_long_chain_of_stray_unclosed_braces_parses_quickly_and_without_crashing():
+    """A repetition-loop failure mode: thousands of stray `{` with no closing braces. Every
+    position must fail to decode, so the response is unparseable — but it must not take
+    quadratic time (naively re-scanning to the end of the text from every stray `{`) and it must
+    not crash (a long enough unclosed chain blows the interpreter's recursion limit inside
+    `raw_decode` itself)."""
+    import time
+
+    text = '{"a":' * 8000
+    t0 = time.perf_counter()
+    score, cells, ok = parse_mllm_response(text)
+    elapsed = time.perf_counter() - t0
+    assert ok is False and score == 0.5 and cells == []
+    assert elapsed < 1.5, f"parse_mllm_response took {elapsed:.2f}s on pathological input"
+
+
 def test_cells_to_grid_sets_the_named_cells():
     grid = cells_to_grid(["A1", "G7"])
     assert grid.shape == (7, 7)
