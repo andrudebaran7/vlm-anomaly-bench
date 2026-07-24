@@ -35,7 +35,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"available methods: {available()}")
         return 1
 
-    method.prepare(device=args.device)
     dataset = MVTecAD2(args.root)
     # Resolved before ResultStore exists: ResultStore.__init__ creates --results on disk, and
     # if --results is nested inside --root (as it legitimately can be, e.g. in a tmp-dir test),
@@ -45,6 +44,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     store = ResultStore(args.results)
     meta = run_meta({"method": args.method, "split": args.split}, seed=args.seed)
 
+    # method.prepare() is NOT called here: run_evaluation() owns that decision, calling it
+    # only if there is genuinely work left (see its docstring) so a fully-resumed run never
+    # pays for a model load and a run with work never loads it twice.
     written = run_evaluation(
         dataset, method, store, meta,
         categories=categories,
