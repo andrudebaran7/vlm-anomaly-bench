@@ -1,3 +1,5 @@
+import pytest
+
 from mvtec_tree import build_category
 from run_eval import main
 from vlmab.eval.store import ResultStore
@@ -63,3 +65,28 @@ def test_run_eval_reports_a_method_that_cannot_run_here_cleanly(tmp_path, capsys
                  "--split", "test_public", "--results", str(tmp_path / "results"), "--seed", "0"])
     assert code == 1
     assert "mllm_qwen" in capsys.readouterr().out
+
+
+class _CudaFailure(AnomalyMethod):
+    """Stands in for a real GPU adapter that hits a genuine runtime error deep inside
+    predict() (e.g. a CUDA error, a shape-mismatch bug) -- as opposed to the "cannot run
+    here" signal a method raises from prepare(). This must NOT be mistaken for that signal."""
+
+    name = "intensity_baseline"  # match the registry name run_eval resolves via --method
+    zero_shot = True
+
+    def prepare(self, device: str = "cuda") -> None:
+        pass
+
+    def predict(self, image, category):
+        raise RuntimeError("simulated CUDA failure")
+
+
+def test_run_eval_does_not_mask_a_genuine_runtime_error_from_predict(tmp_path, monkeypatch):
+    """A plain RuntimeError raised from inside a real predict() is a genuine bug -- it must
+    propagate out of main(), not be caught and misreported as "cannot run here"."""
+    build_category(tmp_path, "vial")
+    monkeypatch.setattr("run_eval.build_method", lambda name: _CudaFailure())
+    with pytest.raises(RuntimeError, match="simulated CUDA failure"):
+        main(["--method", "intensity_baseline", "--root", str(tmp_path),
+              "--split", "test_public", "--results", str(tmp_path / "results"), "--seed", "0"])

@@ -25,7 +25,7 @@ from typing import Callable
 
 import numpy as np
 
-from vlmab.methods.base import AnomalyMethod, Prediction
+from vlmab.methods.base import AnomalyMethod, MethodNotRunnable, Prediction
 from vlmab.methods.postprocess import upsample_to
 
 _GRID = 7
@@ -143,14 +143,14 @@ class QwenMLLM(AnomalyMethod):
         """With an injected client there is nothing to load. Otherwise the real Qwen client is
         built here — a Colab-only path that imports transformers lazily, never in CI."""
         if self._client is None:  # pragma: no cover - needs a GPU and transformers
-            raise RuntimeError(
+            raise MethodNotRunnable(
                 "no model_client injected and real-client construction is Colab-only; "
                 "inject a callable for CPU use or build the Qwen client in a GPU session"
             )
 
     def predict(self, image: np.ndarray, category: str) -> Prediction:
         if self._client is None:
-            raise RuntimeError("QwenMLLM has no model_client; inject one or call prepare() on GPU")
+            raise MethodNotRunnable("QwenMLLM has no model_client; inject one or call prepare() on GPU")
         response = self._client(image, PROMPT.replace("{category}", category))
         score, cells, parse_ok = parse_mllm_response(response)
         amap = upsample_to(cells_to_grid(cells), image.shape[:2])

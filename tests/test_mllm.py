@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from method_contract import assert_valid_prediction
+from vlmab.methods.base import MethodNotRunnable
 from vlmab.methods.mllm import PROMPT, QwenMLLM, cells_to_grid, parse_mllm_response
 
 
@@ -203,8 +204,11 @@ def test_predict_puts_the_category_in_the_prompt():
 
 def test_predict_without_a_client_or_prepare_fails_loudly():
     m = QwenMLLM()  # no injected client, prepare() not called
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError) as excinfo:
         m.predict(np.zeros((8, 8, 3), dtype=np.uint8), "vial")
+    # MethodNotRunnable subclasses RuntimeError -- this is the "cannot run here" signal,
+    # not a generic runtime error, so scripts/run_eval.py can catch it narrowly.
+    assert isinstance(excinfo.value, MethodNotRunnable)
 
 
 def test_adapter_prompt_stays_in_sync_with_the_published_config():

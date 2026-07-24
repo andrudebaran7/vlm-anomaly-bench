@@ -13,6 +13,7 @@ from vlmab.datasets.mvtec_ad2 import MVTecAD2
 from vlmab.eval.provenance import run_meta
 from vlmab.eval.runner import run_evaluation
 from vlmab.eval.store import ResultStore
+from vlmab.methods.base import MethodNotRunnable
 from vlmab.methods.registry import available, build_method
 
 
@@ -55,10 +56,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             maps_dir=args.maps_dir,
             device=args.device,
         )
-    except RuntimeError as exc:
+    except MethodNotRunnable as exc:
         # The specific "this adapter cannot run in this environment" signal (e.g. an MLLM
         # adapter with no injected/constructible model client) -- fail cleanly instead of
-        # an uncaught traceback. Any other exception type is a real bug and should propagate.
+        # an uncaught traceback. Any other exception type (including a plain RuntimeError
+        # raised from inside a real predict()) is a real bug and must propagate.
         print(f"{args.method}: cannot run here ({exc})")
         return 1
 
