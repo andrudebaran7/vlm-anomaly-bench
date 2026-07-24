@@ -1,8 +1,10 @@
 """Name -> adapter, for the CLI and the Colab notebook.
 
-Only GPU-free adapters are registered here today. Each deferred model wrapper (WinCLIP,
-AnomalyCLIP, AdaCLIP, SAA+, PatchCore) adds its own entry when its plan lands, so an unknown
-name fails with the list of what actually runs rather than a promise.
+Adapters are buildable by name here even when they need a GPU backend they cannot construct on
+CPU (mllm_qwen, patchcore_ref): they build, but their prepare() raises MethodNotRunnable without
+an injected backend. Each remaining deferred wrapper (WinCLIP, AnomalyCLIP, AdaCLIP, SAA+) adds
+its own entry when its plan lands, so an unknown name fails with the list of what actually runs
+rather than a promise.
 """
 from typing import Callable
 
