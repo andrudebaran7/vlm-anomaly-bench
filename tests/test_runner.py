@@ -362,3 +362,37 @@ def test_default_split_is_a_real_mvtec_ad2_split(tmp_path, counting_method):
     df = pd.read_parquet(written[0])
     assert set(df["split"]) == {"test_public"}
     assert sorted(df["label"]) == [0, 1]  # one good, one bad, i.e. the public test split
+
+
+def test_runner_records_a_positive_latency_per_row(tmp_path, fake_dataset, counting_method):
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {"seed": 0}, categories=["alpha"])
+    df = pd.read_parquet(store.path_for("fake", "counting", "alpha"))
+    assert "latency_ms" in df.columns
+    assert (df["latency_ms"] >= 0).all()
+    assert df["latency_ms"].notna().all()
+
+
+def test_runner_carries_prediction_extras_into_prefixed_columns(tmp_path, fake_dataset):
+    """API methods report tokens+cost via extras (protocol §4); the shard must keep them."""
+    class _ExtrasMethod(AnomalyMethod):
+        name = "extras"
+        def prepare(self, device="cuda"):
+            pass
+        def predict(self, image, category):
+            return Prediction(image_score=0.5, anomaly_map=np.zeros((8, 8), dtype=np.float32),
+                              extras={"tokens": 123, "parse_ok": True})
+
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, _ExtrasMethod(), store, {"seed": 0}, categories=["alpha"])
+    df = pd.read_parquet(store.path_for("fake", "extras", "alpha"))
+    assert list(df["extras_tokens"]) == [123, 123, 123]
+    assert list(df["extras_parse_ok"]) == [True, True, True]
+
+
+def test_runner_omits_extras_columns_when_a_method_returns_none(tmp_path, fake_dataset,
+                                                                counting_method):
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {"seed": 0}, categories=["alpha"])
+    df = pd.read_parquet(store.path_for("fake", "counting", "alpha"))
+    assert not [c for c in df.columns if c.startswith("extras_")]

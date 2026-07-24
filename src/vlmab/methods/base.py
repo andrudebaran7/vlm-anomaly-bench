@@ -7,6 +7,12 @@ from dataclasses import dataclass
 import numpy as np
 
 
+class MethodNotRunnable(RuntimeError):
+    """Raised by an adapter that cannot run in the current environment (e.g. a model
+    wrapper with no weights/GPU/client available). Distinct from a genuine runtime error
+    inside predict(), so callers can surface real bugs while handling this cleanly."""
+
+
 @dataclass
 class Prediction:
     image_score: float

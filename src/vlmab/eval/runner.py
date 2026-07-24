@@ -24,6 +24,7 @@ memory at once.
 """
 import hashlib
 import re
+import time
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -137,7 +138,9 @@ def run_evaluation(
 
         for sample in dataset.samples(split, category):
             image = dataset.load_image(sample)
+            start = time.perf_counter()
             prediction = method.predict(image, category)
+            latency_ms = (time.perf_counter() - start) * 1000.0
 
             row: dict[str, Any] = {
                 "image_path": str(sample.image_path),
@@ -147,7 +150,13 @@ def run_evaluation(
                 # Where the ground truth lives, so aggregation can compute pixel metrics from
                 # the shard alone instead of re-walking the dataset for a second time.
                 "mask_path": str(sample.mask_path) if sample.mask_path is not None else None,
+                # Per-sample wall time. Recorded on every run and tagged with the GPU in `meta`,
+                # but only *reported* from the fixed reference machine (protocol §5).
+                "latency_ms": latency_ms,
             }
+            # API methods report tokens/cost here (protocol §4); flatten under an extras_ prefix.
+            if prediction.extras is not None:
+                row.update({f"extras_{k}": v for k, v in prediction.extras.items()})
             row.update({f"meta_{k}": v for k, v in sample.meta.items() if k != "split"})
 
             if category_maps is not None:

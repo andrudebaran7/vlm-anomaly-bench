@@ -86,6 +86,14 @@ engineering.
   composed from the per-condition results rather than computed in one pass. `pixel_metrics`
   enforces this with a memory budget that refuses the whole-category case.
 
+- **MLLM response parsing.** The Qwen baseline returns free text. A response is parsed for the
+  required JSON (`anomaly_probability` plus a `cells` list on the 7x7 grid); prose around the JSON
+  and an out-of-range probability are tolerated, invalid cell labels are dropped. A response that
+  cannot be parsed carries no information, so its image score is 0.5 (the no-information point for
+  AUROC), never a silent 0 and never NaN, and the failure is recorded per sample
+  (`extras.parse_ok = False`) so the parse-failure rate is a reported number. This policy is fixed
+  for every dataset and category, like the prompt itself.
+
 ## 5. Hardware & software
 
 Accuracy metrics are computed on Google Colab (free tier, single T4, fp16). The assigned GPU varies
@@ -143,3 +151,6 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   which the study wants anyway and which is what makes native resolution fit the reference
   platform's memory. This constrains how numbers are produced, so unlike v0.2.1-v0.2.3 it is not
   documentation-only.
+- 2026-07-24 — v0.2.5. Records the MLLM response-parsing and parse-failure policy in §3 (score 0.5
+  and a per-sample flag on an unparseable response, so parse failures are reported rather than read
+  as confident normals). Fixes it before any MLLM number is produced. No other evaluation rule changed.
