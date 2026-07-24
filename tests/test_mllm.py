@@ -145,15 +145,28 @@ def test_a_long_chain_of_stray_unclosed_braces_parses_quickly_and_without_crashi
     position must fail to decode, so the response is unparseable — but it must not take
     quadratic time (naively re-scanning to the end of the text from every stray `{`) and it must
     not crash (a long enough unclosed chain blows the interpreter's recursion limit inside
-    `raw_decode` itself)."""
+    `raw_decode` itself).
+
+    The "not quadratic" property is asserted by SCALING, not a wall-clock threshold: doubling the
+    input must not multiply the time the way O(n^2) would (~4x). Two sizes timed on the same
+    machine back-to-back is robust to how loaded that machine is — an absolute ceiling here was
+    flaky, failing under concurrent load while the code was fine."""
     import time
 
-    text = '{"a":' * 8000
-    t0 = time.perf_counter()
-    score, cells, ok = parse_mllm_response(text)
-    elapsed = time.perf_counter() - t0
-    assert ok is False and score == 0.5 and cells == []
-    assert elapsed < 1.5, f"parse_mllm_response took {elapsed:.2f}s on pathological input"
+    def timed(n):
+        text = '{"a":' * n
+        t0 = time.perf_counter()
+        score, cells, ok = parse_mllm_response(text)   # must return (not crash / RecursionError)
+        assert ok is False and score == 0.5 and cells == []
+        return time.perf_counter() - t0
+
+    t_small = max(timed(8000), 1e-3)      # floor keeps the ratio meaningful if timing is tiny
+    t_big = timed(16000)
+    # Bounded/linear-ish stays well under the ~4x an O(n^2) re-scan would show when n doubles.
+    assert t_big < 3.0 * t_small, (
+        f"doubling the input took {t_big:.3f}s vs {t_small:.3f}s "
+        f"({t_big / t_small:.1f}x); the scan looks super-linear"
+    )
 
 
 def test_cells_to_grid_sets_the_named_cells():

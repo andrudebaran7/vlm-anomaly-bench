@@ -12,11 +12,13 @@ from vlmab.methods.base import AnomalyMethod
 from vlmab.methods.baseline import IntensityBaseline
 from vlmab.methods.mllm import QwenMLLM
 from vlmab.methods.patchcore_ref import PatchCoreRef
+from vlmab.methods.winclip import WinClipRef
 
 _REGISTRY: dict[str, Callable[[], AnomalyMethod]] = {
     "intensity_baseline": IntensityBaseline,
     "mllm_qwen": QwenMLLM,          # CPU-usable only with an injected client; prepare() gates the rest
     "patchcore_ref": PatchCoreRef,  # CPU-usable only with an injected backend; prepare() gates the rest
+    "winclip": WinClipRef,          # CPU-usable only with an injected backend; prepare() gates the rest
 }
 
 

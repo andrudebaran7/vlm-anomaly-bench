@@ -1,6 +1,12 @@
 name: winclip
-source: official          # pinned commit set at M2
-commit: TODO
-backbone: ViT-B-16-plus-240
-prompts: paper_verbatim   # protocol §3: no prompt tuning
-window_sizes: [2, 3]
+zero_shot: true
+# WinCLIP zero-shot (Jeong et al., CVPR 2023). Provenance: anomalib implementation (protocol §3
+# priority 2 — the official code's prompt ensemble is reproduced by anomalib; the §2 VisA
+# reproduction gate is the check). Record the resolved anomalib version on first Colab run.
+source: anomalib
+anomalib_version: ">=1.1"        # exact pin resolved at integration; record the resolved version
+backbone: ViT-B-16-plus-240      # WinCLIP's CLIP backbone
+k_shot: 0                        # zero-shot; WinCLIP+ (few-shot) is a separate plan
+scales: [2, 3]                   # multi-scale window sizes
+class_name: per_category         # the object noun in the prompt ensemble = the MVTec AD 2 category
+prompts: paper_verbatim          # protocol §3: no prompt tuning; anomalib encodes the paper ensemble
