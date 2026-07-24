@@ -1,8 +1,13 @@
 """Map post-processing shared by every adapter.
 
-Two jobs, both mandated by the protocol: bring an anomaly map to the input image's *native*
-resolution (§4 evaluates pixel metrics there against unmodified masks, so a coarse or resized
-map has to be expanded, never the mask shrunk), and bring scores into [0,1].
+`upsample_to` is the scoring-path utility, mandated by the protocol: it brings an anomaly map
+to the input image's *native* resolution (§4 evaluates pixel metrics there against unmodified
+masks, so a coarse or resized map has to be expanded, never the mask shrunk). Scored maps are
+NOT brought into [0,1] — protocol v0.2.6 keeps them on the method's own consistent scale, since
+per-image [0,1] normalisation would break the cross-image pixel-metric ranking.
+
+`normalise_to_unit` does min-max scores into [0,1], but it is visualisation-only; see its own
+docstring for why it must not be used on the scoring path.
 """
 import numpy as np
 
