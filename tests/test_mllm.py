@@ -60,6 +60,21 @@ def test_non_finite_probability_is_a_parse_failure_not_a_nan_score(literal):
     assert np.isfinite(score)
 
 
+def test_second_json_block_wins_when_a_draft_precedes_the_final_answer():
+    """A response with a draft block followed by a corrected final answer must not be discarded
+    as unparseable just because the greedy regex used to span both blocks. The parser picks the
+    LAST block that parses into an object carrying anomaly_probability."""
+    text = (
+        '{"anomaly_probability": 0.1, "cells": []}\n'
+        'Wait, let me reconsider.\n'
+        '{"anomaly_probability": 0.9, "cells": ["B3"]}'
+    )
+    score, cells, ok = parse_mllm_response(text)
+    assert ok is True
+    assert score == pytest.approx(0.9)
+    assert cells == ["B3"]
+
+
 def test_cells_to_grid_sets_the_named_cells():
     grid = cells_to_grid(["A1", "G7"])
     assert grid.shape == (7, 7)
