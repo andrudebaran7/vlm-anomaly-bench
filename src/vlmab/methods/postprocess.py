@@ -25,7 +25,12 @@ def upsample_to(coarse: np.ndarray, size: tuple[int, int]) -> np.ndarray:
 
 
 def normalise_to_unit(x: np.ndarray) -> np.ndarray:
-    """Min-max `x` into [0,1] as float32. All-equal input -> all zeros (no anomaly signal)."""
+    """Min-max `x` into [0,1] as float32. All-equal input -> all zeros (no signal).
+
+    Do NOT use this to scale an anomaly map for scoring: per-image [0,1] normalisation breaks the
+    cross-image pixel-metric ranking (protocol v0.2.6). It is for genuinely bounded quantities and
+    visualisation only.
+    """
     x = np.asarray(x, dtype=np.float32)
     if not np.isfinite(x).all():
         raise ValueError("map contains non-finite values; a NaN/inf map is a method bug")
