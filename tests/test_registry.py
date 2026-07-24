@@ -10,7 +10,10 @@ def test_builds_a_known_method():
 
 def test_unknown_method_lists_the_known_ones():
     with pytest.raises(KeyError) as exc:
-        build_method("anomalyclip")           # a deferred wrapper: not registered yet
+        # a deferred wrapper, not registered yet — swap for another unregistered name
+        # (e.g. "adaclip", "saa") when anomalyclip itself gets registered, or this test starts
+        # failing for the wrong reason.
+        build_method("anomalyclip")
     assert "intensity_baseline" in str(exc.value)
 
 
