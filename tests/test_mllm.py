@@ -48,6 +48,18 @@ def test_missing_probability_field_is_a_parse_failure():
     assert ok is False and score == 0.5 and cells == []
 
 
+@pytest.mark.parametrize("literal", ["NaN", "Infinity", "-Infinity"])
+def test_non_finite_probability_is_a_parse_failure_not_a_nan_score(literal):
+    """json.loads accepts the non-standard tokens NaN/Infinity/-Infinity; the parser must reject
+    them as a parse failure (score 0.5, parse_ok False) rather than surface a non-finite score."""
+    text = '{"anomaly_probability": %s, "cells": []}' % literal
+    score, cells, ok = parse_mllm_response(text)
+    assert ok is False
+    assert score == 0.5
+    assert cells == []
+    assert np.isfinite(score)
+
+
 def test_cells_to_grid_sets_the_named_cells():
     grid = cells_to_grid(["A1", "G7"])
     assert grid.shape == (7, 7)

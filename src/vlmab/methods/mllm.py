@@ -19,6 +19,7 @@ that would read as "confidently normal", and never NaN. The failure is recorded 
 which is exactly the MLLM failure taxonomy the paper's analysis calls for.
 """
 import json
+import math
 import re
 from typing import Callable
 
@@ -59,8 +60,13 @@ def parse_mllm_response(text: str) -> tuple[float, list[str], bool]:
     if match:
         try:
             obj = json.loads(match.group(0))
-            prob = obj["anomaly_probability"]
-            score = float(np.clip(float(prob), 0.0, 1.0))
+            prob = float(obj["anomaly_probability"])
+            # json.loads accepts the non-standard tokens NaN/Infinity/-Infinity by default; a
+            # non-finite value is not a valid score (protocol §3: the score is never NaN, and
+            # clipping would silently turn Infinity into 1.0), so treat it as a parse failure.
+            if not math.isfinite(prob):
+                raise ValueError("non-finite anomaly_probability")
+            score = float(np.clip(prob, 0.0, 1.0))
             raw = obj.get("cells", []) or []
             cells = [c for c in raw if isinstance(c, str) and _CELL.match(c)]
             return score, cells, True
