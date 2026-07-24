@@ -75,6 +75,40 @@ def test_second_json_block_wins_when_a_draft_precedes_the_final_answer():
     assert cells == ["B3"]
 
 
+def test_a_brace_inside_the_reason_string_does_not_break_the_scan():
+    """A `}` inside a quoted string value must not be mistaken for the object's closing brace.
+    Regression test: the previous non-nesting-regex fix (`\\{[^{}]*\\}`) has no notion of JSON
+    string quoting, so it split this response at the in-string `}` and returned a spurious parse
+    failure (0.5, [], False) instead of the correct answer."""
+    text = '{"anomaly_probability": 0.7, "cells": ["A1"], "reason": "looks like a }"}'
+    score, cells, ok = parse_mllm_response(text)
+    assert ok is True
+    assert score == pytest.approx(0.7)
+    assert cells == ["A1"]
+
+
+def test_a_lone_open_brace_inside_the_reason_string_does_not_break_the_scan():
+    """Same failure mode as above but with a lone `{` inside the string value."""
+    text = '{"anomaly_probability": 0.6, "cells": ["A1"], "reason": "shaped like {"}'
+    score, cells, ok = parse_mllm_response(text)
+    assert ok is True
+    assert score == pytest.approx(0.6)
+    assert cells == ["A1"]
+
+
+def test_a_nested_json_object_in_the_response_does_not_derail_the_scan():
+    """An object whose value is itself an object (e.g. a `location` sub-object) must not confuse
+    the scan into missing the top-level `anomaly_probability`."""
+    text = (
+        '{"anomaly_probability": 0.75, "cells": ["C4"], '
+        '"location": {"row": "C", "col": 4}, "reason": "dent"}'
+    )
+    score, cells, ok = parse_mllm_response(text)
+    assert ok is True
+    assert score == pytest.approx(0.75)
+    assert cells == ["C4"]
+
+
 def test_cells_to_grid_sets_the_named_cells():
     grid = cells_to_grid(["A1", "G7"])
     assert grid.shape == (7, 7)

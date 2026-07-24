@@ -31,11 +31,7 @@ from vlmab.methods.postprocess import upsample_to
 _GRID = 7
 _CELL = re.compile(r"^([A-G])([1-7])$")
 _NO_INFO_SCORE = 0.5
-# Non-nested brace-delimited candidates. The schema never nests a JSON object inside another
-# (`cells` is an array of strings, `reason` is a string), so a genuine answer block never itself
-# contains an inner `{`/`}` — this is deliberately not the greedy `\{.*\}` it replaces, which
-# spans from the first `{` to the last `}` across multiple blocks and yields invalid JSON.
-_JSON_OBJECT = re.compile(r"\{[^{}]*\}", re.DOTALL)
+_DECODER = json.JSONDecoder()
 
 PROMPT = (
     "You are an industrial quality inspector. Look at this image of a {category}.\n"
@@ -80,15 +76,19 @@ def parse_mllm_response(text: str) -> tuple[float, list[str], bool]:
     field that carries the score. `parse_ok=False` returns the no-information score and no cells.
 
     A response can contain more than one brace-delimited block — e.g. a model that shows a draft
-    then a corrected final answer. Every candidate block is tried, and the LAST one that both
-    parses as JSON and yields a usable score wins: a draft-then-revision response puts its
-    considered answer last, so reading it that way (rather than taking the first candidate)
-    recovers the model's corrected final answer instead of discarding it.
+    then a corrected final answer. Every position where a `{` opens is tried with the real JSON
+    parser (`json.JSONDecoder.raw_decode`, quote- and nesting-aware by construction rather than a
+    regex approximation of JSON syntax), and the LAST candidate that both decodes and yields a
+    usable score wins: a draft-then-revision response puts its considered answer last, so reading
+    it that way (rather than taking the first candidate) recovers the model's corrected final
+    answer instead of discarding it.
     """
     best = None
-    for candidate in _JSON_OBJECT.finditer(text):
+    for pos, ch in enumerate(text):
+        if ch != "{":
+            continue
         try:
-            obj = json.loads(candidate.group(0))
+            obj, _end = _DECODER.raw_decode(text, pos)
         except json.JSONDecodeError:
             continue
         if not isinstance(obj, dict):
