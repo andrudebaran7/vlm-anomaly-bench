@@ -396,3 +396,73 @@ def test_runner_omits_extras_columns_when_a_method_returns_none(tmp_path, fake_d
     run_evaluation(fake_dataset, counting_method, store, {"seed": 0}, categories=["alpha"])
     df = pd.read_parquet(store.path_for("fake", "counting", "alpha"))
     assert not [c for c in df.columns if c.startswith("extras_")]
+
+
+def test_runner_fits_a_full_shot_method_once_per_category_before_predicting(tmp_path, fake_dataset):
+    """A full-shot method must see a category's train images (via fit) before it scores that
+    category's test images."""
+    events = []
+
+    class _FullShot(AnomalyMethod):
+        name = "fullshot"
+        zero_shot = False
+
+        def prepare(self, device="cuda"):
+            events.append(("prepare", None))
+
+        def fit(self, train_images, category):
+            events.append(("fit", category, len(list(train_images))))
+
+        def predict(self, image, category):
+            events.append(("predict", category))
+            return Prediction(image_score=0.5, anomaly_map=np.zeros((8, 8), dtype=np.float32))
+
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, _FullShot(), store, {"seed": 0}, categories=["alpha"])
+
+    assert events[0] == ("prepare", None)
+    assert events[1] == ("fit", "alpha", 3)          # FakeDataset yields 3 train images per category
+    assert all(e[0] == "predict" for e in events[2:])  # every fit precedes its predicts
+
+
+def test_runner_raises_instead_of_silently_writing_an_inf_map(tmp_path, fake_dataset):
+    """A finite float32 anomaly map with a value above float16's max (65504) becomes
+    `inf` under the runner's float16 cast with no error, silently corrupting every
+    pixel metric computed from that map. The runner must fail loud instead."""
+    class _HugeScoreMethod(AnomalyMethod):
+        name = "huge"
+        zero_shot = True
+
+        def prepare(self, device="cuda"):
+            pass
+
+        def predict(self, image, category):
+            huge = np.full((8, 8), 1e6, dtype=np.float32)
+            return Prediction(image_score=0.5, anomaly_map=huge)
+
+    store = ResultStore(tmp_path / "results")
+    maps = tmp_path / "maps"
+    with pytest.raises(ValueError, match="65504|1000000|1e\\+06|float16"):
+        run_evaluation(
+            fake_dataset, _HugeScoreMethod(), store, {"seed": 0},
+            categories=["alpha"], maps_dir=maps,
+        )
+    saved = list(maps.rglob("*.npy"))
+    assert not any(np.isinf(np.load(p)).any() for p in saved), (
+        "an inf map was written to disk instead of the runner raising"
+    )
+
+
+def test_runner_does_not_fit_a_zero_shot_method(tmp_path, fake_dataset, counting_method):
+    """counting_method is zero_shot; its fit() must never be called."""
+    calls = []
+    original = counting_method.fit
+
+    def _spy(train_images, category):
+        calls.append(category)
+        return original(train_images, category)
+
+    counting_method.fit = _spy
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {"seed": 0}, categories=["alpha"])
+    assert calls == []

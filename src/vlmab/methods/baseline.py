@@ -9,7 +9,6 @@ something. Pure numpy, no weights, no GPU.
 import numpy as np
 
 from vlmab.methods.base import AnomalyMethod, Prediction
-from vlmab.methods.postprocess import normalise_to_unit
 
 
 class IntensityBaseline(AnomalyMethod):
@@ -21,6 +20,8 @@ class IntensityBaseline(AnomalyMethod):
 
     def predict(self, image: np.ndarray, category: str) -> Prediction:
         gray = np.asarray(image, dtype=np.float32).mean(axis=2)
-        deviation = np.abs(gray - gray.mean())
-        amap = normalise_to_unit(deviation)
-        return Prediction(image_score=float(amap.max()), anomaly_map=amap)
+        deviation = np.abs(gray - gray.mean()).astype(np.float32)
+        # Raw deviation, NOT normalised to [0,1]: per-image rescaling would make every varied
+        # image's score identical (the old bug: I-AUROC 0.5 by ties) and break the cross-image
+        # ranking the pixel metrics depend on (protocol v0.2.6).
+        return Prediction(image_score=float(deviation.max()), anomaly_map=deviation)

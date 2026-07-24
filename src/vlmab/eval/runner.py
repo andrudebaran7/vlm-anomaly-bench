@@ -103,6 +103,7 @@ def run_evaluation(
     # for every caller that took it. test_public is the split with pixel ground truth, i.e.
     # the one every locally computed metric in this study is defined on.
     split: str = "test_public",
+    fit_split: str = "train",
     maps_dir: Path | None = None,
     device: str = "cuda",
 ) -> list[Path]:
@@ -116,6 +117,14 @@ def run_evaluation(
 
     written: list[Path] = []
     for category in todo:
+        if not method.zero_shot:
+            # Full-shot anchor: build this category's memory bank from its defect-free train
+            # images before scoring it (protocol §3). Passed as a lazy generator so the backend
+            # streams them rather than holding a category of 2.66 MP images in memory at once.
+            train_images = (
+                dataset.load_image(s) for s in dataset.samples(fit_split, category)
+            )
+            method.fit(train_images, category)
         # Accumulates in memory for this whole category; nothing here reaches disk (and
         # nothing is resumable) until the sample loop below completes and store.write() runs.
         rows: list[dict[str, Any]] = []
@@ -168,10 +177,32 @@ def run_evaluation(
                         "overwrite — two samples derived the same map filename, so "
                         "their result rows would point at the same map"
                     )
+                anomaly_map = np.asarray(prediction.anomaly_map, dtype=np.float32)
+                # float16 storage is a silent-corruption trap: a finite float32 value
+                # above float16's max (65504) casts to inf with no error (verified:
+                # np.array([1e6], np.float32).astype(np.float16) is inf), and nothing
+                # downstream re-checks finiteness before computing pixel metrics from
+                # the saved array. Protocol v0.2.6 relaxed the map-scale contract from
+                # [0,1] to "finite on the method's own scale", so a raw map exceeding
+                # float16's range is now something a method can in principle produce.
+                # Fail loud instead of clipping — clipping would hide a real problem
+                # (a method whose scores don't fit float16 needs to be flagged, not
+                # quietly truncated). NaN/inf coming IN from the method is already a
+                # method bug; it is caught by the same guard rather than given a
+                # separate path, since either way the map must not reach disk.
+                float16_max = float(np.finfo(np.float16).max)
+                max_abs = float(np.abs(anomaly_map).max()) if anomaly_map.size else 0.0
+                if not np.isfinite(max_abs) or max_abs > float16_max:
+                    raise ValueError(
+                        f"anomaly map for {sample.image_path} has max abs value "
+                        f"{max_abs} which does not survive float16 storage "
+                        f"(finite range is +/-{float16_max}); refusing "
+                        "to silently write an inf map"
+                    )
                 if not maps_dir_ready:
                     category_maps.mkdir(parents=True, exist_ok=True)
                     maps_dir_ready = True
-                np.save(map_path, prediction.anomaly_map.astype(np.float16))
+                np.save(map_path, anomaly_map.astype(np.float16))
                 written_maps.add(map_path)
                 row["map_path"] = str(map_path)
 

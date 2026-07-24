@@ -63,6 +63,12 @@ engineering.
   elsewhere, and applied identically to every method and category. Recorded here, like the
   colour-channel rule above, because it is a decision that touches every pixel-level number.
 
+- **Full-shot anchors.** A full-shot method (the PatchCore anchor) builds a per-category memory
+  bank from that category's defect-free `train` split before scoring its test images. It declares
+  `zero_shot = False`; the runner calls `fit(train_images, category)` once per category. This is the
+  standard PatchCore regime and is fixed here so the anchor's numbers are comparable across
+  categories.
+
 ## 4. Metrics
 
 - Image level: I-AUROC, I-AP, I-F1max.
@@ -93,6 +99,13 @@ engineering.
   AUROC), never a silent 0 and never NaN, and the failure is recorded per sample
   (`extras.parse_ok = False`) so the parse-failure rate is a reported number. This policy is fixed
   for every dataset and category, like the prompt itself.
+
+- **Anomaly-map scale.** Pixel metrics (P-AUROC, AU-PRO, SegF1) rank pooled pixels across every
+  image in a group, so a map's *absolute* scale does not matter but its scale must be *consistent
+  across images*. Methods therefore return maps on their own internal scale (e.g. PatchCore's raw
+  patch distances), NOT rescaled per image to [0,1]. Per-image [0,1] normalisation would stretch a
+  clean image's map to the same range as a defective one and destroy the cross-image ranking the
+  metrics depend on; it is used only for visualisation, never for scored maps.
 
 ## 5. Hardware & software
 
@@ -154,3 +167,9 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
 - 2026-07-24 — v0.2.5. Records the MLLM response-parsing and parse-failure policy in §3 (score 0.5
   and a per-sample flag on an unparseable response, so parse failures are reported rather than read
   as confident normals). Fixes it before any MLLM number is produced. No other evaluation rule changed.
+- 2026-07-24 — v0.2.6. Two contract changes, both forced by the first full-shot method (PatchCore).
+  §3: full-shot anchors fit a per-category memory bank on the train split (`fit()` on the method
+  contract, called per category by the runner). §4: anomaly maps are on the method's own consistent
+  scale, not per-image normalised to [0,1] — per-image rescaling breaks the cross-image pixel-metric
+  ranking. This is an evaluation-affecting change (it alters the pixel numbers a per-image-normalised
+  method would have produced), decided before any full-shot or real anomalib number exists.

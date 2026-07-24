@@ -1,8 +1,13 @@
 """Map post-processing shared by every adapter.
 
-Two jobs, both mandated by the protocol: bring an anomaly map to the input image's *native*
-resolution (§4 evaluates pixel metrics there against unmodified masks, so a coarse or resized
-map has to be expanded, never the mask shrunk), and bring scores into [0,1].
+`upsample_to` is the scoring-path utility, mandated by the protocol: it brings an anomaly map
+to the input image's *native* resolution (§4 evaluates pixel metrics there against unmodified
+masks, so a coarse or resized map has to be expanded, never the mask shrunk). Scored maps are
+NOT brought into [0,1] — protocol v0.2.6 keeps them on the method's own consistent scale, since
+per-image [0,1] normalisation would break the cross-image pixel-metric ranking.
+
+`normalise_to_unit` does min-max scores into [0,1], but it is visualisation-only; see its own
+docstring for why it must not be used on the scoring path.
 """
 import numpy as np
 
@@ -25,7 +30,12 @@ def upsample_to(coarse: np.ndarray, size: tuple[int, int]) -> np.ndarray:
 
 
 def normalise_to_unit(x: np.ndarray) -> np.ndarray:
-    """Min-max `x` into [0,1] as float32. All-equal input -> all zeros (no anomaly signal)."""
+    """Min-max `x` into [0,1] as float32. All-equal input -> all zeros (no signal).
+
+    Do NOT use this to scale an anomaly map for scoring: per-image [0,1] normalisation breaks the
+    cross-image pixel-metric ranking (protocol v0.2.6). It is for genuinely bounded quantities and
+    visualisation only.
+    """
     x = np.asarray(x, dtype=np.float32)
     if not np.isfinite(x).all():
         raise ValueError("map contains non-finite values; a NaN/inf map is a method bug")

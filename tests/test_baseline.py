@@ -30,16 +30,30 @@ def test_map_is_native_resolution(method):
     assert method.predict(img, "vial").anomaly_map.shape == (31, 47)
 
 
-def test_a_uniform_image_scores_lower_than_one_with_a_bright_blob(method):
+def test_a_flat_image_scores_below_a_spotted_one(method):
     plain = _image()
     spotted = _image(blob=((5, 10, 5, 10), 255))
     assert method.predict(plain, "vial").image_score < method.predict(spotted, "vial").image_score
 
 
+def test_two_images_with_different_contrast_get_different_scores(method):
+    """The bug this fixes: `normalise_to_unit` made every varied image score exactly 1.0, so
+    I-AUROC was 0.5 by ties. Raw scores must differ with contrast."""
+    faint = _image(blob=((5, 10, 5, 10), 150))
+    strong = _image(blob=((5, 10, 5, 10), 255))
+    assert method.predict(faint, "vial").image_score != method.predict(strong, "vial").image_score
+
+
+def test_a_strong_blob_scores_above_one(method):
+    """Proves the map is raw, not per-image normalised to [0,1]: a 255-on-100 blob deviates by
+    ~140, far above 1.0."""
+    assert method.predict(_image(blob=((5, 10, 5, 10), 255)), "vial").image_score > 1.0
+
+
 def test_the_blob_is_the_brightest_region_of_the_map(method):
     img = _image(blob=((5, 10, 5, 10), 255))
     amap = method.predict(img, "vial").anomaly_map
-    assert amap[7, 7] > amap[30, 50]  # inside the blob vs. the plain background
+    assert amap[7, 7] > amap[30, 50]
 
 
 def test_a_perfectly_flat_image_gives_an_all_zero_map(method):
@@ -48,4 +62,4 @@ def test_a_perfectly_flat_image_gives_an_all_zero_map(method):
 
 
 def test_prepare_is_a_noop_and_needs_no_gpu():
-    IntensityBaseline().prepare(device="cpu")  # must not raise
+    IntensityBaseline().prepare(device="cpu")
