@@ -47,13 +47,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     # method.prepare() is NOT called here: run_evaluation() owns that decision, calling it
     # only if there is genuinely work left (see its docstring) so a fully-resumed run never
     # pays for a model load and a run with work never loads it twice.
-    written = run_evaluation(
-        dataset, method, store, meta,
-        categories=categories,
-        split=args.split,
-        maps_dir=args.maps_dir,
-        device=args.device,
-    )
+    try:
+        written = run_evaluation(
+            dataset, method, store, meta,
+            categories=categories,
+            split=args.split,
+            maps_dir=args.maps_dir,
+            device=args.device,
+        )
+    except RuntimeError as exc:
+        # The specific "this adapter cannot run in this environment" signal (e.g. an MLLM
+        # adapter with no injected/constructible model client) -- fail cleanly instead of
+        # an uncaught traceback. Any other exception type is a real bug and should propagate.
+        print(f"{args.method}: cannot run here ({exc})")
+        return 1
+
     print(f"{args.method}: wrote {len(written)} shard(s) to {args.results}")
     return 0
 

@@ -55,3 +55,11 @@ def test_run_eval_does_not_prepare_a_method_on_a_fully_resumed_run(tmp_path, mon
     # raises AssertionError if either is called, and confirm the run still succeeds.
     monkeypatch.setattr("run_eval.build_method", lambda name: _PrepareForbidden())
     assert main(argv) == 0
+
+
+def test_run_eval_reports_a_method_that_cannot_run_here_cleanly(tmp_path, capsys):
+    build_category(tmp_path, "vial")
+    code = main(["--method", "mllm_qwen", "--root", str(tmp_path),
+                 "--split", "test_public", "--results", str(tmp_path / "results"), "--seed", "0"])
+    assert code == 1
+    assert "mllm_qwen" in capsys.readouterr().out
