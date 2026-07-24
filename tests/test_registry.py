@@ -10,7 +10,7 @@ def test_builds_a_known_method():
 
 def test_unknown_method_lists_the_known_ones():
     with pytest.raises(KeyError) as exc:
-        build_method("winclip")           # a deferred wrapper: not registered yet
+        build_method("anomalyclip")           # a deferred wrapper: not registered yet
     assert "intensity_baseline" in str(exc.value)
 
 
@@ -24,3 +24,10 @@ def test_builds_the_patchcore_anchor():
 
     assert isinstance(build_method("patchcore_ref"), PatchCoreRef)
     assert "patchcore_ref" in available()
+
+
+def test_builds_winclip():
+    from vlmab.methods.winclip import WinClipRef
+
+    assert isinstance(build_method("winclip"), WinClipRef)
+    assert "winclip" in available()
