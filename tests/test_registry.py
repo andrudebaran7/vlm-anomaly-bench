@@ -13,7 +13,7 @@ def test_unknown_method_lists_the_known_ones():
         # a deferred wrapper, not registered yet — swap for another unregistered name
         # (e.g. "adaclip", "saa") when anomalyclip itself gets registered, or this test starts
         # failing for the wrong reason.
-        build_method("anomalyclip")
+        build_method("adaclip")
     assert "intensity_baseline" in str(exc.value)
 
 
@@ -34,3 +34,10 @@ def test_builds_winclip():
 
     assert isinstance(build_method("winclip"), WinClipRef)
     assert "winclip" in available()
+
+
+def test_builds_anomalyclip():
+    from vlmab.methods.anomalyclip import AnomalyClipRef
+
+    assert isinstance(build_method("anomalyclip"), AnomalyClipRef)
+    assert "anomalyclip" in available()
