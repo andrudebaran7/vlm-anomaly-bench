@@ -11,9 +11,8 @@ def test_builds_a_known_method():
 def test_unknown_method_lists_the_known_ones():
     with pytest.raises(KeyError) as exc:
         # a deferred wrapper, not registered yet — swap for another unregistered name
-        # (e.g. "adaclip", "saa") when anomalyclip itself gets registered, or this test starts
-        # failing for the wrong reason.
-        build_method("adaclip")
+        # when saa itself gets registered, or this test starts failing for the wrong reason.
+        build_method("saa")
     assert "intensity_baseline" in str(exc.value)
 
 
@@ -41,3 +40,10 @@ def test_builds_anomalyclip():
 
     assert isinstance(build_method("anomalyclip"), AnomalyClipRef)
     assert "anomalyclip" in available()
+
+
+def test_builds_adaclip():
+    from vlmab.methods.adaclip import AdaClipRef
+
+    assert isinstance(build_method("adaclip"), AdaClipRef)
+    assert "adaclip" in available()

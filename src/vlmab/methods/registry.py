@@ -8,6 +8,7 @@ rather than a promise.
 """
 from typing import Callable
 
+from vlmab.methods.adaclip import AdaClipRef
 from vlmab.methods.anomalyclip import AnomalyClipRef
 from vlmab.methods.base import AnomalyMethod
 from vlmab.methods.baseline import IntensityBaseline
@@ -16,6 +17,7 @@ from vlmab.methods.patchcore_ref import PatchCoreRef
 from vlmab.methods.winclip import WinClipRef
 
 _REGISTRY: dict[str, Callable[[], AnomalyMethod]] = {
+    "adaclip": AdaClipRef,          # CPU-usable only with an injected backend; prepare() gates the rest
     "anomalyclip": AnomalyClipRef,  # CPU-usable only with an injected backend; prepare() gates the rest
     "intensity_baseline": IntensityBaseline,
     "mllm_qwen": QwenMLLM,          # CPU-usable only with an injected client; prepare() gates the rest
