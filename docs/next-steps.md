@@ -2,8 +2,10 @@
 
 Living map of where execution stands and what to do next. Milestones (M1–M6) live in the README;
 this file is the operational view — which plans are written, which halves are executed, and the
-order for the work that remains. Everything left is either a **Colab/GPU** step or an **external**
-one; the whole CPU-verifiable core is done, on `master`, and green on CI (Python 3.11 + 3.13).
+order for the work that remains. **Every method now has a written plan** (2026-07-29: AdaCLIP and
+SAA+ were the last two). What remains is either a **Colab/GPU** step, an **external** one, or the
+CPU half of the two newest plans — which is subagent-executable today. The pre-existing
+CPU-verifiable core is done, on `master`, and green on CI (Python 3.11 + 3.13).
 
 ## What is done (CPU, no GPU)
 
@@ -44,14 +46,22 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    (anomalib does not ship it), so its backend is derived from the repo's `test.py` at a pinned
    commit. Use the **VisA-trained** checkpoint for MVTec AD 2 and the **MVTec-AD-trained** checkpoint
    for the VisA reproduction (overlap audit, §3.1).
-4. **AdaCLIP** — *plan not yet written.* Zero-shot and, like AnomalyCLIP, **auxiliary-trained**, so
-   it needs the same kind of overlap audit before its numbers are valid. `src/vlmab/methods/adaclip.py`
-   is still a stub. Ask for the AdaCLIP plan when ready; it mirrors the AnomalyCLIP plan (CPU adapter
-   + overlap audit + Colab backend).
-5. **SAA+** — *plan not yet written.* Training-free (GroundingDINO + SAM cascade), so **no
-   aux-training concern** — simpler than AdaCLIP/AnomalyCLIP on the audit side, but the heaviest on
-   T4 VRAM and the slowest per image (protocol flags it as the run that may not fit a 12h Colab
-   session; report a failure as a failure if so, per §6). `src/vlmab/methods/saa.py` is a stub.
+4. **AdaCLIP CPU tasks (1–3) then Colab phases (A–D)** —
+   `docs/superpowers/plans/2026-07-29-adaclip-zeroshot-adapter.md`. Zero-shot and, like AnomalyCLIP,
+   **auxiliary-trained**, so it carries the same kind of overlap audit. Its CPU half is
+   subagent-executable now; `src/vlmab/methods/adaclip.py` is still a stub until Task 1 lands. Watch:
+   the plan pre-registers a contingency for the case where the repo publishes only one checkpoint —
+   resolve it in Colab phase A.2 before scoring anything.
+5. **SAA+ CPU tasks (1–4) then Colab phases (A–D)** —
+   `docs/superpowers/plans/2026-07-29-saa-trainingfree-adapter.md`. Training-free (GroundingDINO + SAM
+   cascade), so **no aux-training concern** — simpler than AdaCLIP/AnomalyCLIP on the audit side, but it
+   carries three things they do not: a dated §3 amendment for its per-category prompts (taken verbatim
+   from the repo, committed before any scoring), the repo's own mask-based anomaly map taken verbatim
+   plus a granularity diagnostic, and a **measured cost probe** (phase C.2) in place of the untested
+   "may not fit a 12h session" assumption — the runner is resumable, so the real question is total
+   budget, not session length. `src/vlmab/methods/saa.py` is a stub until Task 1 lands. Run this plan
+   **after** AdaCLIP's: AdaCLIP's Task 2 re-points the registry's unknown-method example to `saa`, and
+   SAA+'s Task 3 closes that chain.
 6. **M3 — full MVTec AD 2 grid.** Once each method's VisA gate passes, run the full public-test grid
    over all eight categories, one category at a time (the download/resume/shard unit). Mechanical.
 7. **M4 — evaluation server.** Score the private split. Blocked on the registration below.
