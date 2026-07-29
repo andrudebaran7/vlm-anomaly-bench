@@ -1,2 +1,16 @@
 name: adaclip
-source: TODO_pin_at_M2
+zero_shot: true
+aux_trained: true                # learns hybrid (static + dynamic) prompts on auxiliary AD data
+# AdaCLIP (Cao et al., ECCV 2024). anomalib does not ship it, so provenance is the official repo
+# (protocol §3 priority 1). Pin the commit on the first Colab run.
+source: https://github.com/caoyunkang/AdaCLIP
+commit: unpinned_until_first_colab_run     # record the exact SHA here
+backbone: verify_at_integration            # read from the repo's config at the pinned commit
+# Checkpoint per test set, so the auxiliary data never overlaps the test set
+# (docs/adaclip-overlap-audit.md):
+checkpoint_for_mvtec_ad2: visa_trained     # conservative: AD2 is MVTec-family; train on VisA
+checkpoint_for_visa_reproduction: mvtec_ad_trained   # clean: train on MVTec AD, test on VisA
+# If the repo publishes only the MVTec-AD-trained checkpoint, use it for MVTec AD 2 and set
+# domain_proximity_caveat: true — never report it as clean (see the audit).
+domain_proximity_caveat: false
+prompts: learned_hybrid_static_plus_dynamic   # protocol §3: from the official checkpoint, not tuned
