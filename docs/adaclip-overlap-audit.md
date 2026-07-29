@@ -38,6 +38,15 @@ Pre-registered rule, written before any AdaCLIP number exists:
 > run cleanly (VisA-on-VisA). In that case the gate runs against AdaCLIP's published **MVTec AD
 > (classic)** numbers with the VisA-trained checkpoint instead, and results/reproduction/adaclip_visa.md
 > is renamed to record which dataset the gate actually ran on.
+>
+> If, instead, the published checkpoint(s) were trained on auxiliary data that is neither exactly
+> VisA nor exactly MVTec AD (classic) — e.g. a mixture including other datasets, or a dataset we have
+> not enumerated here — no checkpoint choice above applies as written. In that case: record the
+> complete auxiliary training-set list for the checkpoint actually used in the table's "Auxiliary
+> data" cell (not just its nearest label), and set `domain_proximity_caveat: true` if **any**
+> component of that training data shares a provider or industrial-inspection domain with the test
+> set in use, else `false`. This is decided from the training-set list alone, the same way the clean
+> rows above are — never improvised in the GPU session.
 
 ## Recorded on first Colab run
 
@@ -45,5 +54,5 @@ Pre-registered rule, written before any AdaCLIP number exists:
 - Checkpoints published by the repo (list every one found): ____
 - VisA-trained checkpoint file + sha256: ____
 - MVTec-AD-trained checkpoint file + sha256: ____
-- Contingency triggered? (none / MVTec-only / VisA-only): ____
+- Contingency triggered? (none / MVTec-only / VisA-only / other-auxiliary-data): ____
 - If triggered, the caveat text used in the paper's tables: ____

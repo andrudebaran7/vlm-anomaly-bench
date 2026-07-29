@@ -10,7 +10,9 @@ backbone: verify_at_integration            # read from the repo's config at the 
 # (docs/adaclip-overlap-audit.md):
 checkpoint_for_mvtec_ad2: visa_trained     # conservative: AD2 is MVTec-family; train on VisA
 checkpoint_for_visa_reproduction: mvtec_ad_trained   # clean: train on MVTec AD, test on VisA
-# If the repo publishes only the MVTec-AD-trained checkpoint, use it for MVTec AD 2 and set
-# domain_proximity_caveat: true — never report it as clean (see the audit).
-domain_proximity_caveat: false
+# Must be resolved to true or false during Colab phase A.2, once the published checkpoints are
+# known — never leave this defaulting to a clean answer before that. If the repo publishes only
+# the MVTec-AD-trained checkpoint, use it for MVTec AD 2 and set domain_proximity_caveat: true —
+# never report it as clean (see the audit).
+domain_proximity_caveat: unresolved_until_first_colab_run
 prompts: learned_hybrid_static_plus_dynamic   # protocol §3: from the official checkpoint, not tuned

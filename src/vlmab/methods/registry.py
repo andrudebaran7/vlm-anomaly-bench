@@ -1,8 +1,8 @@
 """Name -> adapter, for the CLI and the Colab notebook.
 
 Adapters are buildable by name here even when they need a GPU backend they cannot construct on
-CPU (mllm_qwen, patchcore_ref): they build, but their prepare() raises MethodNotRunnable without
-an injected backend. Each remaining deferred wrapper (WinCLIP, AnomalyCLIP, AdaCLIP, SAA+) adds
+CPU (mllm_qwen, patchcore_ref, winclip, anomalyclip, adaclip): they build, but their prepare()
+raises MethodNotRunnable without an injected backend. The remaining deferred wrapper (SAA+) adds
 its own entry when its plan lands, so an unknown name fails with the list of what actually runs
 rather than a promise.
 """

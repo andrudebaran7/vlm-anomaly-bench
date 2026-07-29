@@ -17,7 +17,7 @@ class _FakeBackend:
     def score(self, image, category):
         self.calls.append(category)
         m = np.zeros((16, 16), dtype=np.float32)
-        m[4, 7] = 2.5
+        m[4, 7] = 1.3
         return 2.5, m
 
 
@@ -49,9 +49,11 @@ def test_predict_returns_a_native_resolution_raw_map():
     img = np.zeros((80, 50, 3), dtype=np.uint8)
     pred = m.predict(img, "vial")
     assert_valid_prediction(pred, img)               # finite float32 native map, not [0,1]
+    # score() returns 2.5 but the map's hot cell is 1.3: these must differ so this assertion can
+    # only pass if the backend's score is passed through unchanged, not recomputed from the map.
     assert pred.image_score == pytest.approx(2.5)    # raw score passed through, not rescaled
     assert pred.anomaly_map.shape == (80, 50)        # upsampled to native
-    assert pred.anomaly_map.max() == pytest.approx(2.5)
+    assert pred.anomaly_map.max() == pytest.approx(1.3)
 
 
 def test_predict_records_the_category_in_extras():
