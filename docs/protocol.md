@@ -76,6 +76,17 @@ engineering.
   MVTec AD 2 (conservative, avoiding MVTec-family domain proximity), the MVTec-AD-trained checkpoint
   for the VisA reproduction. Full audit: docs/anomalyclip-overlap-audit.md.
 
+- **AdaCLIP (auxiliary-trained).** AdaCLIP adapts CLIP with hybrid prompts — a static component learned
+  on auxiliary AD data and fixed in the checkpoint, plus a per-image dynamic component — and scores
+  zero-shot; the auxiliary data must not overlap the test set (§3.1 credibility requirement).
+  Provenance is the official repo at a pinned commit (anomalib does not ship it). The checkpoint is
+  chosen per test set on the same rule as AnomalyCLIP, so the auxiliary data is clean: the VisA-trained
+  checkpoint for MVTec AD 2 (conservative, avoiding MVTec-family domain proximity), the
+  MVTec-AD-trained checkpoint for the VisA reproduction. If the repo publishes only one checkpoint, the
+  pre-registered contingency in docs/adaclip-overlap-audit.md applies: the available checkpoint is used
+  and the resulting domain proximity is recorded as a caveat on every table, never reported as clean.
+  Full audit: docs/adaclip-overlap-audit.md.
+
 ## 4. Metrics
 
 - Image level: I-AUROC, I-AP, I-F1max.
@@ -184,3 +195,9 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   set overlap audit (§3, docs/anomalyclip-overlap-audit.md): VisA-trained checkpoint for MVTec AD 2
   (conservative against MVTec-family domain proximity), MVTec-AD-trained for the VisA reproduction.
   Decided before any AnomalyCLIP number exists. No evaluation rule for other methods changed.
+- 2026-07-29 — v0.2.8. Records AdaCLIP's auxiliary-training regime and its checkpoint-per-test-set
+  overlap audit (§3, docs/adaclip-overlap-audit.md), on the same rule already fixed for AnomalyCLIP:
+  VisA-trained checkpoint for MVTec AD 2, MVTec-AD-trained for the VisA reproduction. Also pre-registers
+  the single-checkpoint contingency — if the repo publishes only one, it is used and the domain
+  proximity is carried as a caveat on every table rather than reported as clean. Decided before any
+  AdaCLIP number exists. No evaluation rule for other methods changed.
