@@ -8,7 +8,12 @@ from vlmab.methods.winclip import WinClipRef
 
 class _FakeBackend:
     """Stands in for the real anomalib WinCLIP backend. Records the category, returns a raw
-    score plus a coarse map (like CLIP's windowed anomaly map before upsampling)."""
+    score plus a coarse map (like CLIP's windowed anomaly map before upsampling).
+
+    The score and the map's hot cell are deliberately DIFFERENT values: if they matched, the
+    image-score assertion below would still pass under an adapter bug that ignored the backend's
+    score and returned the map's maximum instead. Passing the backend's score through untouched is
+    the one substantive thing this adapter decides, so the fake has to be able to catch that."""
 
     def __init__(self):
         self.seen = []
@@ -16,7 +21,7 @@ class _FakeBackend:
     def score(self, image, category):
         self.seen.append(category)
         m = np.zeros((15, 15), dtype=np.float32)
-        m[3, 4] = 2.7
+        m[3, 4] = 1.4
         return 2.7, m
 
 
@@ -45,7 +50,7 @@ def test_predict_returns_a_native_resolution_raw_map():
     assert_valid_prediction(pred, img)               # finite float32 native map, not [0,1]
     assert pred.image_score == pytest.approx(2.7)    # raw score passed through, not rescaled
     assert pred.anomaly_map.shape == (75, 60)        # upsampled to native
-    assert pred.anomaly_map.max() == pytest.approx(2.7)   # the hot window survives upsampling
+    assert pred.anomaly_map.max() == pytest.approx(1.4)   # the hot window survives upsampling
 
 
 def test_predict_without_a_backend_is_not_runnable():

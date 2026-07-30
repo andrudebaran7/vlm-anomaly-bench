@@ -87,6 +87,33 @@ engineering.
   and the resulting domain proximity is recorded as a caveat on every table, never reported as clean.
   Full audit: docs/adaclip-overlap-audit.md.
 
+### 3.1 Auxiliary-training overlap
+
+A method is **auxiliary-trained** when it learns something (prompts, adapters, a projection) on an
+anomaly-detection dataset other than the target, then scores the target zero-shot. Such a method's
+numbers are credible only if its auxiliary training data does not overlap the test set. This is a
+common credibility hole in the zero-shot AD literature, and closing it is a requirement of this
+protocol, not a courtesy:
+
+- Every auxiliary-trained method gets a committed **overlap audit** naming the auxiliary dataset
+  behind each checkpoint it uses, the test set each checkpoint is used on, and why that pairing has no
+  overlap. The audit is written **before** any number for that method exists.
+- Where a method ships several checkpoints, which checkpoint is used for which test set is a
+  pre-registration decision recorded in the audit and in the method's config — never a choice made
+  after seeing results.
+- Overlap is judged at the dataset level first. Where a pairing is clean at the image level but the
+  auxiliary data shares a provider or an imaging domain with the test set, that **domain proximity**
+  is either avoided by choosing another checkpoint or recorded as an explicit caveat on every table
+  where the method appears. It is never reported as clean.
+- **Training-free methods** (no method-trained weights at all) still appear in the audit table, marked
+  as such. A table with methods silently missing from it reads as an omission, not an exemption.
+
+Audits on file: `docs/anomalyclip-overlap-audit.md`, `docs/adaclip-overlap-audit.md`. SAA+ is
+training-free and carries the corresponding table row rather than an audit document.
+
+The paper reports this material in its own §3.1, which is why both audit documents and the method
+bullets above cross-reference "§3.1" — the requirement lives here, the reporting lives there.
+
 ## 4. Metrics
 
 - Image level: I-AUROC, I-AP, I-F1max.
@@ -201,3 +228,12 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   the single-checkpoint contingency — if the repo publishes only one, it is used and the domain
   proximity is carried as a caveat on every table rather than reported as clean. Decided before any
   AdaCLIP number exists. No evaluation rule for other methods changed.
+- 2026-07-30 — editorial, **still v0.2.8** (no rule changed, so no version bump; v0.2.9 stays reserved
+  for the pending SAA+ amendment). Adds the §3.1 subsection this document had been cross-referencing
+  since v0.2.7 without containing: §3 and both overlap-audit documents cited "§3.1" as the
+  auxiliary-training credibility requirement, but the protocol's headings ran §1–§7 with no §3.1, so
+  every such reference resolved to nothing. The new subsection states the requirement that was already
+  being applied — per-checkpoint overlap audits written before any number exists, checkpoint choice
+  pre-registered, domain proximity avoided or carried as an explicit caveat, training-free methods
+  listed rather than omitted — and records that the paper reports this material in its own §3.1. It
+  introduces no new obligation and changes no method's treatment.
