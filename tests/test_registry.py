@@ -10,9 +10,9 @@ def test_builds_a_known_method():
 
 def test_unknown_method_lists_the_known_ones():
     with pytest.raises(KeyError) as exc:
-        # a deferred wrapper, not registered yet — swap for another unregistered name
-        # when saa itself gets registered, or this test starts failing for the wrong reason.
-        build_method("saa")
+        # a name that is deliberately not a method and never will be: every planned method is now
+        # registered, so borrowing a real one would make this test fail as each plan lands.
+        build_method("not_a_method_sentinel")
     assert "intensity_baseline" in str(exc.value)
 
 
@@ -47,3 +47,24 @@ def test_builds_adaclip():
 
     assert isinstance(build_method("adaclip"), AdaClipRef)
     assert "adaclip" in available()
+
+
+def test_builds_saa():
+    from vlmab.methods.saa import SaaRef
+
+    assert isinstance(build_method("saa"), SaaRef)
+    assert "saa" in available()
+
+
+def test_every_planned_method_is_registered():
+    """The registry docstring promised an entry per deferred wrapper as each plan landed. With SAA+
+    registered they all have one, so this pins the full set and makes an accidental removal fail."""
+    assert set(available()) == {
+        "adaclip",
+        "anomalyclip",
+        "intensity_baseline",
+        "mllm_qwen",
+        "patchcore_ref",
+        "saa",
+        "winclip",
+    }
