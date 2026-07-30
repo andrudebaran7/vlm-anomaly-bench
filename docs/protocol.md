@@ -41,9 +41,15 @@ overlap table required in the paper).
 
 Priority order: (1) official code, pinned commit; (2) anomalib implementation, pinned version;
 (3) re-implementation (last resort, flagged). Prompts for CLIP-based methods are taken verbatim
-from the original papers. The MLLM baseline uses one fixed structured prompt + one fixed scoring
-rubric for all datasets, published in `configs/methods/mllm_qwen.yaml` — no per-category prompt
-engineering.
+from the original papers. The governing principle: what is forbidden is prompt content **we** write,
+reword or tune per category. Per-category content taken **verbatim from the method's own published
+source** — WinCLIP's object noun from its paper's prompt ensemble, SAA+'s per-object prompts from its
+repo — is not "engineering"; it is required for faithful reproduction, and omitting it would measure
+a degraded method the source never reports. The MLLM baseline's own commitment is stricter than this
+floor, and stays binding regardless: one fixed structured prompt + one fixed scoring rubric for **all**
+datasets and categories, published in `configs/methods/mllm_qwen.yaml`, with no per-category variation
+of any kind — the MLLM has no published per-category prompt to reproduce, so there is nothing verbatim
+to substitute.
 
 - **Colour channels.** MVTec AD 2 images are grayscale in at least one category (Vial: 8-bit,
   1400x1900). Every method in this study expects 3-channel RGB input, so the loader converts
@@ -87,23 +93,35 @@ engineering.
   and the resulting domain proximity is recorded as a caveat on every table, never reported as clean.
   Full audit: docs/adaclip-overlap-audit.md.
 
-- **SAA+ (training-free; per-category prompts, by amendment).** SAA+ is a cascade of two frozen
+- **SAA+ (training-free; per-category prompts sourced from the repo).** SAA+ is a cascade of two frozen
   foundation models (GroundingDINO region proposals refined by SAM). Nothing is trained by the method,
   so no auxiliary-training overlap audit applies — SAA+ appears in the §3.1 table as *training-free, no
-  auxiliary data*, so that table has no silent gaps. **This bullet amends §3's "no per-category prompt
-  engineering" rule for SAA+ alone.** SAA+'s contribution is hybrid prompt regularization: per-object
-  defect language expressions and object-specific property constraints. Running it with a single generic
-  prompt would measure a method its own paper does not report. The exemption is conditional: the
-  per-object prompts are taken **verbatim from the official repo at the pinned commit**, recorded with
-  their exact file provenance in configs/methods/saa_prompts.yaml, committed before the first scoring
-  run, and never adjusted after seeing a result. Where the repo publishes no prompt for one of our
-  categories, that is recorded as such — no prompt is invented.
+  auxiliary data*, so that table has no silent gaps. **This bullet applies §3's verbatim-sourcing
+  principle to SAA+, whose per-object prompts are published in the official repo rather than in a
+  paper.** SAA+'s contribution is hybrid prompt regularization: per-object defect language expressions
+  and object-specific property constraints. Running it with a single generic prompt would measure a
+  method its own paper does not report. Applying the principle here is conditional: the per-object
+  prompts are taken **verbatim from the official repo at the pinned commit**, recorded with their exact
+  file provenance in configs/methods/saa_prompts.yaml, committed before the first scoring run, and never
+  adjusted after seeing a result. Where the repo publishes no prompt for one of our categories, that is
+  recorded as such — no prompt is invented. This is the realistic case for every one of MVTec AD 2's
+  eight categories: SAA+'s published prompts cover MVTec AD (classic) and VisA objects, none of which
+  are `can`, `fabric`, `fruit_jelly`, `rice`, `sheet_metal`, `vial`, `wallplugs` or `walnuts`. Where a
+  category has no published prompt, SAA+ runs on the repo's own generic fallback prompt for that
+  category instead, and every table marks that category's numbers as *SAA+ without its per-object
+  prompts* — never reported as SAA+ proper. If every one of the eight categories falls back this way,
+  the paper records that this provision had no effect for MVTec AD 2 and says so plainly, rather than
+  presenting fallback numbers as the method its prompts describe. `configs/methods/saa.yaml`'s
+  `prompt_coverage` field records, once Colab phase A.3 has read the repo, how many of the eight
+  categories actually got a published prompt.
+
 - **Mask-based anomaly maps (SAA+).** SAA+ emits region masks with confidence scores rather than a
   dense per-pixel field, so its anomaly map has few distinct levels, and every threshold-sweeping pixel
   metric is sensitive to that. The map is taken **verbatim from the repo's own inference output** and
   only upsampled: recomposing it from masks would be a re-implementation (priority 3), and smoothing it
   would be a post-process no other method in this study receives. Map granularity is instead measured
   (`postprocess.distinct_levels`) and reported alongside SAA+'s pixel metrics as a stated confound.
+
 - **Two pinned checkpoints for SAA+.** GroundingDINO and SAM are independent artefacts with independent
   versions; both are pinned by sha256 in configs/methods/saa.yaml. Changing either moves every pixel
   metric without any code change.
@@ -258,12 +276,18 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   pre-registered, domain proximity avoided or carried as an explicit caveat, training-free methods
   listed rather than omitted — and records that the paper reports this material in its own §3.1. It
   introduces no new obligation and changes no method's treatment.
-- 2026-07-29 — v0.2.9. Amends §3 for SAA+ only, and states the conditions. (a) Prompts: SAA+'s
-  per-object domain prompts are its contribution, not tuning, so the "no per-category prompt
-  engineering" rule is lifted for SAA+ on the condition that every prompt is verbatim from the official
-  repo at the pinned commit, recorded with file provenance in configs/methods/saa_prompts.yaml,
-  committed before the first scoring run, and never changed after seeing a result; unpublished prompts
-  are recorded as unpublished, never invented. (b) Map provenance: SAA+'s mask-based map is taken
-  verbatim from the repo and only upsampled — never recomposed, never smoothed — with its granularity
-  measured and reported as a confound. (c) Two checkpoints (GroundingDINO, SAM) are pinned by sha256,
-  not one. Decided before any SAA+ number exists. No evaluation rule for other methods changed.
+- 2026-07-30 — v0.2.9. Clarifies §3's governing principle (verbatim-sourced per-category content is
+  reproduction, not "engineering") and applies it to SAA+, whose per-category prompts are published in
+  its repo rather than a paper; also states SAA+'s conditions. (a) Prompts: SAA+'s per-object domain
+  prompts are its contribution, taken verbatim from the official repo at the pinned commit, recorded
+  with file provenance in configs/methods/saa_prompts.yaml, committed before the first scoring run, and
+  never changed after seeing a result; unpublished prompts are recorded as unpublished, never invented.
+  Where a category has no published prompt — the realistic outcome for all eight MVTec AD 2 categories,
+  since SAA+'s published prompts cover MVTec AD (classic) and VisA objects only — SAA+ runs on the
+  repo's own generic fallback prompt for that category, and every table marks those numbers as *SAA+
+  without its per-object prompts*, never as SAA+ proper; if that applies to every category, the paper
+  records that this provision had no effect on MVTec AD 2. (b) Map provenance: SAA+'s mask-based map is
+  taken verbatim from the repo and only upsampled — never recomposed, never smoothed — with its
+  granularity measured and reported as a confound. (c) Two checkpoints (GroundingDINO, SAM) are pinned
+  by sha256, not one. Decided before any SAA+ number exists. No evaluation rule for other methods
+  changed.

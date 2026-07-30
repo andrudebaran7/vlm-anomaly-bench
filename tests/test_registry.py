@@ -57,8 +57,10 @@ def test_builds_saa():
 
 
 def test_every_planned_method_is_registered():
-    """The registry docstring promised an entry per deferred wrapper as each plan landed. With SAA+
-    registered they all have one, so this pins the full set and makes an accidental removal fail."""
+    """Pins the full set of currently-registered method names, so an accidental removal fails. This is
+    not every method the project ever plans to run — WinCLIP+ (few-shot) is noted as a separate plan in
+    configs/methods/winclip.yaml and listed in README.md's methods table — only every method with a
+    landed CPU-adapter plan, which as of SAA+ is all seven of these."""
     assert set(available()) == {
         "adaclip",
         "anomalyclip",

@@ -735,13 +735,20 @@ class SaaBackend:
         self._model = _build_cascade(grounding_dino_checkpoint, sam_checkpoint, device)  # FILL
         # FILL from A.4: the repo's own per-object prompt lookup. Select from it; never build prompts.
         self._prompts = _load_repo_prompts(repo_dir)                                     # FILL
+        # FILL from A.4: the repo's own fallback prompt for an object it has no per-object entry for
+        # (e.g. its "unknown object" or default prompt) — used, never invented by us. See score() below.
+        self._fallback_prompt = _load_repo_fallback_prompt(repo_dir)                     # FILL
         self._device = device
 
     def score(self, image: np.ndarray, category: str) -> tuple[float, np.ndarray]:
         import torch
 
-        prompt = self._prompts[category]   # KeyError here is correct: an unprompted category is a
-                                           # pre-registration gap to record, not to paper over.
+        # An unprompted category is a pre-registration gap: record it (configs/methods/saa_prompts.yaml,
+        # configs/methods/saa.yaml's prompt_coverage) AND still score it, on the repo's own fallback
+        # prompt for an unknown object — never a silent KeyError, and never an invented prompt. Numbers
+        # produced this way are marked on every table as "SAA+ without its per-object prompts" (protocol
+        # §3 v0.2.9), never reported as SAA+ proper.
+        prompt = self._prompts.get(category, self._fallback_prompt)
         with torch.no_grad():
             # FILL from A.4: run the cascade and take the repo's OWN final score and anomaly map.
             image_score, anomaly_map = _run_cascade(self._model, image, prompt)
@@ -751,8 +758,8 @@ class SaaBackend:
         return score, amap
 ```
 
-Replace the three `FILL` helpers (`_build_cascade`, `_load_repo_prompts`, `_run_cascade`) with the exact
-calls from the repo. Keep them small and named. **Do not guess these — follow the repo's inference
+Replace the four `FILL` helpers (`_build_cascade`, `_load_repo_prompts`, `_load_repo_fallback_prompt`,
+`_run_cascade`) with the exact calls from the repo. Keep them small and named. **Do not guess these — follow the repo's inference
 script.**
 
 - [ ] **B.2 — Smoke test the backend**
