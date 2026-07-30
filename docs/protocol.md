@@ -87,6 +87,27 @@ engineering.
   and the resulting domain proximity is recorded as a caveat on every table, never reported as clean.
   Full audit: docs/adaclip-overlap-audit.md.
 
+- **SAA+ (training-free; per-category prompts, by amendment).** SAA+ is a cascade of two frozen
+  foundation models (GroundingDINO region proposals refined by SAM). Nothing is trained by the method,
+  so no auxiliary-training overlap audit applies — SAA+ appears in the §3.1 table as *training-free, no
+  auxiliary data*, so that table has no silent gaps. **This bullet amends §3's "no per-category prompt
+  engineering" rule for SAA+ alone.** SAA+'s contribution is hybrid prompt regularization: per-object
+  defect language expressions and object-specific property constraints. Running it with a single generic
+  prompt would measure a method its own paper does not report. The exemption is conditional: the
+  per-object prompts are taken **verbatim from the official repo at the pinned commit**, recorded with
+  their exact file provenance in configs/methods/saa_prompts.yaml, committed before the first scoring
+  run, and never adjusted after seeing a result. Where the repo publishes no prompt for one of our
+  categories, that is recorded as such — no prompt is invented.
+- **Mask-based anomaly maps (SAA+).** SAA+ emits region masks with confidence scores rather than a
+  dense per-pixel field, so its anomaly map has few distinct levels, and every threshold-sweeping pixel
+  metric is sensitive to that. The map is taken **verbatim from the repo's own inference output** and
+  only upsampled: recomposing it from masks would be a re-implementation (priority 3), and smoothing it
+  would be a post-process no other method in this study receives. Map granularity is instead measured
+  (`postprocess.distinct_levels`) and reported alongside SAA+'s pixel metrics as a stated confound.
+- **Two pinned checkpoints for SAA+.** GroundingDINO and SAM are independent artefacts with independent
+  versions; both are pinned by sha256 in configs/methods/saa.yaml. Changing either moves every pixel
+  metric without any code change.
+
 ### 3.1 Auxiliary-training overlap
 
 A method is **auxiliary-trained** when it learns something (prompts, adapters, a projection) on an
@@ -237,3 +258,12 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   pre-registered, domain proximity avoided or carried as an explicit caveat, training-free methods
   listed rather than omitted — and records that the paper reports this material in its own §3.1. It
   introduces no new obligation and changes no method's treatment.
+- 2026-07-29 — v0.2.9. Amends §3 for SAA+ only, and states the conditions. (a) Prompts: SAA+'s
+  per-object domain prompts are its contribution, not tuning, so the "no per-category prompt
+  engineering" rule is lifted for SAA+ on the condition that every prompt is verbatim from the official
+  repo at the pinned commit, recorded with file provenance in configs/methods/saa_prompts.yaml,
+  committed before the first scoring run, and never changed after seeing a result; unpublished prompts
+  are recorded as unpublished, never invented. (b) Map provenance: SAA+'s mask-based map is taken
+  verbatim from the repo and only upsampled — never recomposed, never smoothed — with its granularity
+  measured and reported as a confound. (c) Two checkpoints (GroundingDINO, SAM) are pinned by sha256,
+  not one. Decided before any SAA+ number exists. No evaluation rule for other methods changed.

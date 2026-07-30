@@ -1,0 +1,36 @@
+# SAA+ per-category prompts — PRE-REGISTERED (protocol §3 amendment v0.2.9)
+#
+# SAA+'s contribution is hybrid prompt regularization: per-object domain knowledge, consisting of
+# defect language expressions plus object-specific property constraints (anomaly region area, size,
+# position). Those prompts ARE the method, which is why protocol §3's no-per-category-prompts rule is
+# amended for SAA+ rather than applied to it.
+#
+# THE CONDITION THAT MAKES THE AMENDMENT DEFENSIBLE — read before editing this file:
+#   1. Every value below is copied VERBATIM from the official repo at the pinned commit recorded in
+#      configs/methods/saa.yaml. Cite the exact file and line range you copied it from.
+#   2. Nothing here is written, reworded or tuned by us.
+#   3. Nothing here is changed after seeing any result, on any dataset. If a prompt turns out to be
+#      wrong, the fix is to re-read the repo and record a dated correction — not to improve the prompt.
+#   4. This file is committed BEFORE the first scoring run (Colab phase A.3, before phase C).
+#
+# If the repo has no prompt for one of our categories (MVTec AD 2 categories are not MVTec AD classic
+# categories), do NOT invent one. Record `prompt: NOT_PUBLISHED_IN_REPO` and the fallback the repo's
+# own code uses for an unknown object, and note it in results/reproduction/saa_visa.md — an invented
+# prompt would be exactly the per-category engineering §3 forbids.
+
+source_commit: unpinned_until_first_colab_run
+source_files: unrecorded            # e.g. "SAA/prompts.py L12-L88" — the exact provenance
+recorded_on: unrecorded             # date the values below were copied
+
+categories:
+  can:          {prompt: unrecorded, property_constraints: unrecorded, copied_from: unrecorded}
+  fabric:       {prompt: unrecorded, property_constraints: unrecorded, copied_from: unrecorded}
+  fruit_jelly:  {prompt: unrecorded, property_constraints: unrecorded, copied_from: unrecorded}
+  rice:         {prompt: unrecorded, property_constraints: unrecorded, copied_from: unrecorded}
+  sheet_metal:  {prompt: unrecorded, property_constraints: unrecorded, copied_from: unrecorded}
+  vial:         {prompt: unrecorded, property_constraints: unrecorded, copied_from: unrecorded}
+  wallplugs:    {prompt: unrecorded, property_constraints: unrecorded, copied_from: unrecorded}
+  walnuts:      {prompt: unrecorded, property_constraints: unrecorded, copied_from: unrecorded}
+
+# VisA objects, for the §2 reproduction gate. Fill from the repo the same way.
+visa_categories: unrecorded
