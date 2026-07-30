@@ -97,36 +97,49 @@ This materially reduces the damage of the evaluation-server blocker below: witho
 access the study loses the leaderboard entry and the paired same-scene contrast, but keeps the
 lighting-shift result, all pixel-level localisation metrics, and the full method comparison.
 
-### ⚠️ Open blocker — evaluation-server registration requires a company email address
+### ✅ RESOLVED — evaluation-server access granted (2026-07-30)
+
+**Status: access authorised 2026-07-30.** M4 is unblocked and the private test split is in scope:
+protocol §2 private-split reporting, §4's official metric set and §7's one-submission-per-method
+rule are all executable. The scope-reduction amendment drafted below was **never needed** and is
+kept only as the record of what the fallback would have been.
+
+To record now that access exists (fill on first login):
+
+- Address the account was granted to: ____
+- Registered on: ____
+- Official metric names + definitions, read from the server's submission docs: ____
+  *(protocol §4 marks these "still unverified" and adopts them as the server defines them — this is
+  the first thing to read, since it is a §4 dependency, not a detail.)*
+- Submission format + any rate/attempt limits: ____
+  *(§7 commits to one submission per method, final. Confirm the server does not impose a stricter
+  limit before any submission is spent.)*
+
+#### History of the blocker (kept — it explains the protocol's contingency language)
 
 Observed on the benchmark login page (2026-07-23): registration asks for a username that is an
 email address, and states that **a company email address is required**. Free providers
-(gmail.com and similar) are therefore expected to be rejected. The page directs registration
+(gmail.com and similar) were therefore expected to be rejected. The page directs registration
 problems to `webmaster@mvtec.com`.
 
-This is a hard dependency, not a nuisance: the private test split is scored *only* on that
-server, so without an account the protocol's §2 private-split reporting, its §4 official metric
-set, and the §7 one-submission-per-method rule are all unexecutable, and M4 cannot happen.
+This was a hard dependency, not a nuisance: the private test split is scored *only* on that
+server, so without an account M4 could not happen.
 
-Routes being tried, in order:
+Routes tried, in order:
 
 1. An institutional address (University of Luxembourg), if still active.
 2. A request to `webmaster@mvtec.com` explaining the independent academic research context.
 
-Status: ☐ not resolved — route 2 request sent 2026-07-23, awaiting reply.
-If no response by **2026-08-06** (two weeks), follow up once; if that also goes unanswered,
-treat the private split as unavailable and open the protocol amendment described below rather
-than letting M4 sit blocked indefinitely.
+Route 2 request was sent 2026-07-23 and **granted 2026-07-30**, seven days later — before the
+2026-08-06 follow-up deadline the decision rule had set, so no follow-up was sent and no scope
+reduction was opened.
 
-- Address the account was granted to: ____
-- Registered on: ____
-
-**If both routes fail**, the study is limited to the public test split. That is a second scope
-reduction and must be handled the same way as the first: a dated Changelog entry in
-`docs/protocol.md` amending §2/§4/§7, plus corresponding changes to the paper's contributions —
-not a quiet omission. Note that this affects only the *evaluation server*; the dataset download
-itself is a separate registration under the CC BY-NC-SA 4.0 research license, and local metrics
-on the public split remain fully available either way.
+**Had both routes failed**, the study would have been limited to the public test split — a second
+scope reduction, handled like the first: a dated Changelog entry in `docs/protocol.md` amending
+§2/§4/§7, plus corresponding changes to the paper's contributions, not a quiet omission. Note that
+this only ever affected the *evaluation server*; the dataset download is a separate registration
+under the CC BY-NC-SA 4.0 research license, and local metrics on the public split were available
+either way.
 
 ## VisA + MVTec AD (classic) — sanity only
 

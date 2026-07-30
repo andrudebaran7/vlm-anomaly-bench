@@ -66,16 +66,21 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    SAA+'s Task 3 closes that chain.
 6. **M3 — full MVTec AD 2 grid.** Once each method's VisA gate passes, run the full public-test grid
    over all eight categories, one category at a time (the download/resume/shard unit). Mechanical.
-7. **M4 — evaluation server.** Score the private split. Blocked on the registration below.
+7. **M4 — evaluation server.** Score the private split. **Unblocked** — access granted 2026-07-30
+   (`docs/datasets-access.md`). First action on first login is to read the server's submission docs
+   for the official metric names and definitions: protocol §4 adopts them as the server defines them
+   and still marks them unverified, so that reading is a §4 dependency. Also confirm the submission
+   format and any attempt limit *before* spending a submission, since §7 commits to one per method,
+   final.
 8. **M5 — efficiency pass** on a rented fixed instance (protocol §5: latency never from Colab).
 9. **M6 — preprint.**
 
 ## External / parallel
 
-- **MVTec evaluation-server registration** (only blocks M4, not M2/M3). The company-email request
-  was sent 2026-07-23; **follow up on 2026-08-06** if unanswered, then — if still unanswered — open a
-  dated protocol amendment limiting the study to the public split (`docs/datasets-access.md` has the
-  decision rule written down).
+- ~~**MVTec evaluation-server registration**~~ — **done. Access granted 2026-07-30**, seven days after
+  the 2026-07-23 request and ahead of the 2026-08-06 follow-up deadline, so no follow-up was sent and
+  the public-split-only scope reduction was never opened. The private split is in scope; the record
+  and the remaining fields to fill on first login are in `docs/datasets-access.md`.
 - **Dataset downloads for the grid:** only Vial (0.77 GB) is on disk. The rest of MVTec AD 2 is
   fetched per category on Colab when M3 runs (largest: Fabric, 10 GB); never into `/tmp` (tmpfs).
 
