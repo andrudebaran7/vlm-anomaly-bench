@@ -94,9 +94,9 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
   size verified from the real archive. Official metric names remain pending behind the
   evaluation-server registration.
 - [ ] M2 — **core + adapter CPU-halves done**: pixel metrics, loader, resumable runner,
-  lighting-grouped aggregation, and the CPU-testable half of five adapters (intensity_baseline,
-  mllm_qwen, patchcore_ref, winclip, anomalyclip), all tested. Remaining: the GPU backends and the
-  ±1pt VisA reproduction, on Colab. **Operational state and ordering: [`docs/next-steps.md`](docs/next-steps.md).**
+  lighting-grouped aggregation, and the CPU-testable half of six adapters (intensity_baseline,
+  mllm_qwen, patchcore_ref, winclip, anomalyclip, adaclip), all tested. Remaining: the GPU backends
+  and the ±1pt VisA reproduction, on Colab. **Operational state and ordering: [`docs/next-steps.md`](docs/next-steps.md).**
 - [ ] M3 — full grid on the MVTec AD 2 public test split
 - [ ] M4 — one evaluation-server submission per method; leaderboard numbers recorded *(registration
   requested 2026-07-23; see [`docs/datasets-access.md`](docs/datasets-access.md))*

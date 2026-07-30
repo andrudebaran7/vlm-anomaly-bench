@@ -3,15 +3,15 @@
 Living map of where execution stands and what to do next. Milestones (M1–M6) live in the README;
 this file is the operational view — which plans are written, which halves are executed, and the
 order for the work that remains. **Every method now has a written plan** (2026-07-29: AdaCLIP and
-SAA+ were the last two). What remains is either a **Colab/GPU** step, an **external** one, or the
-CPU half of the two newest plans — which is subagent-executable today. The pre-existing
-CPU-verifiable core is done, on `master`, and green on CI (Python 3.11 + 3.13).
+SAA+ were the last two). AdaCLIP's CPU half has since landed and is registered. What remains is
+either a **Colab/GPU** step, an **external** one, or SAA+'s CPU half — which is subagent-executable
+today. The pre-existing CPU-verifiable core is done, on `master`, and green on CI (Python 3.11 + 3.13).
 
 ## What is done (CPU, no GPU)
 
 - **Evaluation core:** image/pixel metrics (P-AUROC, AU-PRO, SegF1), provenance, a crash-safe
   result store, a resumable runner with per-sample latency, per-category `fit` for full-shot
-  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.7**.
+  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.8**.
 - **MVTec AD 2 data path:** loader (verified against the real Vial archive), layout verification
   (`scripts/prepare_data.py`), and the run_eval CLI. Native-resolution, raw-scale maps (v0.2.6).
 - **Method adapters — CPU halves done and registered** (each wraps an injectable backend; without
@@ -22,6 +22,8 @@ CPU-verifiable core is done, on `master`, and green on CI (Python 3.11 + 3.13).
   - `winclip` — zero-shot; the anomalib WinClip backend is the seam.
   - `anomalyclip` — zero-shot, object-agnostic; the official-repo backend is the seam, plus the
     committed auxiliary-training overlap audit (`docs/anomalyclip-overlap-audit.md`).
+  - `adaclip` — zero-shot, hybrid learnable prompts; the official-repo backend is the seam, plus
+    the committed auxiliary-training overlap audit (`docs/adaclip-overlap-audit.md`).
 
 ## The gating fact
 
@@ -46,12 +48,12 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    (anomalib does not ship it), so its backend is derived from the repo's `test.py` at a pinned
    commit. Use the **VisA-trained** checkpoint for MVTec AD 2 and the **MVTec-AD-trained** checkpoint
    for the VisA reproduction (overlap audit, §3.1).
-4. **AdaCLIP CPU tasks (1–3) then Colab phases (A–D)** —
+4. **AdaCLIP Colab phases (A–D)** —
    `docs/superpowers/plans/2026-07-29-adaclip-zeroshot-adapter.md`. Zero-shot and, like AnomalyCLIP,
-   **auxiliary-trained**, so it carries the same kind of overlap audit. Its CPU half is
-   subagent-executable now; `src/vlmab/methods/adaclip.py` is still a stub until Task 1 lands. Watch:
-   the plan pre-registers a contingency for the case where the repo publishes only one checkpoint —
-   resolve it in Colab phase A.2 before scoring anything.
+   **auxiliary-trained**, so it carries the same kind of overlap audit. Its CPU half is done and
+   registered (`src/vlmab/methods/adaclip.py`, `docs/adaclip-overlap-audit.md`); what remains is the
+   GPU backend. Watch: the plan pre-registers a contingency for the case where the repo publishes
+   only one checkpoint — resolve it in Colab phase A.2 before scoring anything.
 5. **SAA+ CPU tasks (1–4) then Colab phases (A–D)** —
    `docs/superpowers/plans/2026-07-29-saa-trainingfree-adapter.md`. Training-free (GroundingDINO + SAM
    cascade), so **no aux-training concern** — simpler than AdaCLIP/AnomalyCLIP on the audit side, but it
