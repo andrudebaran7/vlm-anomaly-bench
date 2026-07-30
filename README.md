@@ -7,10 +7,11 @@
 > 2025 frontier benchmark** MVTec AD 2. This repository closes that gap for the
 > zero-shot / VLM family, with a reproducible protocol and honest, efficiency-aware metrics.
 
-**Status:** protocol frozen at v0.2.4 (see [`docs/protocol.md`](docs/protocol.md)); the evaluation
+**Status:** protocol frozen at v0.2.9 (see [`docs/protocol.md`](docs/protocol.md)); the evaluation
 core — metrics, resumable runner, MVTec AD 2 loader and lighting-grouped aggregation — is built and
-tested (147 tests, no dataset or GPU required), verified end-to-end against the real MVTec AD 2 layout.
-The six method adapters are the remaining piece before the first results. No results computed yet.
+tested (246 of 246 tests passing, no dataset or GPU required), verified end-to-end
+against the real MVTec AD 2 layout. The CPU-testable half of every method adapter is done; only the
+Colab GPU backends remain before the first results. No results computed yet.
 
 ## Why this benchmark
 
@@ -80,23 +81,23 @@ results/            # generated tables/figures (source parquet tracked via relea
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 # Working today:
-.venv/bin/python -m pytest -q                                  # 147 tests, no dataset needed
+.venv/bin/python -m pytest -q                                  # 246 tests, no dataset needed
 .venv/bin/python scripts/prepare_data.py --root data/mvtec_ad2 # verify a downloaded category
 
-# Once the six method adapters land (M2):
+# Once the Colab GPU backends land (M2):
 .venv/bin/python scripts/run_eval.py --method winclip --dataset mvtec_ad2
 .venv/bin/python scripts/make_tables.py                        # regenerates results/tables
 ```
 
 ## Roadmap
 
-- [x] M1 — protocol frozen (v0.2.4); MVTec AD 2 downloaded and its layout, split names and 30.4 GB
+- [x] M1 — protocol frozen (v0.2.9); MVTec AD 2 downloaded and its layout, split names and 30.4 GB
   size verified from the real archive. Official metric names remain pending behind the
   evaluation-server registration.
 - [ ] M2 — **core + adapter CPU-halves done**: pixel metrics, loader, resumable runner,
-  lighting-grouped aggregation, and the CPU-testable half of six adapters (intensity_baseline,
-  mllm_qwen, patchcore_ref, winclip, anomalyclip, adaclip), all tested. Remaining: the GPU backends
-  and the ±1pt VisA reproduction, on Colab. **Operational state and ordering: [`docs/next-steps.md`](docs/next-steps.md).**
+  lighting-grouped aggregation, and the CPU-testable half of seven adapters (intensity_baseline,
+  mllm_qwen, patchcore_ref, winclip, anomalyclip, adaclip, saa), all tested. Remaining: the GPU
+  backends and the ±1pt VisA reproduction, on Colab. **Operational state and ordering: [`docs/next-steps.md`](docs/next-steps.md).**
 - [ ] M3 — full grid on the MVTec AD 2 public test split
 - [ ] M4 — one evaluation-server submission per method; leaderboard numbers recorded *(registration
   requested 2026-07-23; see [`docs/datasets-access.md`](docs/datasets-access.md))*

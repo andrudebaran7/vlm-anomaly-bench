@@ -1,2 +1,27 @@
 name: saa
-source: TODO_pin_at_M2
+zero_shot: true
+aux_trained: false               # training-free cascade; no method-trained weights, no auxiliary data
+# SAA+ (Cao et al., "Segment Any Anomaly without Training"). anomalib does not ship it, so provenance
+# is the official repo (protocol §3 priority 1). Pin the commit on the first Colab run.
+source: https://github.com/caoyunkang/Segment-Any-Anomaly
+commit: unpinned_until_first_colab_run     # record the exact SHA here
+# TWO independent frozen artefacts, each pinned separately: swapping either moves every pixel metric
+# without touching a line of code.
+grounding_dino_checkpoint: unpinned_until_first_colab_run
+grounding_dino_sha256: unpinned_until_first_colab_run
+sam_checkpoint: unpinned_until_first_colab_run
+sam_sha256: unpinned_until_first_colab_run
+# Per-category prompts, taken VERBATIM from the repo at the pinned commit — never tuned by us, never
+# adjusted after seeing a result. Protocol §3 amendment v0.2.9. Table: configs/methods/saa_prompts.yaml
+prompts: per_category_verbatim_from_official_repo
+prompts_file: configs/methods/saa_prompts.yaml
+# How many of MVTec AD 2's eight categories actually got a published prompt from the repo, vs. fell
+# back to the repo's own generic unknown-object prompt (protocol §3 v0.2.9). SAA+'s published prompts
+# cover MVTec AD (classic) and VisA objects, none of which are our eight categories, so the realistic
+# outcome is 0/8 — must be set in Colab phase A.3 after reading the repo, so that decision cannot be
+# skipped or discovered only when a table looks odd. Any category left on the fallback is reported on
+# every table as "SAA+ without its per-object prompts", never as SAA+ proper.
+prompt_coverage: unresolved_until_first_colab_run
+# The anomaly map is the repo's OWN final map, taken verbatim. Not recomposed, not smoothed
+# (protocol §3: any composition of ours would be a re-implementation, priority 3).
+anomaly_map_source: official_repo_final_map

@@ -1,0 +1,93 @@
+# SAA+ per-category prompts — PRE-REGISTERED (protocol §3 amendment v0.2.9)
+#
+# SAA+'s contribution is hybrid prompt regularization: per-object domain knowledge, consisting of
+# defect language expressions plus object-specific property constraints (anomaly region area, size,
+# position). Those prompts ARE the method, which is why protocol §3's verbatim-sourcing principle
+# applies them here from the repo rather than a paper.
+#
+# THE CONDITION THAT MAKES THIS DEFENSIBLE — read before editing this file:
+#   1. Every value below is copied VERBATIM from the official repo at the pinned commit recorded in
+#      configs/methods/saa.yaml. Cite the exact file and line range you copied it from.
+#   2. Nothing here is written, reworded or tuned by us.
+#   3. Nothing here is changed after seeing any result, on any dataset. If a prompt turns out to be
+#      wrong, the fix is to re-read the repo and record a dated correction — not to improve the prompt.
+#   4. This file is committed BEFORE the first scoring run (Colab phase A.3, before phase C).
+#
+# If the repo has no prompt for one of our categories (MVTec AD 2 categories are not MVTec AD classic
+# categories), do NOT invent one. Record `prompt: NOT_PUBLISHED_IN_REPO` and the fallback the repo's
+# own code uses for an unknown object, and note it in results/reproduction/saa_visa.md — an invented
+# prompt would be exactly the per-category engineering §3 forbids. Any category left on the repo's
+# fallback is reported on every table as "SAA+ without its per-object prompts", never as SAA+ proper
+# (protocol §3, v0.2.9).
+#
+# KEEP THIS BLOCK-SCALAR FORM. Do not collapse a category back into a flow mapping
+# (`{prompt: ..., property_constraints: ...}`): pasted repo text routinely contains commas and
+# colons (e.g. "black hole, defect" or "area: 0.01-0.2"), and PyYAML's flow-mapping parser either
+# silently truncates at the comma (producing a junk key with no error) or raises on the colon. The
+# `|` block scalars below survive both intact. `configs/methods/mllm_qwen.yaml` uses the same form
+# for the same reason.
+
+source_commit: unpinned_until_first_colab_run
+source_files: unrecorded            # e.g. "SAA/prompts.py L12-L88" — the exact provenance
+recorded_on: unrecorded             # date the values below were copied
+
+categories:
+  can:
+    prompt: |
+      unrecorded
+    property_constraints: |
+      unrecorded
+    copied_from: unrecorded
+  fabric:
+    prompt: |
+      unrecorded
+    property_constraints: |
+      unrecorded
+    copied_from: unrecorded
+  fruit_jelly:
+    prompt: |
+      unrecorded
+    property_constraints: |
+      unrecorded
+    copied_from: unrecorded
+  rice:
+    prompt: |
+      unrecorded
+    property_constraints: |
+      unrecorded
+    copied_from: unrecorded
+  sheet_metal:
+    prompt: |
+      unrecorded
+    property_constraints: |
+      unrecorded
+    copied_from: unrecorded
+  vial:
+    prompt: |
+      unrecorded
+    property_constraints: |
+      unrecorded
+    copied_from: unrecorded
+  wallplugs:
+    prompt: |
+      unrecorded
+    property_constraints: |
+      unrecorded
+    copied_from: unrecorded
+  walnuts:
+    prompt: |
+      unrecorded
+    property_constraints: |
+      unrecorded
+    copied_from: unrecorded
+
+# VisA objects, for the §2 reproduction gate. Same keyed shape as `categories:` above, same reason
+# (block scalars survive commas/colons in pasted text). The VisA object list itself — which objects
+# exist and what to name each key — is filled in Colab phase A.3, from the repo, verbatim.
+visa_categories:
+  __fill_from_repo_in_colab_phase_a3__:
+    prompt: |
+      unrecorded
+    property_constraints: |
+      unrecorded
+    copied_from: unrecorded

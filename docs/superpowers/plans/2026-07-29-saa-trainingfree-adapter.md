@@ -131,7 +131,12 @@ from vlmab.methods.saa import SaaRef
 class _FakeBackend:
     """Stands in for the real SAA+ cascade. The category is substantive here — it selects the
     per-object domain prompts — so the fake records it. The returned map mimics the real output
-    shape: a near-binary field built from a couple of mask regions, not a smooth field."""
+    shape: a near-binary field built from a couple of mask regions, not a smooth field.
+
+    The score and the map's maximum are deliberately DIFFERENT values: if they matched, the
+    image-score assertion below would still pass under an adapter bug that ignored the backend's
+    score and returned the map's maximum instead. Passing the backend's score through untouched is
+    the one substantive thing this adapter decides, so the fake has to be able to catch that."""
 
     def __init__(self):
         self.calls = []
@@ -141,7 +146,7 @@ class _FakeBackend:
         m = np.zeros((16, 16), dtype=np.float32)
         m[2:5, 2:5] = 0.81       # one high-confidence mask region
         m[10:12, 9:13] = 0.44    # one lower-confidence region
-        return 0.81, m
+        return 0.93, m           # NOT the map max — see the class docstring
 
 
 def test_is_zero_shot_and_training_free():
@@ -171,7 +176,7 @@ def test_predict_returns_a_native_resolution_raw_map():
     img = np.zeros((80, 50, 3), dtype=np.uint8)
     pred = m.predict(img, "vial")
     assert_valid_prediction(pred, img)               # finite float32 native map, not [0,1]
-    assert pred.image_score == pytest.approx(0.81)   # raw score passed through, not rescaled
+    assert pred.image_score == pytest.approx(0.93)   # the BACKEND's score, not the map's max (0.81)
     assert pred.anomaly_map.shape == (80, 50)        # upsampled to native
 
 
@@ -338,9 +343,9 @@ def test_distinct_levels_separates_a_mask_map_from_a_continuous_one():
     assert distinct_levels(continuous) > 100
 
 
-def test_distinct_levels_ignores_nan_free_float_precision_noise():
-    """Counts exact distinct float32 values — no tolerance bucketing, so the number is unambiguous
-    and reproducible across machines."""
+def test_distinct_levels_counts_exact_float32_values_without_bucketing():
+    """Two values a float32 tick apart count as two, not one: no tolerance bucketing, so the number
+    is unambiguous and reproducible across machines."""
     from vlmab.methods.postprocess import distinct_levels
 
     amap = np.array([[np.float32(0.1), np.float32(0.1) + np.float32(1e-7)]], dtype=np.float32)
@@ -730,13 +735,20 @@ class SaaBackend:
         self._model = _build_cascade(grounding_dino_checkpoint, sam_checkpoint, device)  # FILL
         # FILL from A.4: the repo's own per-object prompt lookup. Select from it; never build prompts.
         self._prompts = _load_repo_prompts(repo_dir)                                     # FILL
+        # FILL from A.4: the repo's own fallback prompt for an object it has no per-object entry for
+        # (e.g. its "unknown object" or default prompt) — used, never invented by us. See score() below.
+        self._fallback_prompt = _load_repo_fallback_prompt(repo_dir)                     # FILL
         self._device = device
 
     def score(self, image: np.ndarray, category: str) -> tuple[float, np.ndarray]:
         import torch
 
-        prompt = self._prompts[category]   # KeyError here is correct: an unprompted category is a
-                                           # pre-registration gap to record, not to paper over.
+        # An unprompted category is a pre-registration gap: record it (configs/methods/saa_prompts.yaml,
+        # configs/methods/saa.yaml's prompt_coverage) AND still score it, on the repo's own fallback
+        # prompt for an unknown object — never a silent KeyError, and never an invented prompt. Numbers
+        # produced this way are marked on every table as "SAA+ without its per-object prompts" (protocol
+        # §3 v0.2.9), never reported as SAA+ proper.
+        prompt = self._prompts.get(category, self._fallback_prompt)
         with torch.no_grad():
             # FILL from A.4: run the cascade and take the repo's OWN final score and anomaly map.
             image_score, anomaly_map = _run_cascade(self._model, image, prompt)
@@ -746,8 +758,8 @@ class SaaBackend:
         return score, amap
 ```
 
-Replace the three `FILL` helpers (`_build_cascade`, `_load_repo_prompts`, `_run_cascade`) with the exact
-calls from the repo. Keep them small and named. **Do not guess these — follow the repo's inference
+Replace the four `FILL` helpers (`_build_cascade`, `_load_repo_prompts`, `_load_repo_fallback_prompt`,
+`_run_cascade`) with the exact calls from the repo. Keep them small and named. **Do not guess these — follow the repo's inference
 script.**
 
 - [ ] **B.2 — Smoke test the backend**

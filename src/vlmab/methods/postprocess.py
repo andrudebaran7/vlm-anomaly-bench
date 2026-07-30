@@ -24,6 +24,14 @@ def upsample_to(coarse: np.ndarray, size: tuple[int, int]) -> np.ndarray:
     coarse = np.asarray(coarse, dtype=np.float32)
     gh, gw = coarse.shape
     h, w = size
+    if gh > h or gw > w:
+        raise ValueError(
+            f"upsample_to got a coarse map {coarse.shape} larger than the target {size} in at least "
+            "one dimension; this function only upsamples. Protocol §4 requires maps be brought to "
+            "native resolution and never downsampled — shrinking regions distorts AU-PRO, which "
+            "weights every connected region equally, so a tiny defect can vanish and take its equal "
+            "share of the score with it."
+        )
     ys = (np.arange(h) * gh) // h
     xs = (np.arange(w) * gw) // w
     return coarse[ys][:, xs]
@@ -44,3 +52,25 @@ def normalise_to_unit(x: np.ndarray) -> np.ndarray:
     if hi == lo:
         return np.zeros_like(x)
     return ((x - lo) / (hi - lo)).astype(np.float32)
+
+
+def distinct_levels(amap: np.ndarray) -> int:
+    """How many distinct values an anomaly map contains — a diagnostic, never a metric.
+
+    Mask-based methods (SAA+: GroundingDINO region proposals refined by SAM) emit a map composed of a
+    handful of constant-confidence regions, so it has a handful of distinct levels. Patch-based methods
+    emit a near-continuous field. Every threshold-sweeping pixel metric (P-AUROC, AU-PRO, SegF1) is
+    sensitive to that difference, so a low count is a confound to report alongside the metric rather
+    than a result to explain away (paper §5.2).
+
+    Counts exact distinct float32 values with no tolerance bucketing, so the figure is unambiguous and
+    reproducible.
+    """
+    amap = np.asarray(amap, dtype=np.float32)
+    # np.unique collapses every NaN into a single value, so an all-NaN map would otherwise return 1 —
+    # indistinguishable from this function's own documented "expected, reportable" low count for a
+    # genuine mask-based map. A NaN map is a method bug (as normalise_to_unit already enforces), not a
+    # granularity finding, so it must fail loudly here rather than be recorded as research signal.
+    if not np.isfinite(amap).all():
+        raise ValueError("map contains non-finite values; a NaN/inf map is a method bug")
+    return int(np.unique(amap).size)

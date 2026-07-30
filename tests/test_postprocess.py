@@ -33,6 +33,15 @@ def test_upsample_handles_a_target_not_divisible_by_the_grid():
     assert out.min() == 0.0 and out.max() == 8.0  # no new values invented
 
 
+def test_upsample_rejects_a_coarse_map_larger_than_the_target():
+    """upsample_to only upsamples. A 20x20 map taken to (5, 5) would silently drop a whole hot region
+    (protocol §4: downsampling shrinks regions and distorts AU-PRO), so it must raise instead."""
+    coarse = np.zeros((20, 20), dtype=np.float32)
+    coarse[0, 0] = 1.0
+    with pytest.raises(ValueError):
+        upsample_to(coarse, (5, 5))
+
+
 def test_normalise_maps_min_to_zero_and_max_to_one():
     out = normalise_to_unit(np.array([2.0, 4.0, 6.0], dtype=np.float32))
     assert out.tolist() == [0.0, 0.5, 1.0]
@@ -47,3 +56,51 @@ def test_normalise_a_constant_array_is_all_zero_not_nan():
 def test_normalise_rejects_non_finite_values():
     with pytest.raises(ValueError):
         normalise_to_unit(np.array([0.0, np.nan, 1.0], dtype=np.float32))
+
+
+def test_distinct_levels_counts_unique_values():
+    from vlmab.methods.postprocess import distinct_levels
+
+    amap = np.array([[0.0, 0.0, 0.5], [0.5, 0.9, 0.9]], dtype=np.float32)
+    assert distinct_levels(amap) == 3
+
+
+def test_distinct_levels_of_a_constant_map_is_one():
+    from vlmab.methods.postprocess import distinct_levels
+
+    assert distinct_levels(np.zeros((8, 8), dtype=np.float32)) == 1
+
+
+def test_distinct_levels_separates_a_mask_map_from_a_continuous_one():
+    """The whole point: a few-region SAA+-style map has orders of magnitude fewer levels than a
+    continuous patch-based map of the same size, and that difference is what gets reported."""
+    from vlmab.methods.postprocess import distinct_levels
+
+    mask_style = np.zeros((32, 32), dtype=np.float32)
+    mask_style[2:8, 2:8] = 0.7
+    mask_style[20:24, 20:28] = 0.3
+
+    rng = np.random.default_rng(0)
+    continuous = rng.random((32, 32)).astype(np.float32)
+
+    assert distinct_levels(mask_style) == 3
+    assert distinct_levels(continuous) > 100
+
+
+def test_distinct_levels_counts_exact_float32_values_without_bucketing():
+    """Two distinct, closely-spaced float32 values count as two, not one: no tolerance bucketing
+    merges near-equal-but-distinct values, so the count is exact and reproducible across machines."""
+    from vlmab.methods.postprocess import distinct_levels
+
+    amap = np.array([[np.float32(0.1), np.float32(0.1) + np.float32(1e-7)]], dtype=np.float32)
+    assert distinct_levels(amap) == 2
+
+
+def test_distinct_levels_rejects_non_finite_values():
+    """np.unique collapses all NaNs into one value, so an all-NaN map would otherwise report 1 level —
+    indistinguishable from this function's own documented low-count case for a genuine mask-based map.
+    A NaN map is a method bug and must fail loudly, not be recorded as a research finding."""
+    from vlmab.methods.postprocess import distinct_levels
+
+    with pytest.raises(ValueError):
+        distinct_levels(np.array([[0.0, np.nan, 1.0]], dtype=np.float32))

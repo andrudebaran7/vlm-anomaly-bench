@@ -59,7 +59,7 @@ def test_predict_returns_a_native_resolution_raw_map():
 def test_predict_records_the_category_in_extras():
     m = AdaClipRef(backend=_FakeBackend())
     m.prepare(device="cpu")
-    pred = m.predict(np.zeros((8, 8, 3), dtype=np.uint8), "can")
+    pred = m.predict(np.zeros((32, 32, 3), dtype=np.uint8), "can")  # must exceed the fake's 16x16 map: upsample_to only upsamples
     assert pred.extras == {"category": "can"}
 
 
