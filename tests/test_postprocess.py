@@ -47,3 +47,41 @@ def test_normalise_a_constant_array_is_all_zero_not_nan():
 def test_normalise_rejects_non_finite_values():
     with pytest.raises(ValueError):
         normalise_to_unit(np.array([0.0, np.nan, 1.0], dtype=np.float32))
+
+
+def test_distinct_levels_counts_unique_values():
+    from vlmab.methods.postprocess import distinct_levels
+
+    amap = np.array([[0.0, 0.0, 0.5], [0.5, 0.9, 0.9]], dtype=np.float32)
+    assert distinct_levels(amap) == 3
+
+
+def test_distinct_levels_of_a_constant_map_is_one():
+    from vlmab.methods.postprocess import distinct_levels
+
+    assert distinct_levels(np.zeros((8, 8), dtype=np.float32)) == 1
+
+
+def test_distinct_levels_separates_a_mask_map_from_a_continuous_one():
+    """The whole point: a few-region SAA+-style map has orders of magnitude fewer levels than a
+    continuous patch-based map of the same size, and that difference is what gets reported."""
+    from vlmab.methods.postprocess import distinct_levels
+
+    mask_style = np.zeros((32, 32), dtype=np.float32)
+    mask_style[2:8, 2:8] = 0.7
+    mask_style[20:24, 20:28] = 0.3
+
+    rng = np.random.default_rng(0)
+    continuous = rng.random((32, 32)).astype(np.float32)
+
+    assert distinct_levels(mask_style) == 3
+    assert distinct_levels(continuous) > 100
+
+
+def test_distinct_levels_counts_exact_float32_values_without_bucketing():
+    """Two values a float32 tick apart count as two, not one: no tolerance bucketing, so the number
+    is unambiguous and reproducible across machines."""
+    from vlmab.methods.postprocess import distinct_levels
+
+    amap = np.array([[np.float32(0.1), np.float32(0.1) + np.float32(1e-7)]], dtype=np.float32)
+    assert distinct_levels(amap) == 2

@@ -44,3 +44,18 @@ def normalise_to_unit(x: np.ndarray) -> np.ndarray:
     if hi == lo:
         return np.zeros_like(x)
     return ((x - lo) / (hi - lo)).astype(np.float32)
+
+
+def distinct_levels(amap: np.ndarray) -> int:
+    """How many distinct values an anomaly map contains — a diagnostic, never a metric.
+
+    Mask-based methods (SAA+: GroundingDINO region proposals refined by SAM) emit a map composed of a
+    handful of constant-confidence regions, so it has a handful of distinct levels. Patch-based methods
+    emit a near-continuous field. Every threshold-sweeping pixel metric (P-AUROC, AU-PRO, SegF1) is
+    sensitive to that difference, so a low count is a confound to report alongside the metric rather
+    than a result to explain away (paper §5.2).
+
+    Counts exact distinct float32 values with no tolerance bucketing, so the figure is unambiguous and
+    reproducible.
+    """
+    return int(np.unique(np.asarray(amap, dtype=np.float32)).size)
