@@ -159,8 +159,27 @@ bullets above cross-reference "§3.1" — the requirement lives here, the report
 - Pixel level: P-AUROC, AU-PRO@0.3, AU-PRO@0.05, and the MVTec AD 2 official metric set.
 - Efficiency: median and p95 latency per image at batch size 1 on the fixed hardware below,
   parameter count, peak VRAM. API-based baselines report tokens + cost instead of VRAM.
-- The official MVTec AD 2 metric set is adopted as the evaluation server defines it. *(Exact metric
-  names and definitions are read from the server's submission documentation at download time.)*
+- **The official MVTec AD 2 metric — verified 2026-07-30.** Read from the VAND 3.0 challenge report
+  (arXiv:2509.17615 §4.2–§4.5), which documents the benchmark server's Category 1 evaluation. The
+  official metric is the pixel-level **SegF1**, `2 · (precision · recall) / (precision + recall)`,
+  with precision and recall computed **over the complete set of pixels in the test set, not averaged
+  over individual images**. Per-category scores are averaged over the eight categories, and a
+  submission's rank is the mean of its ranks on `test_private` and `test_private_mixed` (ties broken
+  by the smaller absolute difference between the two). This replaces the earlier note that the
+  definitions were still unread.
+
+- **SegF1 needs a threshold, and `seg_f1max` is not it.** The server takes **thresholded** anomaly
+  maps alongside the continuous ones, so a threshold must be committed to **without ground truth**.
+  `metrics.pixel_level.seg_f1max` maximises F1 *over* thresholds, which means it inspects the ground
+  truth to pick one: it is an **oracle** metric — legitimate and comparable on the public split,
+  strictly optimistic, and **not** what the server scores. The two must never be reported in the same
+  column without marking. Until a ground-truth-free threshold rule exists in this repo, this protocol
+  can report oracle `SegF1max` on `test_public` and **cannot** produce a private-split submission.
+  That rule is a hard prerequisite for M4: it must be fixed on the `validation` split (defect-free,
+  never on test data), pre-registered here before any submission, and reported as a result in its own
+  right — the challenge organisers name threshold selection as "a challenge often not yet considered
+  within the scientific community but indispensable for deployment", so how it is chosen is a
+  finding, not an implementation detail.
 - **Evaluation resolution.** Pixel metrics are computed at the dataset's native resolution
   (1400x1900 for Vial), against unmodified ground-truth masks. Methods may run inference at
   whatever internal resolution they were designed for, but every adapter returns its anomaly map
@@ -215,6 +234,10 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   that method's configuration is frozen. The private test split has hidden ground truth; repeated
   submissions with selection of the best outcome is the same "best of N" forbidden above. Submission
   date and returned scores are recorded in `results/`.
+  *Server-side limit, verified 2026-07-30 (arXiv:2509.17615 §4.3): the platform itself caps accounts
+  at **two submissions per week**. That is looser than the rule above, so this protocol remains the
+  binding constraint — the cap is recorded so that hitting it is never mistaken for our own limit,
+  and so the submission schedule accounts for it.*
 
 ## Changelog
 
@@ -291,3 +314,16 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   granularity measured and reported as a confound. (c) Two checkpoints (GroundingDINO, SAM) are pinned
   by sha256, not one. Decided before any SAA+ number exists. No evaluation rule for other methods
   changed.
+- 2026-07-30 — v0.2.10. Fills in §4's official-metric commitment and discloses a gap it exposes,
+  both read from the VAND 3.0 challenge report (arXiv:2509.17615), which documents the benchmark
+  server's Category 1 evaluation. (a) The official MVTec AD 2 metric is pixel-level SegF1 with
+  precision and recall pooled over the complete set of test pixels, NOT averaged per image; ranks
+  average `test_private` and `test_private_mixed`. §4 previously said these definitions were still
+  unread. (b) SegF1 requires committing to a threshold without ground truth, whereas this repo's
+  `seg_f1max` maximises over thresholds and therefore inspects ground truth: it is an oracle metric,
+  strictly optimistic, and not what the server scores. Until a ground-truth-free threshold rule is
+  built and pre-registered on the `validation` split, this protocol can report oracle SegF1max on
+  `test_public` and cannot produce a private-split submission — making that rule a hard prerequisite
+  for M4. (c) §7 records the server's own two-submissions-per-week cap; our one-per-method rule is
+  stricter and remains binding. No evaluation rule for any method changed, and no number already
+  computed is affected.
