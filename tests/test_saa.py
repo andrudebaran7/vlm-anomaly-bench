@@ -73,7 +73,7 @@ def test_predict_does_not_smooth_or_renormalise_the_map():
 def test_predict_records_the_category_in_extras():
     m = SaaRef(backend=_FakeBackend())
     m.prepare(device="cpu")
-    pred = m.predict(np.zeros((8, 8, 3), dtype=np.uint8), "walnuts")
+    pred = m.predict(np.zeros((32, 32, 3), dtype=np.uint8), "walnuts")  # must exceed the fake's 16x16 map: upsample_to only upsamples
     assert pred.extras == {"category": "walnuts"}
 
 
