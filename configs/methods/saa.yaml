@@ -1,2 +1,20 @@
 name: saa
-source: TODO_pin_at_M2
+zero_shot: true
+aux_trained: false               # training-free cascade; no method-trained weights, no auxiliary data
+# SAA+ (Cao et al., "Segment Any Anomaly without Training"). anomalib does not ship it, so provenance
+# is the official repo (protocol §3 priority 1). Pin the commit on the first Colab run.
+source: https://github.com/caoyunkang/Segment-Any-Anomaly
+commit: unpinned_until_first_colab_run     # record the exact SHA here
+# TWO independent frozen artefacts, each pinned separately: swapping either moves every pixel metric
+# without touching a line of code.
+grounding_dino_checkpoint: unpinned_until_first_colab_run
+grounding_dino_sha256: unpinned_until_first_colab_run
+sam_checkpoint: unpinned_until_first_colab_run
+sam_sha256: unpinned_until_first_colab_run
+# Per-category prompts, taken VERBATIM from the repo at the pinned commit — never tuned by us, never
+# adjusted after seeing a result. Protocol §3 amendment v0.2.9. Table: configs/methods/saa_prompts.yaml
+prompts: per_category_verbatim_from_official_repo
+prompts_file: configs/methods/saa_prompts.yaml
+# The anomaly map is the repo's OWN final map, taken verbatim. Not recomposed, not smoothed
+# (protocol §3: any composition of ours would be a re-implementation, priority 3).
+anomaly_map_source: official_repo_final_map
