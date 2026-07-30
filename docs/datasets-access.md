@@ -21,7 +21,13 @@ Verified from the official download page, 2026-07-23:
   - `test_private_mixed` — the **same scenes as `test_private`** under varied lighting, ground
     truth withheld
 - Dataset version / date: ____ (record on download)
-- Official metric names, read from the server submission docs: ____ (still unverified)
+- Official metric: pixel-level **SegF1**, pooled over all test pixels rather than averaged per image
+  — verified 2026-07-30 from the VAND 3.0 challenge report, recorded in protocol §4 (v0.2.10). The
+  full definition and the submission mechanics are in the evaluation-server section below.
+- Dataset paper (verified 2026-07-30): Heckler-Kram, Neudeck, Scheler, König and Steger, *The MVTec
+  AD 2 Dataset: Advanced Scenarios for Unsupervised Anomaly Detection*, arXiv:2503.21622; also IJCV
+  vol. 134. Released for the VAND 3.0 challenge at CVPR 2025. Reports that state-of-the-art methods
+  stay **below 60% average AU-PRO** on this dataset.
 
 ### Per-category download sizes
 
@@ -108,12 +114,22 @@ To record now that access exists (fill on first login):
 
 - Address the account was granted to: ____
 - Registered on: ____
-- Official metric names + definitions, read from the server's submission docs: ____
-  *(protocol §4 marks these "still unverified" and adopts them as the server defines them — this is
-  the first thing to read, since it is a §4 dependency, not a detail.)*
-- Submission format + any rate/attempt limits: ____
-  *(§7 commits to one submission per method, final. Confirm the server does not impose a stricter
-  limit before any submission is spent.)*
+
+**Metric and submission mechanics — answered 2026-07-30 from a secondary but authoritative source**,
+the VAND 3.0 challenge report (arXiv:2503.21622's companion, arXiv:2509.17615 §4.2–§4.5), written by
+the MVTec team that runs this server and documenting its Category 1 evaluation. Recorded in protocol
+§4/§7 (v0.2.10). **Still confirm each against the server's own submission docs on first login** — a
+challenge report describes one edition's rules, and the server is the authority:
+
+- Official metric: pixel-level **SegF1**, precision and recall pooled over the complete set of test
+  pixels, **not** averaged per image; per-category scores averaged over the eight categories; rank =
+  mean of the ranks on `test_private` and `test_private_mixed`. Confirmed against server docs: ☐
+- Submission payload: **both** thresholded and continuous anomaly maps per test split. This is what
+  forces a ground-truth-free threshold choice, which the repo cannot yet make (protocol §4, v0.2.10 —
+  a hard prerequisite for M4). Confirmed against server docs: ☐
+- Rate limit: **two submissions per week per account.** Looser than §7's one-per-method rule, so §7
+  stays binding. Confirmed against server docs: ☐
+- Anything the server's docs say that the above does not cover: ____
 
 #### History of the blocker (kept — it explains the protocol's contingency language)
 
