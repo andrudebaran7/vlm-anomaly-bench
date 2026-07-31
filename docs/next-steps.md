@@ -100,6 +100,7 @@ pre-registered in the protocol before any submission. It needs its own spec; non
 Worth noting it is not merely a chore — the VAND 3.0 organisers call threshold selection "a challenge
 often not yet considered within the scientific community but indispensable for deployment", which is
 why it became a contribution rather than a footnote.
+
 ## Companion paper — where it stands
 
 `../vlm-anomaly-paper`, branch `master`. Abstract and **§1–§3 are written and reviewed**; §4–§6 are
