@@ -11,7 +11,7 @@ is done, on `master`, and green on CI (Python 3.11 + 3.13).
 
 - **Evaluation core:** image/pixel metrics (P-AUROC, AU-PRO, SegF1), provenance, a crash-safe
   result store, a resumable runner with per-sample latency, per-category `fit` for full-shot
-  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.9**.
+  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.10**.
 - **MVTec AD 2 data path:** loader (verified against the real Vial archive), layout verification
   (`scripts/prepare_data.py`), and the run_eval CLI. Native-resolution, raw-scale maps (v0.2.6).
 - **Method adapters — CPU halves done and registered** (each wraps an injectable backend; without
@@ -70,14 +70,51 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    phases A–D.
 6. **M3 — full MVTec AD 2 grid.** Once each method's VisA gate passes, run the full public-test grid
    over all eight categories, one category at a time (the download/resume/shard unit). Mechanical.
-7. **M4 — evaluation server.** Score the private split. **Unblocked** — access granted 2026-07-30
-   (`docs/datasets-access.md`). First action on first login is to read the server's submission docs
-   for the official metric names and definitions: protocol §4 adopts them as the server defines them
-   and still marks them unverified, so that reading is a §4 dependency. Also confirm the submission
-   format and any attempt limit *before* spending a submission, since §7 commits to one per method,
-   final.
+7. **M4 — evaluation server.** Score the private split. Access is **granted** (2026-07-30), but M4 is
+   **blocked on unbuilt work**, not on access: see the threshold rule below. On first login, confirm
+   the metric definition, submission payload and attempt limit against the server's own docs — they
+   are recorded in `docs/datasets-access.md` from the VAND 3.0 challenge report (a secondary source)
+   with a checkbox each.
 8. **M5 — efficiency pass** on a rented fixed instance (protocol §5: latency never from Colab).
-9. **M6 — preprint.**
+9. **M6 — preprint.** Paper §1–§3 are already written (see below); §4–§6 need M3.
+
+## ⚠️ The one piece of unplanned work, and it gates M4
+
+**A ground-truth-free threshold rule does not exist in this repo.** Protocol v0.2.10 §4 spells this
+out. The official MVTec AD 2 metric is pixel-level SegF1, and the server takes **thresholded** maps,
+so a threshold must be committed to without ever seeing ground truth. What this repo computes is
+`metrics.pixel_level.seg_f1max`, which maximises F1 *over* thresholds — it inspects the ground truth
+to pick one. That is an **oracle** metric: fine and comparable on `test_public`, strictly optimistic,
+and **not what the server scores**.
+
+Consequences, both already written down:
+- Until the rule exists, the study can report oracle SegF1max on the public split and **cannot make a
+  private-split submission**. M4 cannot run.
+- The paper claims this rule as contribution **C3**, and C1 claims private-split coverage. Both carry
+  `\todo{withdraw if the threshold rule is not built before submission}` tripwires in
+  `sections/02-introduction.tex` of the paper repo. If it is never built, those claims come out and
+  the study reports public-split oracle numbers as a stated limitation.
+
+The rule must be **fixed on the defect-free `validation` split** (never on test data) and
+pre-registered in the protocol before any submission. It needs its own spec; none is written yet.
+Worth noting it is not merely a chore — the VAND 3.0 organisers call threshold selection "a challenge
+often not yet considered within the scientific community but indispensable for deployment", which is
+why it became a contribution rather than a footnote.
+## Companion paper — where it stands
+
+`../vlm-anomaly-paper`, branch `master`. Abstract and **§1–§3 are written and reviewed**; §4–§6 are
+stubs awaiting M3. Two things there that this repo's work must stay consistent with:
+
+- `docs/verified-literature-facts.md` is the paper's provenance record — every literature claim
+  traces to a primary source read directly, and it also records what was **not** verified. It
+  corrected two assumptions that lived in *this* repo: "GroundingDINO + SAM" for SAA+ (now verified
+  from the paper's §1/§2) and the belief that WinCLIP had been a VAND 3.0 entry (it was a Category 2
+  baseline, on LOCO AD).
+- It independently corroborates the SAA+ prompt-coverage contingency pre-registered in protocol
+  v0.2.9: SAA+'s own paper reports on VisA, MVTec-AD, MTD and KSDD2 — **none of them MVTec AD 2** — so
+  the realistic outcome is that no AD 2 category has a published prompt. Resolve
+  `prompt_coverage: unresolved_until_first_colab_run` in `configs/methods/saa.yaml` at Colab phase A.3
+  and decide then whether SAA+ stays in the study on those terms.
 
 ## External / parallel
 
@@ -96,3 +133,29 @@ These cannot be pre-written without the data/repo in front of you, and each play
   own paper — record the exact source next to the table.
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
+
+## Where to pick up (session handoff, 2026-07-31)
+
+Neither repo has been pushed since `vlm-anomaly-bench` was pushed on 2026-07-30. As of this note:
+**bench is 4 commits ahead of origin, paper is 20 ahead.** Both working trees are clean and both
+build/test green (bench: 246 tests; paper: pdflatex chain exits 0, 5 pages).
+
+Three candidate next moves, in the order that makes most sense:
+
+1. **The threshold-rule spec** (see the warning section above). It is the only thing standing between
+   the study and M4 now that server access exists, and the paper already makes claims that depend on
+   it. Brainstorm → spec → plan, like every other piece of work here.
+2. **The first Colab session: PatchCore** (step 1 of the ordered list). Interactive, GPU, executed by
+   a human — not by CPU subagents. It closes M2 and is the ceiling every zero-shot number is measured
+   against.
+3. **Push both repos.** Nothing blocks it; it simply has not been done.
+
+Two items only the author can close, both flagged in the paper's `references.bib` as `\todo` that
+render as red text in the printed bibliography:
+- the DOI for `duarte2026survey` (the author's own survey), and
+- the full author list for `mllmzsad`.
+
+One standing rule this project learned the hard way, worth restating: **a fact verified but not
+recorded is a fact the next person cannot use.** Three times a claim was read from a primary source
+and written straight into a task brief without landing in `verified-literature-facts.md`, and each
+time the work correctly stalled until it was recorded. Record first, then write.
