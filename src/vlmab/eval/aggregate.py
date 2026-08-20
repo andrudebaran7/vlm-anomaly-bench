@@ -205,6 +205,44 @@ def threshold_metrics(
             "threshold_metrics needs a map_path column: it scores thresholded anomaly maps, "
             "so a run without saved maps has nothing for it to threshold"
         )
+
+    # Guard the other side of the join. `category` names which of the artifact's blocks to
+    # read, but nothing upstream stops a caller handing in a df that does not actually match
+    # it -- a multi-category results root pools every category's maps and cuts them all at
+    # this one's threshold; a df for a different method or dataset gets scored at a threshold
+    # fitted on a different method's or dataset's maps entirely, silently, because IDENTITY_
+    # COLUMNS (vlmab.eval.store) are present but never checked against the artifact.
+    for column in ("category", "method", "dataset"):
+        if column not in df.columns:
+            raise ValueError(
+                f"threshold_metrics needs a {column!r} column to confirm the df it was handed "
+                f"actually matches the {category!r} category it is about to be scored against"
+            )
+    found_categories = sorted(df["category"].unique())
+    if found_categories != [category]:
+        raise ValueError(
+            f"threshold_metrics was asked for category {category!r} but df contains category "
+            f"{found_categories}: pooling other categories' maps into this call would cut them "
+            f"at {category!r}'s threshold, which is fit on a different distribution of scores"
+        )
+    artifact_method = artifact["method"]
+    found_methods = sorted(df["method"].unique())
+    if found_methods != [artifact_method]:
+        raise ValueError(
+            f"threshold_metrics got method(s) {found_methods} but the calibration artifact was "
+            f"fitted for method {artifact_method!r}: anomaly maps are on each method's own "
+            "scale (protocol §4) and a threshold fitted for one method is meaningless applied "
+            "to another's"
+        )
+    artifact_dataset = artifact["dataset"]
+    found_datasets = sorted(df["dataset"].unique())
+    if found_datasets != [artifact_dataset]:
+        raise ValueError(
+            f"threshold_metrics got dataset(s) {found_datasets} but the calibration artifact "
+            f"was fitted for dataset {artifact_dataset!r}: a threshold fitted on one dataset's "
+            "validation split says nothing about another's"
+        )
+
     labels = df["label"].to_numpy()
     if (labels == LABEL_UNKNOWN).any():
         raise ValueError(

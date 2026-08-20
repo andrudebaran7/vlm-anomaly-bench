@@ -156,3 +156,35 @@ def test_load_artifact_rejects_designated_for_submission_not_in_rules(tmp_path):
     path.write_text(yaml.safe_dump(raw))
     with pytest.raises(ValueError, match="designated_for_submission"):
         load_artifact(path)
+
+
+def test_load_artifact_rejects_a_missing_fitted_scalar(tmp_path):
+    # A hand-edited artifact missing `k:` entirely. Without this guard the KeyError surfaces
+    # later from aggregate.py instead of here, in the wrong module.
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    del raw["categories"]["vial"]["per_image_robust_z"]["k"]
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="k"):
+        load_artifact(path)
+
+
+def test_load_artifact_rejects_a_nan_fitted_scalar(tmp_path):
+    # A hand-edited `k: .nan` loads clean as YAML and would otherwise produce `nan`
+    # thresholds; since `>= nan` is always False, every rule would then silently report
+    # SegF1 0.0 and FPR 0.0 instead of raising.
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    raw["categories"]["vial"]["per_image_robust_z"]["k"] = float("nan")
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="not finite"):
+        load_artifact(path)
+
+
+def test_load_artifact_rejects_a_non_finite_threshold(tmp_path):
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    raw["categories"]["vial"]["global_quantile"]["threshold"] = float("inf")
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="not finite"):
+        load_artifact(path)

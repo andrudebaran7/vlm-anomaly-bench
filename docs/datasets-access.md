@@ -125,8 +125,8 @@ challenge report describes one edition's rules, and the server is the authority:
   pixels, **not** averaged per image; per-category scores averaged over the eight categories; rank =
   mean of the ranks on `test_private` and `test_private_mixed`. Confirmed against server docs: ☐
 - Submission payload: **both** thresholded and continuous anomaly maps per test split. This is what
-  forces a ground-truth-free threshold choice, which the repo cannot yet make (protocol §4, v0.2.10 —
-  a hard prerequisite for M4). Confirmed against server docs: ☐
+  forces a ground-truth-free threshold choice, which the repo now makes via the pre-registered
+  threshold rule (protocol §4, v0.2.11 — was a hard prerequisite for M4). Confirmed against server docs: ☐
 - Rate limit: **two submissions per week per account.** Looser than §7's one-per-method rule, so §7
   stays binding. Confirmed against server docs: ☐
 - Anything the server's docs say that the above does not cover: ____

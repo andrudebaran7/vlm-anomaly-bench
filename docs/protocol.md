@@ -172,8 +172,8 @@ bullets above cross-reference "§3.1" — the requirement lives here, the report
   maps alongside the continuous ones, so a threshold must be committed to **without ground truth**.
   `metrics.pixel_level.seg_f1max` maximises F1 *over* thresholds, which means it inspects the ground
   truth to pick one: it is an **oracle** metric — legitimate and comparable on the public split,
-  strictly optimistic, and **not** what the server scores. The two must never be reported in the same
-  column without marking.
+  strictly optimistic relative to the global-threshold rules (see Reporting below), and **not**
+  what the server scores. The two must never be reported in the same column without marking.
 
   **The rule, pre-registered 2026-08-20 (v0.2.11).** Every candidate has the same form —
   transform the scores, pool them, cut at a quantile — and they differ on two axes: the

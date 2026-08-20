@@ -16,6 +16,7 @@ the registered grid {1e-4, 1e-3, 1e-2, 1e-1} into *throwaway* paths, then scorin
 reported curve, not a choice, and an uncommitted artifact cannot be mistaken for one.
 """
 import argparse
+import sys
 from pathlib import Path
 from typing import Sequence
 
@@ -64,6 +65,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--alpha", default=PREREGISTERED_ALPHA, type=float)
     parser.add_argument("--designate", default=DESIGNATED_RULE)
     args = parser.parse_args(argv)
+
+    if args.designate == "transductive_quantile":
+        raise ValueError(
+            "--designate transductive_quantile is not allowed: protocol §4 (v0.2.11) fixes "
+            "per_image_robust_z as the designated submission rule specifically because "
+            "transductive_quantile adapts to the split it is scoring, which a pre-registered "
+            "threshold must not do"
+        )
 
     df = ResultStore(args.results).load_all()
     if df.empty:
@@ -129,7 +138,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         categories=categories,
         designated_for_submission=args.designate,
     )
-    print(f"wrote {path} — commit it before any submission (protocol §4)")
+    if args.alpha != PREREGISTERED_ALPHA:
+        print(
+            f"warning: --alpha {args.alpha} differs from the pre-registered "
+            f"{PREREGISTERED_ALPHA}; this is a sensitivity-sweep artifact and must not be "
+            "committed as the pre-registration (protocol §4)",
+            file=sys.stderr,
+        )
+        print(f"wrote {path}")
+    else:
+        print(f"wrote {path} — commit it before any submission (protocol §4)")
     return 0
 
 

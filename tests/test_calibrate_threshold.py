@@ -191,3 +191,39 @@ def test_calibrate_raises_when_the_shard_has_no_split_column(tmp_path):
     with pytest.raises(ValueError, match="split column"):
         _run(["--results", str(results), "--dataset", "mvtec_ad2",
               "--method", "intensity_baseline", "--out", str(tmp_path / "a.yaml")])
+
+
+def test_calibrate_refuses_to_designate_the_transductive_rule(tmp_path):
+    # transductive_quantile adapts to the split it is scoring (protocol §4), so it is
+    # explicitly not eligible for the private-split submission -- reject it before any file
+    # is even read, rather than merely relying on the default being correct.
+    results = _validation_run(tmp_path)
+    with pytest.raises(ValueError, match="transductive_quantile"):
+        _run(["--results", str(results), "--dataset", "mvtec_ad2",
+              "--method", "intensity_baseline", "--out", str(tmp_path / "a.yaml"),
+              "--designate", "transductive_quantile"])
+
+
+def test_calibrate_warns_on_stderr_when_alpha_is_not_preregistered(tmp_path, capsys):
+    # The alpha sweep (protocol §4's sensitivity grid) must never be mistaken for the
+    # pre-registration: a non-default alpha gets a stderr warning and no "commit it" line,
+    # even when --out points at the committed path.
+    results = _validation_run(tmp_path)
+    out = tmp_path / "a.yaml"
+    assert _run(["--results", str(results), "--dataset", "mvtec_ad2",
+                 "--method", "intensity_baseline", "--out", str(out),
+                 "--alpha", "1e-2"]) == 0
+    captured = capsys.readouterr()
+    assert "sensitivity-sweep" in captured.err
+    assert "must not be committed" in captured.err
+    assert "commit it" not in captured.out
+
+
+def test_calibrate_prints_the_commit_reminder_at_the_preregistered_alpha(tmp_path, capsys):
+    results = _validation_run(tmp_path)
+    out = tmp_path / "a.yaml"
+    assert _run(["--results", str(results), "--dataset", "mvtec_ad2",
+                 "--method", "intensity_baseline", "--out", str(out)]) == 0
+    captured = capsys.readouterr()
+    assert "commit it" in captured.out
+    assert captured.err == ""

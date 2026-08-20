@@ -479,8 +479,15 @@ def test_aggregate_names_the_failing_group_on_a_single_class_group(tmp_path):
     assert exc_info.value.__cause__ is not None  # original exception chained, not swallowed
 
 
-def _threshold_shard(tmp_path, n=4, size=16):
-    """A shard with real map files on disk and one anomalous square per bad image."""
+def _threshold_shard(
+    tmp_path, n=4, size=16, category="vial", dataset="mvtec_ad2", method="intensity_baseline"
+):
+    """A shard with real map files on disk and one anomalous square per bad image.
+
+    Stamps the identity columns (`dataset`, `method`, `category` -- see IDENTITY_COLUMNS in
+    vlmab.eval.store) a real ResultStore shard always carries, since threshold_metrics checks
+    them against the artifact it is handed.
+    """
     import pandas as pd
     from PIL import Image
 
@@ -506,6 +513,9 @@ def _threshold_shard(tmp_path, n=4, size=16):
             "mask_path": None if mask_path is None else str(mask_path),
             "map_path": str(map_path),
             "meta_lighting": "regular",
+            "dataset": dataset,
+            "method": method,
+            "category": category,
         })
     return pd.DataFrame(rows)
 
@@ -562,12 +572,41 @@ def test_threshold_metrics_refuses_unlabelled_rows(tmp_path):
 
 
 def test_threshold_metrics_raises_on_a_category_the_artifact_has_not_calibrated(tmp_path):
-    df = _threshold_shard(tmp_path)
+    # df's own category matches what's requested (so the join guard is satisfied); the
+    # artifact itself just never calibrated that category.
+    df = _threshold_shard(tmp_path, category="fabric")
     with pytest.raises(KeyError, match="fabric"):
-        threshold_metrics(df, _threshold_artifact(tmp_path), "fabric")
+        threshold_metrics(df, _threshold_artifact(tmp_path, category="vial"), "fabric")
 
 
 def test_threshold_metrics_needs_maps(tmp_path):
     df = _threshold_shard(tmp_path).drop(columns=["map_path"])
     with pytest.raises(ValueError, match="map_path"):
         threshold_metrics(df, _threshold_artifact(tmp_path), "vial")
+
+
+def test_threshold_metrics_refuses_a_df_pooling_other_categories(tmp_path):
+    # A multi-category results root, loaded whole and handed in with only `category="vial"`
+    # requested: without this guard, the other category's maps would be pooled in and cut at
+    # vial's threshold.
+    vial = _threshold_shard(tmp_path, category="vial")
+    fabric = _threshold_shard(tmp_path, category="fabric")
+    df = pd.concat([vial, fabric], ignore_index=True)
+    with pytest.raises(ValueError, match="category"):
+        threshold_metrics(df, _threshold_artifact(tmp_path, category="vial"), "vial")
+
+
+def test_threshold_metrics_refuses_a_method_mismatch(tmp_path):
+    # The exact notebook mistake the spec forbids: a df for method B scored against an
+    # artifact calibrated for method A. Maps are on each method's own scale (protocol §4).
+    df = _threshold_shard(tmp_path, method="winclip")
+    artifact = _threshold_artifact(tmp_path)  # method="intensity_baseline"
+    with pytest.raises(ValueError, match="winclip"):
+        threshold_metrics(df, artifact, "vial")
+
+
+def test_threshold_metrics_refuses_a_dataset_mismatch(tmp_path):
+    df = _threshold_shard(tmp_path, dataset="visa")
+    artifact = _threshold_artifact(tmp_path)  # dataset="mvtec_ad2"
+    with pytest.raises(ValueError, match="visa"):
+        threshold_metrics(df, artifact, "vial")

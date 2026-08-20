@@ -141,8 +141,12 @@ metric turns out to be the cheap one.
 - No ground-truth positives in the group → `0.0`, mirroring `seg_f1max`.
 - Nothing predicted (`TP + FP == 0`) → `0.0`; precision is undefined and F1 with it.
 
-**The invariant that ties the two metrics together**, tested as a property:
-`seg_f1_at(m, a, t) <= seg_f1max(m, a)` for every `t`.
+**The invariant that ties the two metrics together**, tested as a property, holds for the
+global-threshold rules (`global_quantile`, `transductive_quantile`), which search the same
+single-threshold space `seg_f1max` maximises over: `seg_f1_at(m, a, t) <= seg_f1max(m, a)` for
+every global (scalar) `t`. It does **not** extend to `per_image_robust_z`: a per-image threshold
+is a non-nested, strictly larger search space, so its `seg_f1_at` can in principle exceed
+`seg_f1max` without that being a bug.
 
 `normal_pixel_fpr_at` reports the **realised** FPR on test against the `alpha` **targeted** on
 validation. For A and B under lighting shift, that gap is itself a headline number of C3. It needs
@@ -249,7 +253,9 @@ new entry point, because it is the step whose output gets committed.
 TDD, in the repo's existing style — a naive reference plus property tests.
 
 - `seg_f1_at` against a naive whole-pooling implementation on small arrays.
-- The invariant `seg_f1_at(t) <= seg_f1max` over random thresholds.
+- The invariant `seg_f1_at(t) <= seg_f1max` over random *global* (scalar) thresholds — the
+  global-threshold rules only; `per_image_robust_z`'s per-image thresholds are a different,
+  non-nested search space and are not covered by this property.
 - The streaming top-`k` quantile against `np.quantile` on data small enough to pool, including the
   `k = 1` and `k >= N` edges.
 - Calibration recovers the target: on synthetic maps of known distribution, the realised FPR on

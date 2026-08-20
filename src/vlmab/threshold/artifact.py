@@ -6,6 +6,7 @@ a file in git with a date is what makes that claim checkable afterwards -- a sub
 artifact was committed later than the submission is a violation anyone can detect from the log.
 """
 from datetime import date
+from math import isfinite
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -135,4 +136,34 @@ def load_artifact(path: Path) -> dict[str, Any]:
                 f"{path} category {category!r} is missing its designated_for_submission rule "
                 f"{designated!r}"
             )
+        # Validate the fitted scalars, same reasoning as alpha above: the artifact is a
+        # hand-editable file in git, and an artifact with a corrupted fitted value is a
+        # malformed pre-registration. Left unchecked it fails silently downstream instead of
+        # here: a missing `k`/`threshold` surfaces as a bare KeyError from aggregate.py, and a
+        # NaN one loads clean and produces `nan` thresholds -- since `>= nan` is always False,
+        # every rule then reports SegF1 0.0 and FPR 0.0 rather than raising.
+        for rule, rule_block in block.items():
+            key = VALUE_KEY.get(rule)
+            if key is None:
+                continue
+            if not isinstance(rule_block, dict) or key not in rule_block:
+                raise ValueError(
+                    f"{path} category {category!r} rule {rule!r} is missing its fitted scalar "
+                    f"{key!r}: a threshold rule cannot produce a threshold without it"
+                )
+            value = rule_block[key]
+            try:
+                value_f = float(value)
+            except (TypeError, ValueError):
+                raise ValueError(
+                    f"{path} category {category!r} rule {rule!r} field {key!r} is {value!r}, "
+                    "not a number"
+                )
+            if not isfinite(value_f):
+                raise ValueError(
+                    f"{path} category {category!r} rule {rule!r} field {key!r} is {value_f}, "
+                    "not finite: a corrupted fitted scalar produces thresholds that are also "
+                    "not finite, and since `>= nan` is always False, every rule would then "
+                    "silently report SegF1 0.0 and FPR 0.0 instead of raising here"
+                )
     return raw
