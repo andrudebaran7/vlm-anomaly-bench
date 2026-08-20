@@ -8,9 +8,13 @@ import pytest
 from PIL import Image
 
 from vlmab.datasets.mvtec_ad2 import LABEL_UNKNOWN
-from vlmab.eval.aggregate import BYTES_PER_PIXEL, aggregate, image_metrics, pixel_metrics
+from vlmab.eval.aggregate import (
+    BYTES_PER_PIXEL, aggregate, image_metrics, pixel_metrics, threshold_metrics,
+)
 from vlmab.metrics.image_level import i_ap, i_auroc, i_f1max
 from vlmab.metrics.pixel_level import au_pro, p_auroc, seg_f1max
+from vlmab.threshold.artifact import load_artifact, write_artifact
+from vlmab.threshold.rules import Calibration
 
 
 def _shard(tmp_path, n=4, separable=True, with_pixels=True):
@@ -473,3 +477,136 @@ def test_aggregate_names_the_failing_group_on_a_single_class_group(tmp_path):
     assert "meta_lighting" in message and "regular" in message
     assert "only label 0" in message  # the underlying reason must survive, not just the label
     assert exc_info.value.__cause__ is not None  # original exception chained, not swallowed
+
+
+def _threshold_shard(
+    tmp_path, n=4, size=16, category="vial", dataset="mvtec_ad2", method="intensity_baseline"
+):
+    """A shard with real map files on disk and one anomalous square per bad image.
+
+    Stamps the identity columns (`dataset`, `method`, `category` -- see IDENTITY_COLUMNS in
+    vlmab.eval.store) a real ResultStore shard always carries, since threshold_metrics checks
+    them against the artifact it is handed.
+    """
+    import pandas as pd
+    from PIL import Image
+
+    rng = np.random.default_rng(0)
+    rows = []
+    for i in range(n):
+        amap = rng.random((size, size)).astype(np.float32)
+        bad = i % 2 == 1
+        mask_path = None
+        if bad:
+            amap[2:6, 2:6] += 5.0
+            mask = np.zeros((size, size), dtype=np.uint8)
+            mask[2:6, 2:6] = 255
+            mask_path = tmp_path / f"{i}_mask.png"
+            Image.fromarray(mask, mode="L").save(mask_path)
+        map_path = tmp_path / f"{i}.npy"
+        np.save(map_path, amap.astype(np.float16))
+        rows.append({
+            "image_path": f"/fake/{i}.png",
+            "label": int(bad),
+            "image_score": float(amap.max()),
+            "split": "test_public",
+            "mask_path": None if mask_path is None else str(mask_path),
+            "map_path": str(map_path),
+            "meta_lighting": "regular",
+            "dataset": dataset,
+            "method": method,
+            "category": category,
+        })
+    return pd.DataFrame(rows)
+
+
+def _threshold_artifact(tmp_path, category="vial"):
+    path = write_artifact(
+        tmp_path / "cal.yaml",
+        dataset="mvtec_ad2",
+        method="intensity_baseline",
+        alpha=1e-3,
+        calibrated_on={"split": "validation", "n_images": 4, "lighting": ["regular"]},
+        run_id="deadbeef",
+        categories={category: {
+            "global_quantile": Calibration("global_quantile", 1.0, 1e-3, 100, 0),
+            "per_image_robust_z": Calibration("per_image_robust_z", 3.0, 1e-3, 100, 0),
+            "transductive_quantile": Calibration("transductive_quantile", float("nan"), 1e-3, 0, 0),
+        }},
+        designated_for_submission="per_image_robust_z",
+    )
+    return load_artifact(path)
+
+
+def test_threshold_metrics_reports_every_rule(tmp_path):
+    df = _threshold_shard(tmp_path)
+    out = threshold_metrics(df, _threshold_artifact(tmp_path), "vial")
+    for rule in ("global_quantile", "per_image_robust_z", "transductive_quantile"):
+        assert 0.0 <= out[f"seg_f1_at__{rule}"] <= 1.0
+        assert 0.0 <= out[f"fpr_at__{rule}"] <= 1.0
+        assert out[f"degenerate_mad__{rule}"] == 0
+    assert out["n"] == 4
+
+
+def test_threshold_metrics_on_this_fixture_do_not_beat_the_oracle(tmp_path):
+    # NOT a universal invariant: seg_f1max upper-bounds only rules that pick one *global*
+    # threshold (global_quantile, transductive_quantile) -- it searches that same space
+    # exhaustively. per_image_robust_z picks one threshold per image, a different,
+    # non-nested, strictly larger search space, so it is not bounded by the oracle in
+    # general and can in principle score above it on heterogeneous data. Here it happens
+    # to stay under the oracle too, which this test records as an observation on this
+    # fixture, not as a law; a future failure of this assertion on real data would be a
+    # finding about the rule's behaviour, not necessarily a bug.
+    df = _threshold_shard(tmp_path)
+    out = threshold_metrics(df, _threshold_artifact(tmp_path), "vial")
+    oracle = pixel_metrics(df)["seg_f1max"]
+    for rule in ("global_quantile", "per_image_robust_z", "transductive_quantile"):
+        assert out[f"seg_f1_at__{rule}"] <= oracle + 1e-12
+
+
+def test_threshold_metrics_refuses_unlabelled_rows(tmp_path):
+    df = _threshold_shard(tmp_path)
+    df.loc[0, "label"] = -1
+    with pytest.raises(ValueError, match="unlabelled"):
+        threshold_metrics(df, _threshold_artifact(tmp_path), "vial")
+
+
+def test_threshold_metrics_raises_on_a_category_the_artifact_has_not_calibrated(tmp_path):
+    # df's own category matches what's requested (so the join guard is satisfied); the
+    # artifact itself just never calibrated that category.
+    df = _threshold_shard(tmp_path, category="fabric")
+    with pytest.raises(KeyError, match="fabric"):
+        threshold_metrics(df, _threshold_artifact(tmp_path, category="vial"), "fabric")
+
+
+def test_threshold_metrics_needs_maps(tmp_path):
+    df = _threshold_shard(tmp_path).drop(columns=["map_path"])
+    with pytest.raises(ValueError, match="map_path"):
+        threshold_metrics(df, _threshold_artifact(tmp_path), "vial")
+
+
+def test_threshold_metrics_refuses_a_df_pooling_other_categories(tmp_path):
+    # A multi-category results root, loaded whole and handed in with only `category="vial"`
+    # requested: without this guard, the other category's maps would be pooled in and cut at
+    # vial's threshold.
+    vial = _threshold_shard(tmp_path, category="vial")
+    fabric = _threshold_shard(tmp_path, category="fabric")
+    df = pd.concat([vial, fabric], ignore_index=True)
+    with pytest.raises(ValueError, match="category"):
+        threshold_metrics(df, _threshold_artifact(tmp_path, category="vial"), "vial")
+
+
+def test_threshold_metrics_refuses_a_method_mismatch(tmp_path):
+    # The exact notebook mistake the spec forbids: a df for method B scored against an
+    # artifact calibrated for method A. Maps are on each method's own scale (protocol §4).
+    df = _threshold_shard(tmp_path, method="winclip")
+    artifact = _threshold_artifact(tmp_path)  # method="intensity_baseline"
+    with pytest.raises(ValueError, match="winclip"):
+        threshold_metrics(df, artifact, "vial")
+
+
+def test_threshold_metrics_refuses_a_dataset_mismatch(tmp_path):
+    df = _threshold_shard(tmp_path, dataset="visa")
+    artifact = _threshold_artifact(tmp_path)  # dataset="mvtec_ad2"
+    with pytest.raises(ValueError, match="visa"):
+        threshold_metrics(df, artifact, "vial")

@@ -5,14 +5,18 @@ at a time and never holds a grid's worth of anomaly maps in memory. Aggregation 
 are read back, so it is also where the memory ceiling has to be enforced — Colab's free tier has
 roughly 12.7 GB of host RAM, and a category of 2.66 MP images adds up fast.
 """
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
 import pandas as pd
 
 from vlmab.datasets.mvtec_ad2 import LABEL_UNKNOWN
 from vlmab.metrics.image_level import i_ap, i_auroc, i_f1max
-from vlmab.metrics.pixel_level import au_pro, p_auroc, seg_f1max
+from vlmab.metrics.pixel_level import (
+    au_pro, normal_pixel_fpr_at, p_auroc, seg_f1_at, seg_f1max,
+)
+from vlmab.threshold.artifact import VALUE_KEY
+from vlmab.threshold.rules import RULES, thresholds_for
 
 
 def image_metrics(df: pd.DataFrame) -> dict[str, float]:
@@ -175,3 +179,100 @@ def aggregate(
         record["n_pixel_rows"] = pixels["n"]
         records.append(record)
     return pd.DataFrame(records)
+
+
+def threshold_metrics(
+    df: pd.DataFrame,
+    artifact: Mapping[str, Any],
+    category: str,
+) -> dict[str, float]:
+    """SegF1 at each pre-registered rule, and the FPR each one actually realised.
+
+    Kept out of `pixel_metrics` on purpose. `pixel_metrics` sorts (P-AUROC, SegF1max, AU-PRO),
+    so it carries a memory guard and is aggregated per lighting condition. At a fixed threshold
+    nothing is sorted, only counted: `seg_f1_at` itself streams, while this function holds the
+    (mask, map) pairs at about 5 bytes per pixel -- roughly 1.9 GB for a 140-image Vial category
+    -- rather than the ~80 bytes/pixel sorting peak that forces `pixel_metrics` to keep its
+    memory guard and stay per lighting condition. That is cheap enough to pool a whole category,
+    which is what the official SegF1 definition requires (protocol §4). No `max_bytes`
+    parameter, because there is nothing here to guard against.
+
+    Needs ground truth, so it is for `test_public` only. `seg_f1_at` alongside `seg_f1max` in
+    a table is fine and is the point; in the same *column* without marking is not (protocol §4).
+    """
+    if "map_path" not in df.columns:
+        raise ValueError(
+            "threshold_metrics needs a map_path column: it scores thresholded anomaly maps, "
+            "so a run without saved maps has nothing for it to threshold"
+        )
+
+    # Guard the other side of the join. `category` names which of the artifact's blocks to
+    # read, but nothing upstream stops a caller handing in a df that does not actually match
+    # it -- a multi-category results root pools every category's maps and cuts them all at
+    # this one's threshold; a df for a different method or dataset gets scored at a threshold
+    # fitted on a different method's or dataset's maps entirely, silently, because IDENTITY_
+    # COLUMNS (vlmab.eval.store) are present but never checked against the artifact.
+    for column in ("category", "method", "dataset"):
+        if column not in df.columns:
+            raise ValueError(
+                f"threshold_metrics needs a {column!r} column to confirm the df it was handed "
+                f"actually matches the {category!r} category it is about to be scored against"
+            )
+    found_categories = sorted(df["category"].unique())
+    if found_categories != [category]:
+        raise ValueError(
+            f"threshold_metrics was asked for category {category!r} but df contains category "
+            f"{found_categories}: pooling other categories' maps into this call would cut them "
+            f"at {category!r}'s threshold, which is fit on a different distribution of scores"
+        )
+    artifact_method = artifact["method"]
+    found_methods = sorted(df["method"].unique())
+    if found_methods != [artifact_method]:
+        raise ValueError(
+            f"threshold_metrics got method(s) {found_methods} but the calibration artifact was "
+            f"fitted for method {artifact_method!r}: anomaly maps are on each method's own "
+            "scale (protocol §4) and a threshold fitted for one method is meaningless applied "
+            "to another's"
+        )
+    artifact_dataset = artifact["dataset"]
+    found_datasets = sorted(df["dataset"].unique())
+    if found_datasets != [artifact_dataset]:
+        raise ValueError(
+            f"threshold_metrics got dataset(s) {found_datasets} but the calibration artifact "
+            f"was fitted for dataset {artifact_dataset!r}: a threshold fitted on one dataset's "
+            "validation split says nothing about another's"
+        )
+
+    labels = df["label"].to_numpy()
+    if (labels == LABEL_UNKNOWN).any():
+        raise ValueError(
+            f"{int((labels == LABEL_UNKNOWN).sum())} unlabelled rows (label {LABEL_UNKNOWN}): "
+            "these come from the private splits, whose ground truth is withheld. SegF1 and the "
+            "realised FPR both need masks, and synthesising them would score unknown as normal."
+        )
+    if category not in artifact["categories"]:
+        raise KeyError(
+            f"the calibration artifact has no thresholds for category {category!r}; it "
+            f"calibrated {sorted(artifact['categories'])}"
+        )
+
+    rows = list(df[df["map_path"].notna()].itertuples())
+    if not rows:
+        return {"n": 0}
+    masks, amaps = zip(*(_load_pair(row) for row in rows))
+    # One map at a time, re-read per pass: this is the streaming path, so holding the pair
+    # list is already the peak and the factory adds nothing to it.
+    factory = lambda: iter(amaps)
+
+    block = artifact["categories"][category]
+    alpha = float(artifact["alpha"])
+    out: dict[str, float] = {}
+    for rule in RULES:
+        key = VALUE_KEY.get(rule)
+        value = None if key is None else float(block[rule][key])
+        ts, degenerate = thresholds_for(rule, value, factory, alpha)
+        out[f"seg_f1_at__{rule}"] = seg_f1_at(masks, amaps, ts)
+        out[f"fpr_at__{rule}"] = normal_pixel_fpr_at(masks, amaps, ts)
+        out[f"degenerate_mad__{rule}"] = degenerate
+    out["n"] = len(rows)
+    return out

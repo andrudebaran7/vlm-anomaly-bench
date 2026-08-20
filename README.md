@@ -7,9 +7,9 @@
 > 2025 frontier benchmark** MVTec AD 2. This repository closes that gap for the
 > zero-shot / VLM family, with a reproducible protocol and honest, efficiency-aware metrics.
 
-**Status:** protocol frozen at v0.2.9 (see [`docs/protocol.md`](docs/protocol.md)); the evaluation
+**Status:** protocol frozen at v0.2.11 (see [`docs/protocol.md`](docs/protocol.md)); the evaluation
 core — metrics, resumable runner, MVTec AD 2 loader and lighting-grouped aggregation — is built and
-tested (246 of 246 tests passing, no dataset or GPU required), verified end-to-end
+tested (304 of 304 tests passing, no dataset or GPU required), verified end-to-end
 against the real MVTec AD 2 layout. The CPU-testable half of every method adapter is done; only the
 Colab GPU backends remain before the first results. No results computed yet.
 
@@ -81,7 +81,7 @@ results/            # generated tables/figures (source parquet tracked via relea
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
 
 # Working today:
-.venv/bin/python -m pytest -q                                  # 246 tests, no dataset needed
+.venv/bin/python -m pytest -q                                  # 304 tests, no dataset needed
 .venv/bin/python scripts/prepare_data.py --root data/mvtec_ad2 # verify a downloaded category
 
 # Once the Colab GPU backends land (M2):

@@ -11,7 +11,7 @@ is done, on `master`, and green on CI (Python 3.11 + 3.13).
 
 - **Evaluation core:** image/pixel metrics (P-AUROC, AU-PRO, SegF1), provenance, a crash-safe
   result store, a resumable runner with per-sample latency, per-category `fit` for full-shot
-  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.10**.
+  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.11**.
 - **MVTec AD 2 data path:** loader (verified against the real Vial archive), layout verification
   (`scripts/prepare_data.py`), and the run_eval CLI. Native-resolution, raw-scale maps (v0.2.6).
 - **Method adapters — CPU halves done and registered** (each wraps an injectable backend; without
@@ -70,36 +70,40 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    phases A–D.
 6. **M3 — full MVTec AD 2 grid.** Once each method's VisA gate passes, run the full public-test grid
    over all eight categories, one category at a time (the download/resume/shard unit). Mechanical.
-7. **M4 — evaluation server.** Score the private split. Access is **granted** (2026-07-30), but M4 is
-   **blocked on unbuilt work**, not on access: see the threshold rule below. On first login, confirm
+7. **M4 — evaluation server.** Score the private split. Access is **granted** (2026-07-30) and the
+   threshold rule is built and pre-registered (v0.2.11); what remains is the submission packaging,
+   which needs the server's own format — confirm it on first login. On first login, confirm
    the metric definition, submission payload and attempt limit against the server's own docs — they
    are recorded in `docs/datasets-access.md` from the VAND 3.0 challenge report (a secondary source)
    with a checkbox each.
 8. **M5 — efficiency pass** on a rented fixed instance (protocol §5: latency never from Colab).
 9. **M6 — preprint.** Paper §1–§3 are already written (see below); §4–§6 need M3.
 
-## ⚠️ The one piece of unplanned work, and it gates M4
+## The threshold rule — built and pre-registered (2026-08-20)
 
-**A ground-truth-free threshold rule does not exist in this repo.** Protocol v0.2.10 §4 spells this
-out. The official MVTec AD 2 metric is pixel-level SegF1, and the server takes **thresholded** maps,
-so a threshold must be committed to without ever seeing ground truth. What this repo computes is
-`metrics.pixel_level.seg_f1max`, which maximises F1 *over* thresholds — it inspects the ground truth
-to pick one. That is an **oracle** metric: fine and comparable on `test_public`, strictly optimistic,
-and **not what the server scores**.
+The repo's one piece of unplanned work is done. Protocol v0.2.11 §4 pre-registers three
+ground-truth-free rules on two axes (transform x calibration source), `alpha = 1e-3` with a
+fixed sensitivity grid, and **`per_image_robust_z` as the designated private-split submission
+rule** — fixed, with an a priori justification, before any result existed. `seg_f1_at` computes
+the official SegF1 at a fixed threshold, pooled over a whole category as the official definition
+requires; `seg_f1max` stays and stays marked **oracle**.
 
-Consequences, both already written down:
-- Until the rule exists, the study can report oracle SegF1max on the public split and **cannot make a
-  private-split submission**. M4 cannot run.
-- The paper claims this rule as contribution **C3**, and C1 claims private-split coverage. Both carry
-  `\todo{withdraw if the threshold rule is not built before submission}` tripwires in
-  `sections/02-introduction.tex` of the paper repo. If it is never built, those claims come out and
-  the study reports public-split oracle numbers as a stated limitation.
+Calibration runs on the defect-free `validation` split via `scripts/calibrate_threshold.py`,
+which refuses any other split, and writes `configs/thresholds/<dataset>__<method>.yaml`. **That
+file is committed, and committing it before a submission is what makes the pre-registration
+auditable.**
 
-The rule must be **fixed on the defect-free `validation` split** (never on test data) and
-pre-registered in the protocol before any submission. It needs its own spec; none is written yet.
-Worth noting it is not merely a chore — the VAND 3.0 organisers call threshold selection "a challenge
-often not yet considered within the scientific community but indispensable for deployment", which is
-why it became a contribution rather than a footnote.
+What still gates M4, in order:
+
+1. **Submission packaging** — writing the server's payload (thresholded plus continuous maps in
+   its format). Deliberately not built: the format is unverified until first login
+   (`docs/datasets-access.md` leaves it as a checkbox), and guessing an upstream API is what
+   protocol §3 forbids. Confirm the format on first login, then build it.
+2. **Each method's VisA ±1pt gate**, which is the pre-existing ordering above and unchanged.
+
+The paper's C1 and C3 `\todo{withdraw if the threshold rule is not built before submission}`
+tripwires can come out once a first calibration has run on a real method — not on
+`intensity_baseline`, which is the floor, not a detector.
 
 ## Companion paper — where it stands
 
@@ -141,15 +145,12 @@ Neither repo has been pushed since `vlm-anomaly-bench` was pushed on 2026-07-30.
 **bench is 4 commits ahead of origin, paper is 20 ahead.** Both working trees are clean and both
 build/test green (bench: 246 tests; paper: pdflatex chain exits 0, 5 pages).
 
-Three candidate next moves, in the order that makes most sense:
+Two candidate next moves, in the order that makes most sense:
 
-1. **The threshold-rule spec** (see the warning section above). It is the only thing standing between
-   the study and M4 now that server access exists, and the paper already makes claims that depend on
-   it. Brainstorm → spec → plan, like every other piece of work here.
-2. **The first Colab session: PatchCore** (step 1 of the ordered list). Interactive, GPU, executed by
+1. **The first Colab session: PatchCore** (step 1 of the ordered list). Interactive, GPU, executed by
    a human — not by CPU subagents. It closes M2 and is the ceiling every zero-shot number is measured
    against.
-3. **Push both repos.** Nothing blocks it; it simply has not been done.
+2. **Push both repos.** Nothing blocks it; it simply has not been done.
 
 Two items only the author can close, both flagged in the paper's `references.bib` as `\todo` that
 render as red text in the printed bibliography:
