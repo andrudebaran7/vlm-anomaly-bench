@@ -10,7 +10,7 @@ from scipy import ndimage
 from sklearn import metrics as skm
 
 
-def _flatten(masks: Sequence[np.ndarray], amaps: Sequence[np.ndarray]):
+def _check_pairs(masks: Sequence[np.ndarray], amaps: Sequence[np.ndarray]) -> None:
     if len(masks) != len(amaps):
         raise ValueError(f"masks/amaps length mismatch: {len(masks)} vs {len(amaps)}")
     for i, (m, a) in enumerate(zip(masks, amaps)):
@@ -20,6 +20,10 @@ def _flatten(masks: Sequence[np.ndarray], amaps: Sequence[np.ndarray]):
             raise ValueError(
                 f"mask/amap shape mismatch at index {i}: {m_shape} vs {a_shape}"
             )
+
+
+def _flatten(masks: Sequence[np.ndarray], amaps: Sequence[np.ndarray]):
+    _check_pairs(masks, amaps)
     y = np.concatenate([(np.asarray(m) > 0).ravel() for m in masks])
     # float32 keeps peak memory bounded on ~5MP MVTec AD 2 images (Colab-class RAM);
     # both roc_auc_score and precision_recall_curve accept float32 inputs.
@@ -308,3 +312,83 @@ def au_pro(
         y = np.concatenate([y, [y[-1]]])
 
     return float(_trapezoid(y, x) / fpr_limit)
+
+
+def _per_image_thresholds(
+    amaps: Sequence[np.ndarray], threshold: float | Sequence[float]
+) -> list[float]:
+    if np.isscalar(threshold):
+        return [float(threshold)] * len(amaps)
+    ts = [float(t) for t in threshold]
+    if len(ts) != len(amaps):
+        raise ValueError(
+            f"expected one threshold per image: got {len(ts)} thresholds for "
+            f"{len(amaps)} maps"
+        )
+    return ts
+
+
+def seg_f1_at(
+    masks: Sequence[np.ndarray],
+    amaps: Sequence[np.ndarray],
+    threshold: float | Sequence[float],
+) -> float:
+    """Pixel F1 at a *fixed* threshold — the official MVTec AD 2 metric.
+
+    Precision and recall are computed over the complete set of pooled pixels, not averaged
+    over individual images (protocol §4, v0.2.10). `threshold` is a scalar, or one value per
+    image for a per-image rule.
+
+    Streams: at a fixed threshold nothing has to be sorted, only counted, so the working set
+    is one mask plus one map at a time. That is why this can pool a whole category (the
+    official definition) while `seg_f1max` cannot and stays per lighting condition -- the
+    oracle sorts, this counts. Not interchangeable with `seg_f1max` in a results column:
+    that one inspects the ground truth to choose its threshold and is strictly optimistic.
+
+    Predicted positive is `amap >= threshold`, fixed so the degenerate cases are decidable.
+    Returns 0.0 when the group has no anomalous pixels (mirroring `seg_f1max`) and when
+    nothing is predicted, where precision is undefined and F1 with it.
+    """
+    _check_pairs(masks, amaps)
+    ts = _per_image_thresholds(amaps, threshold)
+    tp = fp = fn = 0
+    for m, a, t in zip(masks, amaps, ts):
+        y = np.asarray(m) > 0
+        pred = np.asarray(a, dtype=np.float32) >= np.float32(t)
+        tp += int(np.count_nonzero(pred & y))
+        fp += int(np.count_nonzero(pred & ~y))
+        fn += int(np.count_nonzero(~pred & y))
+    if tp == 0:
+        return 0.0
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    return float(2 * precision * recall / (precision + recall))
+
+
+def normal_pixel_fpr_at(
+    masks: Sequence[np.ndarray],
+    amaps: Sequence[np.ndarray],
+    threshold: float | Sequence[float],
+) -> float:
+    """Fraction of *normal* pixels flagged at this threshold.
+
+    The realised false-positive rate, against the `alpha` a rule targeted on `validation`.
+    The gap between the two is what a lighting shift does to a threshold, and is a reported
+    result in its own right. Needs masks, so it is computable on `test_public` only -- never
+    on the private splits, where it would be exactly the feedback protocol §7 forbids
+    iterating against.
+    """
+    _check_pairs(masks, amaps)
+    ts = _per_image_thresholds(amaps, threshold)
+    fp = n_normal = 0
+    for m, a, t in zip(masks, amaps, ts):
+        normal = np.asarray(m) == 0
+        pred = np.asarray(a, dtype=np.float32) >= np.float32(t)
+        fp += int(np.count_nonzero(pred & normal))
+        n_normal += int(np.count_nonzero(normal))
+    if n_normal == 0:
+        raise ValueError(
+            "normal_pixel_fpr_at has no normal pixels to measure: every pooled pixel in "
+            "this group is anomalous"
+        )
+    return fp / n_normal

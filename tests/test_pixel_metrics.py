@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy import ndimage
 
-from vlmab.metrics.pixel_level import _trapezoid, p_auroc, pro_thresholds, seg_f1max
+from vlmab.metrics.pixel_level import _trapezoid, normal_pixel_fpr_at, p_auroc, pro_thresholds, seg_f1_at, seg_f1max
 
 
 def _one_region(size=100, region=40, top_left=10):
@@ -403,3 +403,86 @@ def test_au_pro_still_computes_when_every_normal_pixel_sits_at_the_map_minimum(f
     amap = np.zeros((10, 10), dtype=np.float32)
     amap[0, 0] = 1.0
     assert au_pro([mask], [amap], fpr_limit=fpr_limit) == pytest.approx(1.0)
+
+
+def _naive_seg_f1_at(masks, amaps, threshold):
+    """Pool everything, then count. The obvious implementation seg_f1_at must match."""
+    y = np.concatenate([(np.asarray(m) > 0).ravel() for m in masks])
+    ts = [threshold] * len(amaps) if np.isscalar(threshold) else list(threshold)
+    pred = np.concatenate(
+        [(np.asarray(a, dtype=np.float32) >= np.float32(t)).ravel() for a, t in zip(amaps, ts)]
+    )
+    tp = int(np.count_nonzero(pred & y))
+    fp = int(np.count_nonzero(pred & ~y))
+    fn = int(np.count_nonzero(~pred & y))
+    if tp == 0:
+        return 0.0
+    precision = tp / (tp + fp)
+    recall = tp / (tp + fn)
+    return 2 * precision * recall / (precision + recall)
+
+
+def test_seg_f1_at_matches_a_naive_pooled_reference():
+    rng = np.random.default_rng(0)
+    masks = [_one_region(size=40, region=12, top_left=5), _one_region(size=40, region=8, top_left=20)]
+    amaps = [m.astype(np.float32) * 0.6 + rng.random(m.shape).astype(np.float32) for m in masks]
+    for t in (0.2, 0.5, 0.9, 1.4):
+        assert seg_f1_at(masks, amaps, t) == pytest.approx(_naive_seg_f1_at(masks, amaps, t))
+
+
+def test_seg_f1_at_never_exceeds_the_oracle():
+    # The invariant that ties the reportable metric to the oracle one: seg_f1max maximises
+    # F1 over every threshold, so no fixed threshold can beat it. If this ever fails, one of
+    # the two is computing a different quantity than its name claims.
+    rng = np.random.default_rng(1)
+    masks = [_one_region(size=30, region=10, top_left=4) for _ in range(3)]
+    amaps = [m.astype(np.float32) * 0.4 + rng.random(m.shape).astype(np.float32) for m in masks]
+    oracle = seg_f1max(masks, amaps)
+    for t in rng.uniform(-0.5, 2.0, size=25):
+        assert seg_f1_at(masks, amaps, float(t)) <= oracle + 1e-12
+
+
+def test_seg_f1_at_pools_pixels_rather_than_averaging_images():
+    # The official definition computes precision/recall over the complete pixel set, not per
+    # image. Image `b` has no anomalous pixels at all, so its own F1 is 0 and the mean of the
+    # two per-image F1s is half the pooled value -- a number this must NOT return.
+    a = _one_region(size=20, region=10, top_left=2)
+    b = np.zeros((20, 20), dtype=np.uint8)
+    amaps = [a.astype(np.float32), np.zeros((20, 20), dtype=np.float32)]
+    assert seg_f1_at([a, b], amaps, 0.5) == pytest.approx(1.0)
+
+
+def test_seg_f1_at_accepts_one_threshold_per_image():
+    a = _one_region(size=20, region=10, top_left=2)
+    amaps = [a.astype(np.float32), a.astype(np.float32) * 10.0]
+    # A single scalar cannot separate both images; the right per-image pair can.
+    assert seg_f1_at([a, a], amaps, [0.5, 5.0]) == pytest.approx(1.0)
+
+
+def test_seg_f1_at_rejects_a_threshold_vector_of_the_wrong_length():
+    a = _one_region(size=8, region=3, top_left=1)
+    with pytest.raises(ValueError, match="one threshold per image"):
+        seg_f1_at([a, a], [a.astype(np.float32)] * 2, [0.5])
+
+
+def test_seg_f1_at_is_zero_when_the_group_has_no_anomalous_pixels():
+    z = np.zeros((8, 8), dtype=np.uint8)
+    assert seg_f1_at([z], [np.ones((8, 8), dtype=np.float32)], 0.5) == 0.0
+
+
+def test_seg_f1_at_is_zero_when_nothing_is_predicted():
+    a = _one_region(size=8, region=3, top_left=1)
+    assert seg_f1_at([a], [a.astype(np.float32)], np.inf) == 0.0
+
+
+def test_normal_pixel_fpr_at_counts_only_normal_pixels():
+    mask = _one_region(size=10, region=2, top_left=0)  # 4 anomalous of 100
+    amap = np.ones((10, 10), dtype=np.float32)         # everything flagged at t=0.5
+    assert normal_pixel_fpr_at([mask], [amap], 0.5) == pytest.approx(1.0)
+    assert normal_pixel_fpr_at([mask], [amap], np.inf) == 0.0
+
+
+def test_normal_pixel_fpr_at_raises_when_every_pixel_is_anomalous():
+    ones = np.ones((6, 6), dtype=np.uint8)
+    with pytest.raises(ValueError, match="no normal pixels"):
+        normal_pixel_fpr_at([ones], [ones.astype(np.float32)], 0.5)
