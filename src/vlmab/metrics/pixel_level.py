@@ -343,7 +343,11 @@ def seg_f1_at(
     is one mask plus one map at a time. That is why this can pool a whole category (the
     official definition) while `seg_f1max` cannot and stays per lighting condition -- the
     oracle sorts, this counts. Not interchangeable with `seg_f1max` in a results column:
-    that one inspects the ground truth to choose its threshold and is strictly optimistic.
+    that one inspects the ground truth to choose the best *global* threshold, so it upper-bounds
+    any rule that also picks one global threshold (`global_quantile`, `transductive_quantile`).
+    A per-image rule (`per_image_robust_z`) searches a different, non-nested space -- one
+    threshold per image rather than one for the category -- and is not bounded by the oracle;
+    it can score above `seg_f1max` on heterogeneous data without that being a bug.
 
     Predicted positive is `amap >= threshold`, fixed so the degenerate cases are decidable.
     Returns 0.0 when the group has no anomalous pixels (mirroring `seg_f1max`) and when

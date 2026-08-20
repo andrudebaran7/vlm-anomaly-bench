@@ -538,7 +538,15 @@ def test_threshold_metrics_reports_every_rule(tmp_path):
     assert out["n"] == 4
 
 
-def test_threshold_metrics_never_beats_the_oracle(tmp_path):
+def test_threshold_metrics_on_this_fixture_do_not_beat_the_oracle(tmp_path):
+    # NOT a universal invariant: seg_f1max upper-bounds only rules that pick one *global*
+    # threshold (global_quantile, transductive_quantile) -- it searches that same space
+    # exhaustively. per_image_robust_z picks one threshold per image, a different,
+    # non-nested, strictly larger search space, so it is not bounded by the oracle in
+    # general and can in principle score above it on heterogeneous data. Here it happens
+    # to stay under the oracle too, which this test records as an observation on this
+    # fixture, not as a law; a future failure of this assertion on real data would be a
+    # finding about the rule's behaviour, not necessarily a bug.
     df = _threshold_shard(tmp_path)
     out = threshold_metrics(df, _threshold_artifact(tmp_path), "vial")
     oracle = pixel_metrics(df)["seg_f1max"]

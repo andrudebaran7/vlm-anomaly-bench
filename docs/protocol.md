@@ -173,13 +173,57 @@ bullets above cross-reference "§3.1" — the requirement lives here, the report
   `metrics.pixel_level.seg_f1max` maximises F1 *over* thresholds, which means it inspects the ground
   truth to pick one: it is an **oracle** metric — legitimate and comparable on the public split,
   strictly optimistic, and **not** what the server scores. The two must never be reported in the same
-  column without marking. Until a ground-truth-free threshold rule exists in this repo, this protocol
-  can report oracle `SegF1max` on `test_public` and **cannot** produce a private-split submission.
-  That rule is a hard prerequisite for M4: it must be fixed on the `validation` split (defect-free,
-  never on test data), pre-registered here before any submission, and reported as a result in its own
-  right — the challenge organisers name threshold selection as "a challenge often not yet considered
-  within the scientific community but indispensable for deployment", so how it is chosen is a
-  finding, not an implementation detail.
+  column without marking.
+
+  **The rule, pre-registered 2026-08-20 (v0.2.11).** Every candidate has the same form —
+  transform the scores, pool them, cut at a quantile — and they differ on two axes: the
+  transform (`identity`, or `robust_z`: per image, `(s - median)/MAD`) and the calibration
+  source (the defect-free `validation` split, or the unlabelled test split itself). Three are
+  registered:
+
+  | Rule | transform | source | Fitted |
+  |---|---|---|---|
+  | `global_quantile` | `identity` | `validation` | one threshold per (method, category) |
+  | `per_image_robust_z` | `robust_z` | `validation` | one `k` per (method, category) |
+  | `transductive_quantile` | `identity` | test split | nothing; resolved at apply time |
+
+  **`alpha = 1e-3`**, one value, justified as a stated deployment operating point — no more
+  than one pixel in a thousand flagged on a defect-free part — and deliberately **not** derived
+  from the defect-area fraction, which exists only in `test_public`'s masks and whose use would
+  be calibrating on test. Sensitivity is reported over the fixed grid
+  `{1e-4, 1e-3, 1e-2, 1e-1}`; the grid is registered here so it cannot be chosen after seeing
+  the curve.
+
+  **`per_image_robust_z` is designated for the private-split submission**, fixed before any
+  result existed. §7 allows one submission per method, so this cannot be revisited after seeing
+  public-split numbers. The justification is a priori: what distinguishes the private split is
+  `test_private_mixed`'s lighting variation, and it is the only candidate whose calibration is
+  invariant to a per-image shift in level and spread; and it is inductive, needing one image at
+  a time rather than the whole split, which is the deployment setting this study argues for.
+  The other two are computed and reported on `test_public` for comparison; only this one is
+  submitted. `transductive_quantile` uses the test *inputs* and never the labels, which is
+  ground-truth-free, but it is a different access assumption and is labelled transductive in
+  every table.
+
+  **A per-image threshold is not per-image normalisation.** The continuous map stays on the
+  method's own scale, unrescaled — v0.2.6 protects the cross-image ranking that P-AUROC, AU-PRO
+  and SegF1max depend on, and a per-image *threshold* changes no score.
+
+  **Reporting.** `seg_f1_at` (at a rule) and `seg_f1max` (oracle) may appear in the same table
+  and never in the same unmarked column. `seg_f1_at` pools pixels over the complete category,
+  as the official definition requires, because at a fixed threshold nothing is sorted; the
+  oracle sorts, so it stays per lighting condition under the memory budget above. The realised
+  normal-pixel FPR is reported next to the targeted `alpha`, on `test_public` only — on the
+  private splits it would be exactly the feedback §7 forbids iterating against. `seg_f1max`
+  upper-bounds `seg_f1_at` only for the global-threshold rules (`global_quantile`,
+  `transductive_quantile`), which search the same single-threshold space it maximises over;
+  `per_image_robust_z` searches a per-image space that is not nested inside it, so its
+  `seg_f1_at` is not guaranteed to sit below the oracle, and a table should not be read as if it
+  were.
+
+  The calibration artifact (`configs/thresholds/<dataset>__<method>.yaml`) is committed to git
+  before any submission; a submission whose artifact was committed later is a violation
+  detectable from the log.
 - **Evaluation resolution.** Pixel metrics are computed at the dataset's native resolution
   (1400x1900 for Vial), against unmodified ground-truth masks. Methods may run inference at
   whatever internal resolution they were designed for, but every adapter returns its anomaly map
@@ -327,3 +371,13 @@ protocol exclusion). Failed runs are reported as failures, not silently dropped.
   for M4. (c) §7 records the server's own two-submissions-per-week cap; our one-per-method rule is
   stricter and remains binding. No evaluation rule for any method changed, and no number already
   computed is affected.
+- 2026-08-20 — v0.2.11. Pre-registers the ground-truth-free threshold rule §4 v0.2.10 named as a
+  hard prerequisite for M4: three candidates on two axes, `alpha = 1e-3` with a fixed sensitivity
+  grid, and `per_image_robust_z` designated for the private-split submission with an a priori
+  justification recorded before any result existed. Adds `seg_f1_at` (the official SegF1 at a
+  fixed threshold, pooled over a whole category) and the realised-FPR diagnostic, and requires
+  the calibration artifact to be committed before submission. Clarifies that a per-image
+  threshold is not the per-image normalisation v0.2.6 forbids, and that `seg_f1max` upper-bounds
+  `seg_f1_at` only for the global-threshold rules — `per_image_robust_z` searches a non-nested
+  per-image space and is not bounded by the oracle. No existing metric changed.
+  Rationale: docs/superpowers/specs/2026-08-20-threshold-rule-design.md
