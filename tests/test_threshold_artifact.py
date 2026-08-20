@@ -93,3 +93,66 @@ def test_load_artifact_rejects_an_unknown_rule_name(tmp_path):
     path.write_text(yaml.safe_dump(raw))
     with pytest.raises(ValueError, match="unknown rule"):
         load_artifact(path)
+
+
+def test_load_artifact_rejects_missing_categories(tmp_path):
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    del raw["categories"]
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="no categories key"):
+        load_artifact(path)
+
+
+def test_load_artifact_rejects_empty_categories(tmp_path):
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    raw["categories"] = {}
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="empty categories"):
+        load_artifact(path)
+
+
+def test_load_artifact_rejects_categories_not_a_mapping(tmp_path):
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    raw["categories"] = ["vial"]
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="categories must be a mapping"):
+        load_artifact(path)
+
+
+def test_load_artifact_rejects_missing_alpha(tmp_path):
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    del raw["alpha"]
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="alpha"):
+        load_artifact(path)
+
+
+def test_load_artifact_rejects_non_numeric_alpha(tmp_path):
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    raw["alpha"] = "not_a_number"
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="alpha"):
+        load_artifact(path)
+
+
+def test_load_artifact_rejects_out_of_range_alpha(tmp_path):
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    raw["alpha"] = 0.0
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="alpha"):
+        load_artifact(path)
+
+
+def test_load_artifact_rejects_designated_for_submission_not_in_rules(tmp_path):
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    raw["designated_for_submission"] = "nonexistent_rule"
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="designated_for_submission"):
+        load_artifact(path)

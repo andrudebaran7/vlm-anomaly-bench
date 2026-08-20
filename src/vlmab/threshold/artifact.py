@@ -89,12 +89,44 @@ def load_artifact(path: Path) -> dict[str, Any]:
             f"{ARTIFACT_PROTOCOL_VERSION!r}: a threshold calibrated under different rules is "
             "not reportable under these ones"
         )
+
+    # Validate alpha: same check as write_artifact
+    alpha = raw.get("alpha")
+    try:
+        alpha_float = float(alpha)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"{path} has alpha {alpha!r}; alpha must be a number in (0, 1]"
+        )
+    if not 0.0 < alpha_float <= 1.0:
+        raise ValueError(
+            f"{path} has alpha {alpha_float}; alpha must be in (0, 1]"
+        )
+
     designated = raw.get("designated_for_submission")
     if designated not in RULES:
         raise ValueError(
             f"{path} designated_for_submission is {designated!r}; expected one of {RULES}"
         )
-    for category, block in raw.get("categories", {}).items():
+
+    # Validate categories: must exist, not be empty, and be a mapping
+    categories = raw.get("categories")
+    if categories is None:
+        raise ValueError(
+            f"{path} has no categories key; an artifact that calibrated nothing cannot produce "
+            "a submission"
+        )
+    if not isinstance(categories, dict):
+        raise ValueError(
+            f"{path} categories must be a mapping, got {type(categories).__name__}"
+        )
+    if not categories:
+        raise ValueError(
+            f"{path} has an empty categories mapping; an artifact that calibrated nothing cannot "
+            "produce a submission"
+        )
+
+    for category, block in categories.items():
         for rule in block:
             if rule not in RULES:
                 raise ValueError(f"{path} category {category!r} has unknown rule {rule!r}")
