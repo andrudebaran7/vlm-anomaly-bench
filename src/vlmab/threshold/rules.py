@@ -8,7 +8,8 @@ docs/superpowers/specs/2026-08-20-threshold-rule-design.md.
 Pure numpy, no I/O: callers hand in a factory that yields anomaly maps, so this module never
 learns where maps are stored.
 """
-from typing import Iterable
+from dataclasses import dataclass
+from typing import Callable, Iterable
 
 import numpy as np
 
@@ -44,3 +45,128 @@ def topk_quantile(chunks: Iterable[np.ndarray], n_total: int, alpha: float) -> f
             "the value pass disagree, so the quantile would be computed at the wrong rank"
         )
     return float(np.partition(buf, buf.size - k)[buf.size - k])
+
+
+#: The three pre-registered candidates (protocol §4, v0.2.11). `per_image_robust_z` is the
+#: designated submission rule; the other two are reported on `test_public` for comparison.
+RULES = ("global_quantile", "per_image_robust_z", "transductive_quantile")
+
+
+@dataclass(frozen=True)
+class Calibration:
+    """What a rule fitted on `validation`, and what it had to skip to fit it."""
+
+    rule: str
+    value: float          # the threshold itself for global_quantile; k for per_image_robust_z
+    alpha: float
+    n_pixels: int         # pixels that actually contributed, after skipping degenerate images
+    degenerate_mad: int   # images with MAD == 0, excluded from the fit
+
+
+def robust_z_stats(amap: np.ndarray) -> tuple[float, float]:
+    """`(median, MAD)` of one map. The MAD's breakdown point is 50%, so a defect has to
+    cover half the image before it moves these -- which is what lets a per-image threshold
+    absorb a lighting shift without absorbing the anomaly along with it."""
+    v = np.asarray(amap, dtype=np.float64).ravel()
+    med = float(np.median(v))
+    return med, float(np.median(np.abs(v - med)))
+
+
+def calibrate(
+    rule: str,
+    maps_factory: Callable[[], Iterable[np.ndarray]],
+    alpha: float,
+) -> Calibration:
+    """Fit `rule` on defect-free maps. `maps_factory()` must yield a *fresh* iterator each
+    call: this makes two passes, one to count pixels and one to stream values, and the two
+    must agree.
+
+    `alpha` is the target false-positive rate on normal pixels -- the only quantity a
+    defect-free split can speak to, since it contains no positives to compute F1 against.
+    """
+    if rule == "transductive_quantile":
+        raise ValueError(
+            "transductive_quantile fits nothing on validation; it is resolved at apply time "
+            "from the test split's own scores -- call thresholds_for() instead"
+        )
+    if rule == "global_quantile":
+        n_pixels = sum(int(np.asarray(a).size) for a in maps_factory())
+        if n_pixels == 0:
+            raise ValueError("global_quantile got no maps to calibrate on")
+        value = topk_quantile(
+            (np.asarray(a, dtype=np.float64).ravel() for a in maps_factory()), n_pixels, alpha
+        )
+        return Calibration(rule, value, alpha, n_pixels, 0)
+    if rule == "per_image_robust_z":
+        stats: list[tuple[float, float] | None] = []
+        n_pixels = 0
+        degenerate = 0
+        for a in maps_factory():
+            med, mad = robust_z_stats(a)
+            if mad == 0.0:
+                # A constant map has no scale to standardise by. Skipping it is the only
+                # defined choice, and it is counted rather than silently dropped.
+                degenerate += 1
+                stats.append(None)
+                continue
+            stats.append((med, mad))
+            n_pixels += int(np.asarray(a).size)
+        if n_pixels == 0:
+            raise ValueError(
+                f"per_image_robust_z has nothing to calibrate on: all {degenerate} maps are "
+                "constant (MAD == 0)"
+            )
+
+        def standardised():
+            for a, st in zip(maps_factory(), stats):
+                if st is None:
+                    continue
+                med, mad = st
+                yield (np.asarray(a, dtype=np.float64).ravel() - med) / mad
+
+        return Calibration(rule, topk_quantile(standardised(), n_pixels, alpha), alpha, n_pixels, degenerate)
+    raise ValueError(f"unknown rule {rule!r}; expected one of {RULES}")
+
+
+def thresholds_for(
+    rule: str,
+    value: float | None,
+    maps_factory: Callable[[], Iterable[np.ndarray]],
+    alpha: float,
+) -> tuple[list[float], int]:
+    """One threshold per map, ready to hand to `seg_f1_at`, plus the degenerate-MAD count.
+
+    `value` is the calibrated scalar (`None` for transductive_quantile, which has none).
+    """
+    if rule == "global_quantile":
+        if value is None:
+            raise ValueError("global_quantile needs its calibrated threshold, got None")
+        return [float(value)] * sum(1 for _ in maps_factory()), 0
+    if rule == "per_image_robust_z":
+        if value is None:
+            raise ValueError("per_image_robust_z needs its calibrated k, got None")
+        thresholds: list[float] = []
+        degenerate = 0
+        for a in maps_factory():
+            med, mad = robust_z_stats(a)
+            if mad == 0.0:
+                # No scale, so no defensible cut: flag nothing and say so, rather than
+                # dividing by zero or letting the image pass with an arbitrary threshold.
+                thresholds.append(np.inf)
+                degenerate += 1
+            else:
+                thresholds.append(med + float(value) * mad)
+        return thresholds, degenerate
+    if rule == "transductive_quantile":
+        n_images = 0
+        n_pixels = 0
+        for a in maps_factory():
+            n_images += 1
+            n_pixels += int(np.asarray(a).size)
+        if n_pixels == 0:
+            raise ValueError("transductive_quantile got no maps to cut on")
+        t = topk_quantile(
+            (np.asarray(a, dtype=np.float64).ravel() for a in maps_factory()), n_pixels, alpha
+        )
+        return [t] * n_images, 0
+    raise ValueError(f"unknown rule {rule!r}; expected one of {RULES}")
