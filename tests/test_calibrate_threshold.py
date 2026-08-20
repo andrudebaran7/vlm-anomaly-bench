@@ -145,3 +145,49 @@ def test_calibrate_runs_end_to_end_on_a_synthetic_mvtec_tree(tmp_path):
     assert np.isfinite(raw["categories"]["vial"]["global_quantile"]["threshold"])
     assert np.isfinite(raw["categories"]["vial"]["per_image_robust_z"]["k"])
     assert raw["run_id"]  # recovered from the runner's map directory name, not a column
+
+
+def _shard_without_split(tmp_path, category, run_id="cafe1234", n=3, size=12):
+    """A shard whose rows never had a `split` key at all -- distinct from a shard that has
+    the column but the wrong value. ResultStore.write only creates the columns the rows carry,
+    so this shard's DataFrame genuinely has no `split` column."""
+    maps = tmp_path / "maps" / f"mvtec_ad2__intensity_baseline__{run_id}__{category}"
+    maps.mkdir(parents=True, exist_ok=True)
+    rng = np.random.default_rng(1)
+    rows = []
+    for i in range(n):
+        path = maps / f"{i}.npy"
+        np.save(path, rng.random((size, size)).astype(np.float16))
+        rows.append({
+            "image_path": f"/fake-nosplit/{i}.png",
+            "label": 0,
+            "image_score": 0.5,
+            "mask_path": None,
+            "map_path": str(path),
+        })
+    results = tmp_path / "shards"
+    ResultStore(results).write("mvtec_ad2", "intensity_baseline", category, rows, {"seed": 0})
+    return results
+
+
+def test_calibrate_raises_a_domain_error_when_splits_mix_valid_and_nan(tmp_path):
+    # A shard for the same dataset/method that never had a `split` column at all is a real
+    # path: load_all() concatenates every shard under the root, and pandas fills the column a
+    # given shard lacks with NaN for that shard's rows. Sorting a set that mixes a str and a
+    # float NaN raises TypeError -- the guard must turn that into the domain ValueError and
+    # name what it actually found, NaN included.
+    results = _validation_run(tmp_path)  # writes category "vial" with split="validation"
+    _shard_without_split(tmp_path, "cable")  # same results root, no split column at all
+    with pytest.raises(ValueError, match="NaN"):
+        _run(["--results", str(results), "--dataset", "mvtec_ad2",
+              "--method", "intensity_baseline", "--out", str(tmp_path / "a.yaml")])
+
+
+def test_calibrate_raises_when_the_shard_has_no_split_column(tmp_path):
+    # A shard with no `split` column at all must refuse, not raise a bare KeyError -- no split
+    # column means the run cannot be shown to be a validation run, so it is never assumed to be
+    # one.
+    results = _shard_without_split(tmp_path, "vial")
+    with pytest.raises(ValueError, match="split column"):
+        _run(["--results", str(results), "--dataset", "mvtec_ad2",
+              "--method", "intensity_baseline", "--out", str(tmp_path / "a.yaml")])

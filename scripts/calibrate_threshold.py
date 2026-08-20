@@ -76,10 +76,23 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     # Shards are keyed (dataset, method, category) with no split, so a test_public run written
     # to this root is indistinguishable by filename. Check the column, not the caller's word.
-    splits = sorted(set(df["split"].unique()))
-    if splits != [CALIBRATION_SPLIT]:
+    #
+    # A shard written without a `split` column at all is a real path: ResultStore.load_all()
+    # concatenates every shard under the root, and pandas fills a column a given shard lacks
+    # with NaN for that shard's rows. Sorting a set that mixes a str and a float NaN raises
+    # TypeError, not a useful ValueError -- so NaN is named explicitly rather than sorted raw.
+    if "split" not in df.columns:
         raise ValueError(
-            f"refusing to calibrate on split(s) {splits}: a threshold rule must be fitted on "
+            f"the shard(s) for dataset={args.dataset!r} method={args.method!r} under "
+            f"{args.results} carry no split column, so this run cannot be shown to be a "
+            f"{CALIBRATION_SPLIT!r} run; refusing to calibrate (protocol §4)"
+        )
+    found = sorted(
+        ({s if isinstance(s, str) else "NaN" for s in df["split"].unique()}), key=str
+    )
+    if found != [CALIBRATION_SPLIT]:
+        raise ValueError(
+            f"refusing to calibrate on split(s) {found}: a threshold rule must be fitted on "
             f"{CALIBRATION_SPLIT!r}, which is defect-free, never on test data (protocol §4). "
             f"Point --results at a run made with --split {CALIBRATION_SPLIT}."
         )
