@@ -212,3 +212,120 @@ def _separation(ctx):
     ctx["s_normal"], ctx["s_anom"] = s_norm, s_anom
     assert s_anom > s_norm, f"anomalous {s_anom} did not exceed normal {s_norm}"
     return f"normal {s_norm:.4f} < anomalous {s_anom:.4f}"
+
+
+# --------------------------------------------------------------------------------------------
+# Hypothesis testing for stage 7.
+#
+# Evidence (2026-08-21, anomalib 2.6.0, Colab T4): stage 7 fails with
+#     AttributeError: 'Folder' object has no attribute 'val_data'
+# raised from lightning/pytorch/loops/evaluation_loop.py setup_data -> val_dataloader.
+#
+# Root cause: val_split_mode=ValSplitMode.NONE means the datamodule never builds `val_data`,
+# but Lightning's fit loop unconditionally sets up the validation loop before the first epoch.
+# The two options are incompatible; nothing we pass to the *constructor* changes that.
+#
+# Note what stage 7's own log said: "configure_optimizers returned None, this fit will run with
+# no optimizer". PatchCore does not train. It runs a forward pass over normal images and
+# subsamples a coreset. The whole Trainer is scaffolding around that.
+#
+# `diagnose_train()` tests each candidate independently, on a fresh model and datamodule, and
+# reports which ones fill the memory bank. One run, three answers.
+# --------------------------------------------------------------------------------------------
+
+def _fresh(root, val_mode=None, val_ratio=None, num_workers=2):
+    """A new model + datamodule, so a failed candidate cannot contaminate the next."""
+    from anomalib.data import Folder
+    from anomalib.data.utils import TestSplitMode, ValSplitMode
+    from anomalib.models import Patchcore
+
+    kwargs = dict(name="fit", root=root, normal_dir="good",
+                  test_split_mode=TestSplitMode.NONE, num_workers=num_workers)
+    kwargs["val_split_mode"] = ValSplitMode.NONE if val_mode is None else val_mode
+    if val_ratio is not None:
+        kwargs["val_split_ratio"] = val_ratio
+    dm = Folder(**kwargs)
+    dm.setup()
+    model = Patchcore(backbone="wide_resnet50_2", layers=["layer2", "layer3"],
+                      coreset_sampling_ratio=0.1, num_neighbors=9)
+    return dm, model
+
+
+def _bank_size(model):
+    """How many patches ended up in the coreset. 0 or missing means fit did nothing."""
+    bank = getattr(getattr(model, "model", None), "memory_bank", None)
+    if bank is None:
+        return None
+    try:
+        return int(bank.shape[0])
+    except Exception:
+        return f"present, shape unavailable ({type(bank).__name__})"
+
+
+def diagnose_train(root=None):
+    """Try each candidate fix for stage 7. Returns {label: (ok, detail)}."""
+    import tempfile, traceback
+    from pathlib import Path
+    import numpy as np
+    from PIL import Image
+    from anomalib.data.utils import ValSplitMode
+    from anomalib.engine import Engine
+
+    if root is None:  # self-contained: build the same 20 normal images
+        tmp = tempfile.TemporaryDirectory()
+        good = Path(tmp.name) / "good"
+        good.mkdir(parents=True)
+        rng = np.random.default_rng(0)
+        for i in range(20):
+            Image.fromarray(rng.integers(90, 110, (256, 256, 3), dtype=np.uint8)).save(
+                good / f"{i:05d}.png")
+        root = tmp.name
+        diagnose_train._tmp = tmp   # keep it alive
+
+    def candidate_a():
+        """Keep every training image in the memory bank; tell Lightning not to validate.
+        Preferred if it works: PatchCore's memory bank IS the model, so holding images back
+        from it changes the result."""
+        dm, model = _fresh(root)
+        Engine(logger=False, limit_val_batches=0, num_sanity_val_steps=0).train(
+            model=model, datamodule=dm)
+        return model
+
+    def candidate_b():
+        """Give the datamodule a real validation split so val_data exists.
+        Costs training images: val_split_ratio of the normal set leaves the memory bank."""
+        dm, model = _fresh(root, val_mode=ValSplitMode.FROM_TRAIN, val_ratio=0.1)
+        Engine(logger=False).train(model=model, datamodule=dm)
+        return model
+
+    def candidate_c():
+        """Skip Engine.train (which also runs test) and call the fit path only, if one exists."""
+        dm, model = _fresh(root)
+        eng = Engine(logger=False, limit_val_batches=0, num_sanity_val_steps=0)
+        if not hasattr(eng, "fit"):
+            raise AttributeError("Engine has no .fit(); candidate not applicable")
+        eng.fit(model=model, datamodule=dm)
+        return model
+
+    results = {}
+    for label, fn in (("A  limit_val_batches=0", candidate_a),
+                      ("B  val_split FROM_TRAIN 0.1", candidate_b),
+                      ("C  Engine.fit() only", candidate_c)):
+        print(f"\n{'=' * 72}\n{label}\n{'-' * 72}")
+        try:
+            model = fn()
+            n = _bank_size(model)
+            ok = n not in (None, 0)
+            print(f"{'PASS' if ok else 'FAIL'}  memory bank: {n}")
+            results[label] = (ok, f"memory bank {n}")
+        except Exception as exc:
+            print(f"FAIL  {type(exc).__name__}: {exc}")
+            traceback.print_exc(limit=3)
+            results[label] = (False, f"{type(exc).__name__}: {exc}")
+
+    print(f"\n{'=' * 72}\nSUMMARY")
+    for label, (ok, detail) in results.items():
+        print(f"  {'PASS' if ok else 'FAIL'}  {label:32} {detail}")
+    winners = [l for l, (ok, _) in results.items() if ok]
+    print(f"\nUsable: {winners or 'none -- the Trainer path may be the wrong abstraction'}")
+    return results
