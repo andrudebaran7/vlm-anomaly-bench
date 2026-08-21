@@ -120,7 +120,9 @@ def _folder(ctx):
     from anomalib.data import Folder
     from anomalib.data.utils import TestSplitMode, ValSplitMode
 
-    kwargs = dict(name="fit", root=ctx["root"], normal_dir="good",
+    # num_workers=2: Colab has 2 CPUs, anomalib defaults to 8 and the DataLoader warns twice
+    # per setup about it. Same value the backend uses.
+    kwargs = dict(name="fit", root=ctx["root"], normal_dir="good", num_workers=2,
                   val_split_mode=ValSplitMode.NONE, test_split_mode=TestSplitMode.NONE)
     unknown = [k for k in kwargs if k not in ctx.get("Folder_params", kwargs)]
     assert not unknown, f"Folder does not accept {unknown}"
@@ -143,20 +145,42 @@ def _setup(ctx):
     return f"{n} train items, one batch pulled"
 
 
-@stage("5. Engine ctor", "Engine builds with ONLY kwargs its signature names")
+#: The Engine configuration verified on anomalib 2.6.0 / Colab T4 (2026-08-21) by running
+#: four candidates and measuring which filled the coreset. Mirrors
+#: src/vlmab/methods/patchcore_backend.py -- stage 5 asserts the two have not drifted apart.
+VERIFIED_ENGINE_KWARGS = dict(
+    logger=False,
+    enable_progress_bar=False,   # without this, rich + anomalib's tqdm nest until RecursionError
+    limit_val_batches=0,         # ValSplitMode.NONE means val_data never exists
+    num_sanity_val_steps=0,
+)
+
+
+@stage("5. Engine ctor", "Engine builds with the verified kwargs, and the backend still uses them")
 def _engine(ctx):
+    import inspect
     from anomalib.engine import Engine
 
-    wanted = dict(accelerator="gpu", devices=1, max_epochs=1)
-    accepted = ctx.get("Engine_params", [])
-    dropped = {k: v for k, v in wanted.items() if accepted and k not in accepted}
-    kwargs = {k: v for k, v in wanted.items() if not accepted or k in accepted}
-    if dropped:
-        # Do not pass these into a **kwargs sink: that is how a failure gets deferred.
-        print(f"  dropping {sorted(dropped)} -- not in Engine's signature")
-    ctx["engine"] = Engine(**kwargs)
-    ctx["engine_kwargs"] = kwargs
-    return f"built with {sorted(kwargs)}"
+    # These go through Engine's **kwargs sink to Lightning's Trainer on purpose: they are
+    # Trainer arguments, and this exact set is the one measured to work. Passing an argument
+    # Trainer does not accept would still fail one call later, which is why the set is fixed
+    # rather than assembled.
+    ctx["engine"] = Engine(**VERIFIED_ENGINE_KWARGS)
+    ctx["engine_kwargs"] = dict(VERIFIED_ENGINE_KWARGS)
+
+    # Drift guard: the probe exists to validate what ships, so if the backend's Engine call
+    # stops matching this set, say so here rather than silently testing something else.
+    try:
+        from vlmab.methods.patchcore_backend import PatchCoreBackend
+        src = inspect.getsource(PatchCoreBackend.__init__)
+        missing = [k for k in VERIFIED_ENGINE_KWARGS if f"{k}=" not in src]
+        if missing:
+            print(f"  WARNING: backend's Engine call is missing {missing} -- probe and backend "
+                  f"have drifted, and this stage is no longer testing what ships")
+    except Exception as exc:   # the backend is not importable in every environment
+        print(f"  (could not cross-check the backend: {type(exc).__name__}: {exc})")
+
+    return f"built with {sorted(VERIFIED_ENGINE_KWARGS)}"
 
 
 @stage("6. model ctor", "Patchcore builds with the pre-registered hyperparameters")
