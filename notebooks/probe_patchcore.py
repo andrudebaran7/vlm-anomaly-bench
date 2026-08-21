@@ -282,35 +282,66 @@ def diagnose_train(root=None):
         root = tmp.name
         diagnose_train._tmp = tmp   # keep it alive
 
+    def _engine(**extra):
+        """Engine with the display layer off.
+
+        Evidence (2026-08-21): candidates A/B/C all got PAST the val_data error and reached
+        "Selecting Coreset Indices" -- the actual work -- then died in rich/console.py with
+        RecursionError while the tqdm bar reprinted ~85 times without advancing. Lightning's
+        RichProgressBar holds a live display and anomalib's coreset sampler writes its own tqdm
+        into it; in a notebook the two nest until the recursion limit blows.
+        So this is the DISPLAY layer failing, not the Trainer path being wrong.
+        """
+        kwargs = dict(logger=False, enable_progress_bar=False,
+                      limit_val_batches=0, num_sanity_val_steps=0)
+        kwargs.update(extra)
+        return Engine(**kwargs)
+
     def candidate_a():
-        """Keep every training image in the memory bank; tell Lightning not to validate.
-        Preferred if it works: PatchCore's memory bank IS the model, so holding images back
-        from it changes the result."""
+        """The val fix alone -- kept so the summary shows it still reaches the coreset step."""
         dm, model = _fresh(root)
         Engine(logger=False, limit_val_batches=0, num_sanity_val_steps=0).train(
             model=model, datamodule=dm)
         return model
 
     def candidate_b():
-        """Give the datamodule a real validation split so val_data exists.
-        Costs training images: val_split_ratio of the normal set leaves the memory bank."""
-        dm, model = _fresh(root, val_mode=ValSplitMode.FROM_TRAIN, val_ratio=0.1)
-        Engine(logger=False).train(model=model, datamodule=dm)
+        """Val fix + Lightning's progress bar off. The hypothesis this round tests."""
+        dm, model = _fresh(root)
+        _engine().train(model=model, datamodule=dm)
         return model
 
     def candidate_c():
-        """Skip Engine.train (which also runs test) and call the fit path only, if one exists."""
-        dm, model = _fresh(root)
-        eng = Engine(logger=False, limit_val_batches=0, num_sanity_val_steps=0)
-        if not hasattr(eng, "fit"):
-            raise AttributeError("Engine has no .fit(); candidate not applicable")
-        eng.fit(model=model, datamodule=dm)
-        return model
+        """As B, and also silence anomalib's own tqdm, in case disabling Lightning's bar is
+        not enough on its own."""
+        import os
+        os.environ["TQDM_DISABLE"] = "1"
+        try:
+            dm, model = _fresh(root)
+            _engine().train(model=model, datamodule=dm)
+            return model
+        finally:
+            os.environ.pop("TQDM_DISABLE", None)
+
+    def candidate_d():
+        """Diagnostic, not a fix: raise the recursion limit. If this alone gets through, the
+        nesting is deep-but-finite; if it still blows, the rendering recurses without bound and
+        no limit will save it. Either answer is informative."""
+        import sys as _sys
+        old = _sys.getrecursionlimit()
+        _sys.setrecursionlimit(20000)
+        try:
+            dm, model = _fresh(root)
+            Engine(logger=False, limit_val_batches=0, num_sanity_val_steps=0).train(
+                model=model, datamodule=dm)
+            return model
+        finally:
+            _sys.setrecursionlimit(old)
 
     results = {}
-    for label, fn in (("A  limit_val_batches=0", candidate_a),
-                      ("B  val_split FROM_TRAIN 0.1", candidate_b),
-                      ("C  Engine.fit() only", candidate_c)):
+    for label, fn in (("A  val fix only (baseline)", candidate_a),
+                      ("B  + enable_progress_bar=False", candidate_b),
+                      ("C  + TQDM_DISABLE too", candidate_c),
+                      ("D  raised recursion limit", candidate_d)):
         print(f"\n{'=' * 72}\n{label}\n{'-' * 72}")
         try:
             model = fn()
