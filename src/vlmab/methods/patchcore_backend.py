@@ -110,13 +110,24 @@ class PatchCoreBackend:
 
     def score(self, image: np.ndarray) -> tuple[float, np.ndarray]:
         import torch
-        from PIL import Image
 
         if not self._fitted:
             raise RuntimeError("PatchCoreBackend.score called before fit")
 
-        tensor = self._transform(Image.fromarray(np.asarray(image, dtype=np.uint8)))
-        tensor = tensor.unsqueeze(0).to(self._device)  # 1x3xHxW
+        # The pre-processor is a torchvision v2 pipeline that carries NO ToTensor step --
+        # on anomalib 2.6.0 it is Resize([256,256]) + Normalize(imagenet), and Normalize
+        # rejects PIL images outright ("Normalize() does not support PIL images").
+        # So the conversion happens here: HWC uint8 -> CHW float in [0,1], which is the
+        # range the ImageNet mean/std in that Normalize are defined against.
+        arr = np.asarray(image, dtype=np.uint8)
+        if arr.ndim != 3 or arr.shape[2] != 3:
+            raise ValueError(
+                f"expected an HxWx3 RGB image, got shape {arr.shape}; grayscale is converted "
+                "to 3-channel upstream (protocol §3)"
+            )
+        tensor = torch.from_numpy(arr).permute(2, 0, 1).float().div_(255.0)
+        tensor = self._transform(tensor).unsqueeze(0).to(self._device)  # 1x3xHxW
+
         with torch.no_grad():
             out = self._model(tensor)   # -> InferenceBatch(pred_score, anomaly_map, ...)
 
