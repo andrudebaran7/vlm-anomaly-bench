@@ -360,3 +360,42 @@ def diagnose_train(root=None):
     winners = [l for l, (ok, _) in results.items() if ok]
     print(f"\nUsable: {winners or 'none -- the Trainer path may be the wrong abstraction'}")
     return results
+
+
+@stage("10. double preprocessing",
+       "the model does NOT re-apply the pre-processor, so applying it once in score() is right")
+def _double_preprocess(ctx):
+    """The dangerous case, because it fails silently rather than raising.
+
+    `PreProcessor` is a module INSIDE the Patchcore model (it shows up in the Lightning
+    summary as child 0). If the forward pass applies it as well as our score() doing so, the
+    image is resized and ImageNet-normalised twice: no error, just wrong numbers, and the VisA
+    gate would fail for a reason no traceback would ever point at.
+
+    Test: feed the same image raw ([0,1], resized only) and pre-processed (normalised), and
+    compare. If the model normalised internally, the raw input is the correctly-prepared one
+    and the two scores differ in a specific direction. Whatever the outcome, it is measured.
+    """
+    import torch
+    import numpy as np
+    from torchvision.transforms.v2 import Resize
+
+    img = np.asarray(ctx["anom"], dtype=np.uint8)
+    base = torch.from_numpy(img).permute(2, 0, 1).float().div_(255.0)
+
+    resized_only = Resize([256, 256], antialias=True)(base).unsqueeze(0).to("cuda")
+    preprocessed = ctx["transform"](base).unsqueeze(0).to("cuda")
+
+    with torch.no_grad():
+        s_raw = float(ctx["model"](resized_only).pred_score.reshape(-1)[0].item())
+        s_pre = float(ctx["model"](preprocessed).pred_score.reshape(-1)[0].item())
+
+    ctx["score_raw_input"], ctx["score_preprocessed_input"] = s_raw, s_pre
+    print(f"  raw [0,1] resized only : {s_raw:.6f}")
+    print(f"  pre-processed (ours)   : {s_pre:.6f}")
+    print(f"  ratio                  : {s_pre / s_raw if s_raw else float('nan'):.4f}")
+    if abs(s_raw - s_pre) < 1e-9:
+        return ("identical scores -> the model normalises internally and IGNORES what we pass; "
+                "score() must NOT pre-process")
+    return ("scores differ -> the model consumes what it is given, so score() applying the "
+            "pre-processor once is correct")
