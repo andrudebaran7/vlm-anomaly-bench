@@ -72,6 +72,7 @@ class PatchCoreBackend:
         self._fitted = False
 
     def fit(self, train_images: Iterable[np.ndarray]) -> None:
+        import torch
         from anomalib.data import Folder
         from anomalib.data.utils import TestSplitMode, ValSplitMode
         from PIL import Image
@@ -105,7 +106,26 @@ class PatchCoreBackend:
         )
         datamodule.setup()
         self._engine.train(model=self._model, datamodule=datamodule)
+
+        # Lightning owns device placement during fit and hands the model back on CPU when it
+        # finishes, but score() calls the model directly with a CUDA tensor:
+        #   RuntimeError: Input type (torch.cuda.FloatTensor) and weight type
+        #   (torch.FloatTensor) should be the same
+        # So reclaim it here. Verified 2026-08-21.
+        self._model.to(self._device)
         self._model.eval()
+
+        # The coreset lives on the inner model as `memory_bank`. If anomalib registered it as
+        # a buffer, .to() above moved it; if it is a plain tensor attribute, it did not, and
+        # the nearest-neighbour search would fail the same way one call later. Checked rather
+        # than assumed, because a half-moved model is the kind of thing that fails deep.
+        inner = getattr(self._model, "model", None)
+        bank = getattr(inner, "memory_bank", None)
+        if isinstance(bank, torch.Tensor) and bank.numel():
+            want = torch.device(self._device)
+            if bank.device.type != want.type:
+                inner.memory_bank = bank.to(want)
+
         self._fitted = True
 
     def score(self, image: np.ndarray) -> tuple[float, np.ndarray]:
