@@ -25,35 +25,48 @@ class PatchCoreBackend:
         coreset_sampling_ratio: float = 0.1,
         num_neighbors: int = 9,
         device: str = "cuda",
+        num_workers: int = 2,
     ):
         from anomalib.models import Patchcore  # lazy: GPU-only
         from anomalib.engine import Engine
 
         self._device = device
+        self._num_workers = num_workers
         self._model = Patchcore(
             backbone=backbone,
             layers=list(layers),
             coreset_sampling_ratio=coreset_sampling_ratio,
             num_neighbors=num_neighbors,
         )
-        # PatchCore trains for a single epoch to fill the memory bank; disable checkpoints/logging.
-        # No `task=` here either. Engine.__init__ takes **kwargs and forwards them to
-        # Lightning's Trainer, which is built lazily inside engine.train() -- so passing
-        # task= constructs fine and then dies one call later with
-        #   TypeError: Trainer.__init__() got an unexpected keyword argument 'task'
-        # A swallowed kwarg is worse than a rejected one: the traceback points at
-        # fit(), not at the constructor that accepted it. Verified 2026-08-21.
+        # The Engine configuration below is EXACTLY the one verified to work on
+        # anomalib 2.6.0 / Colab T4 (2026-08-21), reached by testing four candidates and
+        # measuring which filled the coreset. Nothing is added on top of it: three separate
+        # failures this session came from passing kwargs that looked reasonable and were
+        # never run.
+        #
+        #   * No `task=`. Engine.__init__ takes **kwargs and forwards them to Lightning's
+        #     Trainer, built lazily inside engine.train(), so task= constructs fine and dies
+        #     one call later with TypeError: Trainer.__init__() got an unexpected keyword
+        #     argument 'task'. A swallowed kwarg is worse than a rejected one -- the
+        #     traceback points at fit(), not at the constructor that accepted it.
+        #   * No `enable_checkpointing=False`. anomalib installs its own ModelCheckpoint and
+        #     Lightning refuses the combination outright.
+        #   * `enable_progress_bar=False` is REQUIRED, and is the subtle one. Lightning's
+        #     RichProgressBar holds a live display while anomalib's coreset sampler writes
+        #     its own tqdm into it; in a notebook the two nest until
+        #     RecursionError: maximum recursion depth exceeded, raised from rich's renderer
+        #     while the bar reprints pinned at 0/N. Raising the recursion limit does NOT
+        #     help (tested at 20000) -- the nesting is unbounded, not deep-but-finite.
+        #   * `limit_val_batches=0` + `num_sanity_val_steps=0` because the datamodule is
+        #     built with ValSplitMode.NONE and so never creates `val_data`, while
+        #     Lightning's fit loop sets up the validation loop unconditionally.
+        #   * No accelerator/devices/max_epochs: not in the verified configuration. anomalib
+        #     picks the GPU on its own and stops at max_epochs=1 for PatchCore.
         self._engine = Engine(
-            accelerator="gpu",
-            devices=1,
-            max_epochs=1,
             logger=False,
-            # No enable_checkpointing=False: anomalib 2.x installs its own
-            # ModelCheckpoint callback, and Lightning refuses the combination with
-            #   MisconfigurationException: Trainer was configured with
-            #   `enable_checkpointing=False` but found `ModelCheckpoint` in callbacks list.
-            # Letting it write a checkpoint costs a little disk and nothing else.
-            # Verified 2026-08-21.
+            enable_progress_bar=False,
+            limit_val_batches=0,
+            num_sanity_val_steps=0,
         )
         self._transform = type(self._model).configure_pre_processor().transform
         self._fitted = False
@@ -84,6 +97,9 @@ class PatchCoreBackend:
             name="fit",
             root=self._tmp.name,
             normal_dir="good",
+            # anomalib defaults to 8; Colab has 2 CPUs and the DataLoader warns twice per
+            # setup about it. 2 is what the verified run used.
+            num_workers=self._num_workers,
             val_split_mode=ValSplitMode.NONE,
             test_split_mode=TestSplitMode.NONE,
         )
