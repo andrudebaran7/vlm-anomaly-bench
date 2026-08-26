@@ -431,8 +431,20 @@ def _double_preprocess(ctx):
     gate would fail for a reason no traceback would ever point at.
 
     Test: feed the same image raw ([0,1], resized only) and pre-processed (normalised), and
-    compare. If the model normalised internally, the raw input is the correctly-prepared one
-    and the two scores differ in a specific direction. Whatever the outcome, it is measured.
+    compare.
+
+    ⚠️ READ THE VERDICT NARROWLY. Differing scores rule out exactly one thing: that the model
+    ignores its input. They do NOT settle the question this stage is named after, because
+    `Normalize` is injective -- two different inputs stay different after a second
+    normalisation, so BOTH worlds produce differing scores:
+
+        model does not re-apply  -> our pre-processed input is the correct one
+        model re-applies         -> the raw input is the correct one, and ours is normalised
+                                    twice into a plausible wrong number
+
+    Stage 11 is the discriminator. This stage stays because "the model ignores its input" is
+    still worth excluding, and because the two numbers it records are what stage 11 compares
+    against.
     """
     import torch
     import numpy as np
@@ -453,7 +465,80 @@ def _double_preprocess(ctx):
     print(f"  pre-processed (ours)   : {s_pre:.6f}")
     print(f"  ratio                  : {s_pre / s_raw if s_raw else float('nan'):.4f}")
     if abs(s_raw - s_pre) < 1e-9:
-        return ("identical scores -> the model normalises internally and IGNORES what we pass; "
+        return ("identical scores -> the model IGNORES what we pass and prepares its own input; "
                 "score() must NOT pre-process")
-    return ("scores differ -> the model consumes what it is given, so score() applying the "
-            "pre-processor once is correct")
+    return ("scores differ -> the input reaches the network. WHERE the pre-processor runs is "
+            "not answered here: see stage 11")
+
+
+@stage("11. where the pre-processor runs",
+       "the outer forward passes our tensor through unchanged, so pre-processing once in score() "
+       "is right")
+def _preprocess_locus(ctx):
+    """The discriminator stage 10 is not.
+
+    `PreProcessor` is child 0 of the Patchcore LightningModule, so there are two candidate
+    places the Resize+Normalize can happen: in our `score()`, or inside the module's own
+    `forward`. If both, every image is normalised twice and every number is quietly wrong.
+
+    Two independent pieces of evidence, because either alone can mislead:
+
+    1. **The installed source.** Whether `forward` mentions `pre_processor` at all. Read, not
+       remembered -- anomalib's own docs have already been wrong about this class five times
+       this project.
+    2. **A measurement that separates the two worlds**, which stage 10's could not. The inner
+       `model.model` (PatchcoreModel) is the raw network: it has no PreProcessor and consumes
+       whatever tensor it is handed. So:
+
+           outer      = model(pre)                 <- the shipped path
+           inner_once = model.model(pre)           <- the network on a correctly prepared tensor
+           inner_twice= model.model(normalise(pre))<- the network on a doubly-normalised one
+
+       `outer == inner_once` means the outer forward added nothing and `score()` is right.
+       `outer == inner_twice` means the outer forward normalised again on top of us.
+       The two candidates are far apart, so this is not a tolerance judgement call.
+    """
+    import inspect
+    import numpy as np
+    import torch
+
+    model = ctx["model"]
+    inner = getattr(model, "model", None)
+    assert inner is not None, "no inner .model to compare against"
+
+    fwd = type(model).forward
+    src = inspect.getsource(fwd)
+    mentions = "pre_processor" in src
+    print(f"  forward: {fwd.__qualname__}  (from {getattr(inspect.getmodule(fwd), '__name__', '?')})")
+    for line in src.strip().splitlines():
+        print(f"    | {line}")
+    print(f"  -> its source mentions pre_processor: {mentions}")
+    ctx["forward_mentions_pre_processor"] = mentions
+
+    img = np.asarray(ctx["anom"], dtype=np.uint8)
+    base = torch.from_numpy(img).permute(2, 0, 1).float().div_(255.0)
+    pre = ctx["transform"](base).unsqueeze(0).to("cuda")          # what score() sends today
+    twice = ctx["transform"](pre.squeeze(0)).unsqueeze(0)          # normalised one more time
+
+    def s(module, x):
+        with torch.no_grad():
+            return float(module(x).pred_score.reshape(-1)[0].item())
+
+    outer, inner_once, inner_twice = s(model, pre), s(inner, pre), s(inner, twice)
+    ctx["s_outer"], ctx["s_inner_once"], ctx["s_inner_twice"] = outer, inner_once, inner_twice
+    print(f"  outer      model(pre)              : {outer:.6f}")
+    print(f"  inner      model.model(pre)        : {inner_once:.6f}")
+    print(f"  inner      model.model(pre twice)  : {inner_twice:.6f}")
+
+    d_once, d_twice = abs(outer - inner_once), abs(outer - inner_twice)
+    if mentions and d_once <= d_twice:
+        print("  NOTE: forward mentions pre_processor but behaves as a pass-through here -- it is "
+              "probably guarded by the input type (a Batch, not a bare tensor). The measurement "
+              "is what score() actually experiences, so it wins.")
+    assert d_once < d_twice, (
+        f"the outer forward matches the DOUBLY-normalised call ({inner_twice:.6f}) rather than "
+        f"the correctly-prepared one ({inner_once:.6f}): it re-applies the pre-processor on top "
+        f"of score(). Fix: hand the model a raw [0,1] CHW tensor and let it pre-process."
+    )
+    return (f"pass-through (|outer-once|={d_once:.2e} vs |outer-twice|={d_twice:.2e}); "
+            f"score() pre-processing once is correct")
