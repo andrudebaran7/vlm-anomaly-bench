@@ -15,6 +15,10 @@ Usage in Colab:
     ctx = run()                 # stops at the first failure
     ctx = run(keep_going=True)  # runs every stage, for a full picture
 
+`only=` runs a single stage, but the stages share one `ctx` and later ones depend on what
+earlier ones put there (the model, the transform, the images), so it is for re-running a stage
+inside a session that already got that far -- not for jumping straight to stage 10 from cold.
+
 Nothing here imports anomalib at module level, so importing this file is always safe.
 """
 import traceback
@@ -196,19 +200,51 @@ def _model(ctx):
 
 @stage("7. engine.train", "one epoch fills the coreset memory bank without a Trainer misconfiguration")
 def _train(ctx):
+    import torch
+
     ctx["engine"].train(model=ctx["model"], datamodule=ctx["datamodule"])
+
+    # Lightning owns device placement during fit and hands the model back on CPU. Every stage
+    # after this one calls the model directly with a CUDA tensor, so reclaim it here -- the same
+    # two lines PatchCoreBackend.fit() ends with. Without them stage 8 fails with
+    # "Input type (torch.cuda.FloatTensor) and weight type (torch.FloatTensor) should be the same",
+    # which says nothing about training and everything about the seam between the two ways the
+    # model is driven.
+    ctx["model"].to("cuda")
     ctx["model"].eval()
+    inner = getattr(ctx["model"], "model", None)
+    bank = getattr(inner, "memory_bank", None)
+    if isinstance(bank, torch.Tensor) and bank.numel():
+        if bank.device.type != "cuda":
+            inner.memory_bank = bank.to("cuda")
+        ctx["memory_bank_shape"] = tuple(bank.shape)
+        print(f"  memory bank: {tuple(bank.shape)} on {inner.memory_bank.device}")
     return "trained; memory bank filled"
+
+
+def _model_input(ctx, img):
+    """Prepare one image the way PatchCoreBackend.score() does, and for the same reason.
+
+    The pre-processor is `Resize([256,256]) + Normalize(imagenet)` with **no ToTensor**, so it
+    rejects a PIL image outright ("Normalize() does not support PIL images"). The conversion is
+    ours to do: HWC uint8 -> CHW float in [0,1], the range those ImageNet statistics are defined
+    against. Stages 8-10 all go through here so the probe exercises the shipped path rather than
+    a plausible-looking one -- this file has already been wrong that way once (see stage 5's
+    drift guard).
+    """
+    import numpy as np
+    import torch
+
+    arr = np.asarray(img, dtype=np.uint8)
+    base = torch.from_numpy(arr).permute(2, 0, 1).float().div_(255.0)
+    return ctx["transform"](base).unsqueeze(0).to("cuda")
 
 
 @stage("8. forward shape", "a forward pass returns something exposing pred_score and anomaly_map")
 def _forward(ctx):
     import torch
-    from PIL import Image
-    import numpy as np
 
-    t = ctx["transform"](Image.fromarray(np.asarray(ctx["images"][1], dtype=np.uint8)))
-    t = t.unsqueeze(0).to("cuda")
+    t = _model_input(ctx, ctx["images"][1])
     with torch.no_grad():
         out = ctx["model"](t)
     ctx["out_type"] = type(out).__name__
@@ -223,11 +259,9 @@ def _forward(ctx):
 @stage("9. separation", "the injected bright patch scores ABOVE a normal image")
 def _separation(ctx):
     import torch
-    from PIL import Image
-    import numpy as np
 
     def score(img):
-        t = ctx["transform"](Image.fromarray(np.asarray(img, dtype=np.uint8))).unsqueeze(0).to("cuda")
+        t = _model_input(ctx, img)
         with torch.no_grad():
             o = ctx["model"](t)
         return float(o.pred_score.reshape(-1)[0].item())
@@ -408,7 +442,7 @@ def _double_preprocess(ctx):
     base = torch.from_numpy(img).permute(2, 0, 1).float().div_(255.0)
 
     resized_only = Resize([256, 256], antialias=True)(base).unsqueeze(0).to("cuda")
-    preprocessed = ctx["transform"](base).unsqueeze(0).to("cuda")
+    preprocessed = _model_input(ctx, img)   # exactly what score() sends
 
     with torch.no_grad():
         s_raw = float(ctx["model"](resized_only).pred_score.reshape(-1)[0].item())
