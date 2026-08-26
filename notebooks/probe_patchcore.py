@@ -506,3 +506,46 @@ def _preprocess_locus(ctx):
               "of anomalib is out of date.")
     return (f"outer forward == pre-process once + network ({outer_raw:.4f}); "
             f"score() correctly hands it a raw tensor")
+
+
+@stage("12. the seed controls the coreset",
+       "two fits with the same seed score identically; a different seed gives a different score")
+def _seed_control(ctx):
+    """Does `seed=` actually make PatchCore reproducible? Measured, not assumed.
+
+    The backend seeds with `lightning.seed_everything(seed, workers=True)` before
+    `engine.train`, on the belief that this reaches anomalib's coreset sampler. That belief is
+    exactly the kind this project keeps getting wrong by reading documentation, and protocol §6
+    ("three seeds where any stochasticity exists; report mean ± std") depends on it being true.
+
+    Evidence it is needed: the same image scored 202.796432 and then 203.890701 across two
+    unseeded runs of this probe on byte-identical inputs.
+
+    This is also the only stage that drives the shipped `PatchCoreBackend` end to end -- fit and
+    score, three times over -- so it doubles as the smoke test.
+    """
+    from vlmab.methods.patchcore_backend import PatchCoreBackend
+
+    def fit_and_score(seed):
+        b = PatchCoreBackend(seed=seed, num_workers=2)
+        b.fit(iter(ctx["images"]))
+        return b.score(ctx["anom"])[0]
+
+    a1, a2, other = fit_and_score(0), fit_and_score(0), fit_and_score(1)
+    ctx["seed0_first"], ctx["seed0_second"], ctx["seed1"] = a1, a2, other
+    print(f"  seed=0, fit #1 : {a1:.6f}")
+    print(f"  seed=0, fit #2 : {a2:.6f}")
+    print(f"  seed=1         : {other:.6f}")
+
+    assert abs(a1 - a2) < 1e-9, (
+        f"the same seed gave {a1:.6f} then {a2:.6f}: seed_everything does not reach whatever is "
+        f"stochastic here, so protocol §6's three-seed requirement cannot be met by passing "
+        f"seed= to this backend. Find the source of the variation before running the VisA gate."
+    )
+    if abs(a1 - other) < 1e-9:
+        print("  NOTE: a different seed gave the same score. Either the run is deterministic for "
+              "reasons unrelated to the seed, or the seed is not reaching the sampler -- in "
+              "which case 'three seeds' would report three copies of one number.")
+        return "same-seed reproducible, but the seed changes nothing -- read the NOTE"
+    return (f"reproducible under a fixed seed (delta {abs(a1 - a2):.2e}), and seed=1 moves it "
+            f"by {abs(a1 - other):.4f}")
