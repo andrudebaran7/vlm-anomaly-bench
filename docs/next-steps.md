@@ -56,10 +56,15 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
       tensor at native resolution. Probe stage 11 is the standing guard. The `fit` path was never
       affected: anomalib's own pipeline pre-processes the training images exactly once, so the
       memory bank was always built correctly.
-   2. **Phase 1.2 smoke test**, confirmed green end to end. `fit` reached a 2048-vector memory bank
-      before the last two fixes (tensor input, device after fit) landed; the assertion that the
-      injected defect outscores a normal image has not been seen pass since.
-   3. **Phase 2** — Vial end to end through the existing runner (notebook cells 21–26).
+   2. ~~**Phase 1.2 smoke test.**~~ **Green 2026-08-26** on the corrected path: normal 16.11 <
+      anomalous 69.24, map (256, 256). Probe stage 12 covers the same ground with more of it —
+      it drives the shipped backend end to end three times — so phase 1 is closed.
+   3. **Phase 2** — Vial end to end through the existing runner (notebook cells 21–26). Needs Vial
+      fetched into the Colab session first (0.77 GB, `docs/datasets-access.md`); cell 22 leaves
+      that as a placeholder because how it arrives is the executor's call. ⚠️ Cell 24 builds
+      `PatchCoreBackend()` with no seed while `run_meta(..., seed=0)` writes `seed: 0` into the
+      shard — see the seed section below. Phase 2's shard is a plumbing check and must not be
+      reported.
    4. **Phase 3 — the VisA ±1pt gate.** Deliberately not in the notebook: it needs the VisA loader
       and the `PUBLISHED_VISA_IAUROC` table (with its exact source recorded next to it), both listed
       under *Integration points* below. Writes `results/reproduction/patchcore_visa.md`.
@@ -104,7 +109,7 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 8. **M5 — efficiency pass** on a rented fixed instance (protocol §5: latency never from Colab).
 9. **M6 — preprint.** Paper §1–§3 are already written (see below); §4–§6 need M3.
 
-## The PatchCore Colab session (2026-08-21) — what it settled
+## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
 next one, because four of the five methods still ahead go through the same library.
@@ -169,6 +174,33 @@ picks it up; that is why `patchcore_backend.py` is a tracked `.py` and not a `%%
 Changing the notebook's cell structure instead costs a full reload (reinstall anomalib, re-download
 the weights), so prefer changing tracked Python.
 
+## PatchCore is stochastic, and `--seed` is not wired to anything (2026-08-26)
+
+The probe's own numbers moved between two runs on byte-identical inputs — the same image scored
+202.796432, then 203.890701. PatchCore's greedy coreset sampling is stochastic, and it is the first
+method here that is: `intensity_baseline` is deterministic, so this never came up.
+
+Two consequences, one closed and one open.
+
+**Closed:** `PatchCoreBackend` now takes `seed=`, applied as
+`lightning.seed_everything(seed, workers=True)` before `engine.train`. Probe stage 12 measures that
+this actually reaches the sampler rather than trusting the name: two fits at seed 0 gave
+69.406265 twice (delta 0.00e+00) and seed 1 gave 69.803741. **The spread between seeds is ~0.4 in
+score units on synthetic data** — protocol §6's "three seeds, report mean ± std" is not a formality
+here.
+
+The default is `None`, deliberately not a silent `0`: see the open item for why a backend that
+quietly seeds itself would make a false record look true.
+
+**Open — a decision, not a task.** `scripts/run_eval.py` accepts `--seed`, passes it to
+`run_meta()`, and writes it into every shard's provenance **without applying it to anything**. For
+`intensity_baseline` that was harmless. For PatchCore a shard would record `seed: 0` over a memory
+bank sampled with no seed at all — provenance that reads true and is not. Wiring it through means
+changing the `AnomalyMethod` interface and touching every adapter, and the right shape depends on
+how the three-seed runs are aggregated (three shard roots? a seed column in the shard?). **Settle
+this before the VisA gate**, because a gate run once, unseeded, under a `seed: 0` record is not the
+pre-registered procedure.
+
 ## The threshold rule — built and pre-registered (2026-08-20)
 
 The repo's one piece of unplanned work is done. Protocol v0.2.11 §4 pre-registers three
@@ -229,21 +261,30 @@ These cannot be pre-written without the data/repo in front of you, and each play
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 
-## Where to pick up (session handoff, 2026-08-26)
+## Where to pick up (session handoff, 2026-08-26, after the second Colab session)
 
-**Both repos are clean and in sync with `origin/master`** — nothing is waiting to be pushed, which
-was the open item in the previous handoff. Bench: **313 tests green** (~7 s). Paper: `master` at
-`ef39c4b`, abstract and §1–§3 written and reviewed, §4–§6 stubs awaiting M3.
+**Phase 1 of the PatchCore playbook is closed.** The backend is built, verified stage by stage on a
+Colab T4 (anomalib 2.6.0, torch 2.11.0+cu128), and reproducible under a fixed seed. Both repos are
+clean and in sync with `origin/master`; bench: 313 tests green.
 
-**The next move is the second Colab session**, and it resumes mid-phase rather than at the top:
+What that session actually found, in the order it found it:
 
-1. Run notebook cell 1.1 to sync, then **probe stage 10** — the only open correctness question
-   (double preprocessing, see step 1 of the ordered list). Do it before anything is scored: if the
-   model normalises internally, every number produced until now is quietly wrong.
-2. Then the 1.2 smoke test, phase 2 on Vial, and the VisA gate.
+1. The probe was testing a configuration we had already discarded — stages 8-10 still fed the model
+   a PIL image and stage 7 never took the model back from the CPU. Both were fixed elsewhere on
+   2026-08-21 and never back-ported. Found by reading, before the GPU ran.
+2. anomalib's own `results/` tree tripped the sync cell's cleanliness assert mid-session. Fixed in
+   `.gitignore` rather than by relaxing the assert.
+3. **`score()` was normalising every image twice**, and had been since the backend was written. See
+   the session note above. Nothing downstream would have caught it except the VisA gate.
+4. **PatchCore is stochastic and `--seed` is recorded but never applied.** See the section above.
+   The backend now takes a seed; wiring the runner's is an open decision.
 
-Fixes reach that session by being **pushed to `master`** — cell 1.1 hard-resets to `origin/master`
-and prints what it synced. Push before asking for a re-run.
+**The next move is phase 2**: Vial end to end through the runner, in a Colab session, which needs
+Vial fetched into it first. Then the VisA ±1pt gate (phase 3) — but settle the seed wiring before
+that gate runs, or it will not be the pre-registered procedure.
+
+Fixes reach a live Colab session by being **pushed to `master`** — cell 1.1 hard-resets to
+`origin/master` and prints what it synced. Push before asking for a re-run.
 
 Two items only the author can close, both flagged in the paper's `references.bib` as `\todo` that
 render as red text in the printed bibliography:
