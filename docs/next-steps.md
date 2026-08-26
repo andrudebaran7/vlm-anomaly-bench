@@ -49,13 +49,13 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    once its VisA ±1pt gate passes. It is the ceiling every zero-shot number is measured against.
    **Phase 0 and the backend of phase 1 are done** (2026-08-21) — what remains, in order:
 
-   1. **Probe stage 10 — double preprocessing.** Written but **never run**, and it is the one open
-      correctness question: `PreProcessor` is a module *inside* the Patchcore model, so if the
-      forward pass re-applies it on top of what `score()` already did, every image is resized and
-      ImageNet-normalised twice. No error, just wrong numbers — and the VisA gate would then fail
-      for a reason no traceback points at. It is the last stage of `probe_patchcore.run()`, and
-      it needs the stages before it in the same session (they build the model it questions), so
-      run the probe whole rather than jumping to it.
+   1. ~~**Probe the pre-processing question.**~~ **Answered 2026-08-26, and the answer was the
+      unwanted one: `score()` was double-normalising.** `AnomalibModule.forward` runs
+      `self.pre_processor` unconditionally, so pre-processing before the call resized and
+      ImageNet-normalised every image twice. Fixed — `score()` now hands the model a raw [0,1]
+      tensor at native resolution. Probe stage 11 is the standing guard. The `fit` path was never
+      affected: anomalib's own pipeline pre-processes the training images exactly once, so the
+      memory bank was always built correctly.
    2. **Phase 1.2 smoke test**, confirmed green end to end. `fit` reached a 2048-vector memory bank
       before the last two fixes (tensor input, device after fit) landed; the assertion that the
       injected defect outscores a normal image has not been seen pass since.
@@ -133,6 +133,22 @@ and `max_epochs` were dropped because they were not in the tested set:
 Two more outside the Engine: the pre-processor carries **no ToTensor**, so `score()` hands it a CHW
 float tensor in [0,1], not a PIL image; and Lightning returns the model on **CPU** after `fit`, so
 the backend reclaims it (and the coreset) for the GPU.
+
+**Where the pre-processing happens — settled 2026-08-26, and it was the unwanted answer.**
+`AnomalibModule.forward` is `pre_processor → model → post_processor`, so the module pre-processes
+whatever it is handed. `score()` had been pre-processing first, which resized and ImageNet-
+normalised every image **twice**. It raised nothing, warned nothing, and still separated a defect
+from a normal image — normalising twice is monotonic enough to preserve the ordering, which is
+exactly why the smoke test and the separation stage both passed on the wrong path. Only the VisA
+gate would have caught it, and nothing would have pointed here. `score()` now hands the model a raw
+[0,1] tensor at native resolution and lets it pre-process once, as it does during `fit`.
+
+The measurement that settled it is worth copying for the next backend: the inner `model.model` is
+the raw network with no pre-processor attached, so `model(raw)` vs `model.model(transform(raw))`
+separates "the outer forward pre-processes" from "it does not" by construction, with no tolerance
+judgement. The first attempt at this test compared a raw and a pre-processed input and read
+"the scores differ" as an answer — but `Normalize` is injective, so they differ in both worlds.
+**A test that passes in both worlds is not evidence.**
 
 **⚠️ The open risk for the VisA gate:** that pre-processor is `Resize([256,256]) + Normalize`, with
 **no CenterCrop** and a fixed square resize rather than shorter-side-256. Classic PatchCore is

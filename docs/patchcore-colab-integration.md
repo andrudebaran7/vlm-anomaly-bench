@@ -18,6 +18,14 @@ Inject any object with these two methods into `PatchCoreRef(backend=...)`:
         adapter upsamples it to the image's native resolution. Neither value is per-image
         normalised (protocol v0.2.6) — return anomalib's raw scores.
 
+**Do not pre-process before calling the model.** `AnomalibModule.forward` is
+`pre_processor → model → post_processor`, so the module resizes and ImageNet-normalises whatever it
+is handed; anything prepared beforehand is normalised twice. That was the shipped behaviour until
+2026-08-26 and it produced no error and a plausible score — the defect still outscored the normal
+image — so nothing but the VisA gate would have caught it. The backend hands over a raw [0,1] CHW
+tensor at native resolution, which is the same single pre-processing the training images get.
+Probe stage 11 (`notebooks/probe_patchcore.py`) is the standing guard.
+
 ## Hyperparameters
 
 Frozen in `configs/methods/patchcore_ref.yaml`: `wide_resnet50_2`, layers `layer2`+`layer3`,
