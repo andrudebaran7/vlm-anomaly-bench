@@ -2,7 +2,13 @@
 __pycache__/
 *.pyc
 data/
-results/*.parquet
+# anomalib's Engine writes its own run tree (results/Patchcore/fit/...) next to ours, with no
+# way to turn it off that is part of the verified configuration. Untracked files there tripped
+# the Colab sync cell's cleanliness assert mid-session. Ignore the lot -- results are large
+# artifacts, not source -- except the reproduction record, which the VisA gate commits
+# (results/reproduction/patchcore_visa.md, protocol §2).
+results/*
+!results/reproduction/
 .cache/
 checkpoints/
 .superpowers/
