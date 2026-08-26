@@ -5,7 +5,9 @@ this file is the operational view — which plans are written, which halves are 
 order for the work that remains. **Every method now has a written plan** (2026-07-29: AdaCLIP and
 SAA+ were the last two). AdaCLIP's and SAA+'s CPU halves have since landed and are registered. What
 remains is either a **Colab/GPU** step or an **external** one. The pre-existing CPU-verifiable core
-is done, on `master`, and green on CI (Python 3.11 + 3.13).
+is done, on `master`, and green on CI (Python 3.11 + 3.13). The **first GPU backend now exists and
+runs** — PatchCore's, built in the Colab session of 2026-08-21; see the session note below for what
+that cost and what it means for the four methods behind it.
 
 ## What is done (CPU, no GPU)
 
@@ -18,7 +20,9 @@ is done, on `master`, and green on CI (Python 3.11 + 3.13).
   a backend `prepare()` raises `MethodNotRunnable`, so the CLI never pretends it ran):
   - `intensity_baseline` — the dependency-free floor (fully working, no backend needed).
   - `mllm_qwen` — Qwen2.5-VL-3B; the response parser is complete, the model call is the injectable seam.
-  - `patchcore_ref` — full-shot anchor; the anomalib backend is the seam.
+  - `patchcore_ref` — full-shot anchor; **its anomalib backend is built and fits on a T4**
+    (`src/vlmab/methods/patchcore_backend.py`, a tracked file so a Colab cell can pull it; anomalib
+    and torch are imported lazily, so CI never touches them). See the session note below.
   - `winclip` — zero-shot; the anomalib WinClip backend is the seam.
   - `anomalyclip` — zero-shot, object-agnostic; the official-repo backend is the seam, plus the
     committed auxiliary-training overlap audit (`docs/anomalyclip-overlap-audit.md`).
@@ -39,9 +43,28 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## Next steps, in order
 
-1. **PatchCore anomalib backend** — `docs/superpowers/plans/2026-07-24-patchcore-anomalib-backend-colab.md`.
-   The full-shot anchor; closes M2 once its VisA ±1pt gate passes. Do this first: it is the ceiling
-   every zero-shot number is measured against, and anomalib's API is the most stable.
+1. **PatchCore — finish the Colab session** (plan:
+   `docs/superpowers/plans/2026-07-24-patchcore-anomalib-backend-colab.md`; driver:
+   `notebooks/patchcore_colab.ipynb`, which covers phases 0–2). The full-shot anchor; closes M2
+   once its VisA ±1pt gate passes. It is the ceiling every zero-shot number is measured against.
+   **Phase 0 and the backend of phase 1 are done** (2026-08-21) — what remains, in order:
+
+   1. **Probe stage 10 — double preprocessing.** Written but **never run**, and it is the one open
+      correctness question: `PreProcessor` is a module *inside* the Patchcore model, so if the
+      forward pass re-applies it on top of what `score()` already did, every image is resized and
+      ImageNet-normalised twice. No error, just wrong numbers — and the VisA gate would then fail
+      for a reason no traceback points at. `probe_patchcore.run(only="10. double preprocessing")`.
+   2. **Phase 1.2 smoke test**, confirmed green end to end. `fit` reached a 2048-vector memory bank
+      before the last two fixes (tensor input, device after fit) landed; the assertion that the
+      injected defect outscores a normal image has not been seen pass since.
+   3. **Phase 2** — Vial end to end through the existing runner (notebook cells 21–26).
+   4. **Phase 3 — the VisA ±1pt gate.** Deliberately not in the notebook: it needs the VisA loader
+      and the `PUBLISHED_VISA_IAUROC` table (with its exact source recorded next to it), both listed
+      under *Integration points* below. Writes `results/reproduction/patchcore_visa.md`.
+   5. **Phase 4 — freeze provenance.** `configs/methods/patchcore_ref.yaml` still carries the
+      `anomalib_version: ">=1.1"` range with "record the resolved version" next to it; the resolved
+      version is **2.6.0** (Colab T4, torch 2.11.0+cu128, 2026-08-21). Commit the notebook, confirm
+      both CI jobs stay green.
 2. **WinCLIP Colab phases (A–D)** — the Colab half of
    `docs/superpowers/plans/2026-07-24-winclip-zeroshot-adapter.md`. First zero-shot method; anomalib
    backend. Watch: if it misses the VisA gate, the likely cause is anomalib's prompt ensemble
@@ -78,6 +101,55 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    with a checkbox each.
 8. **M5 — efficiency pass** on a rented fixed instance (protocol §5: latency never from Colab).
 9. **M6 — preprint.** Paper §1–§3 are already written (see below); §4–§6 need M3.
+
+## The PatchCore Colab session (2026-08-21) — what it settled
+
+The first GPU session went entirely into making one backend run. It is worth reading before the
+next one, because four of the five methods still ahead go through the same library.
+
+**anomalib 2.6.0 contradicts its own documentation snippets in five ways, each of which surfaced
+only after the previous was fixed** (verified on Colab T4, torch 2.11.0+cu128):
+
+1. `Folder(task=...)` — removed in 2.x; the API reference has no such parameter, several snippet
+   pages still pass it.
+2. `Engine(task=...)` — **accepted** at construction and rejected one call later by Lightning's
+   `Trainer`, because the Trainer is built lazily inside `train()`. A swallowed kwarg is worse than
+   a rejected one: the traceback points at `fit()`, not at the constructor that took it.
+3. `enable_checkpointing=False` — anomalib installs its own `ModelCheckpoint`; Lightning refuses
+   the combination.
+4. **`enable_progress_bar=False` is required.** Lightning's `RichProgressBar` holds a live display
+   while anomalib's coreset sampler writes its own tqdm into it; in a notebook they nest until
+   `RecursionError`, with the bar pinned at 0/N. Raising the recursion limit does **not** help
+   (tested at 20000) — the nesting is unbounded, not deep-but-finite.
+5. `ValSplitMode.NONE` never builds `val_data` while Lightning's fit loop sets up the validation
+   loop unconditionally → `AttributeError`. Fixed with `limit_val_batches=0, num_sanity_val_steps=0`.
+
+**The verified Engine configuration is exactly this, and nothing else** — `accelerator`, `devices`
+and `max_epochs` were dropped because they were not in the tested set:
+`Engine(logger=False, enable_progress_bar=False, limit_val_batches=0, num_sanity_val_steps=0)`.
+
+Two more outside the Engine: the pre-processor carries **no ToTensor**, so `score()` hands it a CHW
+float tensor in [0,1], not a PIL image; and Lightning returns the model on **CPU** after `fit`, so
+the backend reclaims it (and the coreset) for the GPU.
+
+**⚠️ The open risk for the VisA gate:** that pre-processor is `Resize([256,256]) + Normalize`, with
+**no CenterCrop** and a fixed square resize rather than shorter-side-256. Classic PatchCore is
+Resize(256) → CenterCrop(224). If the ±1pt gate misses, look there first — the playbook already
+names preprocessing mismatch as suspect number one.
+
+**How this was found, and the reason the probe exists.** Three of those fixes were made by inferring
+from a traceback, and each revealed a new failure in the same constructor — the signal that guessing
+had stopped working. What broke the loop was `notebooks/probe_patchcore.py`, a stage-by-stage harness
+where each stage **writes down what it expects before running the smallest thing that tests it**, so
+a surprising PASS is as visible as a FAIL. It also corrected a wrong conclusion — that the Lightning
+Trainer was the wrong abstraction — by showing the candidates reached the coreset step and died in
+the display layer. Use it, and extend it, for the next backend.
+
+**One operational constraint, learned the hard way:** the author cannot paste from a terminal into
+Colab. A fix is delivered by **pushing it to `master`**, where notebook cell 1.1 hard-resets and
+picks it up; that is why `patchcore_backend.py` is a tracked `.py` and not a `%%writefile` cell.
+Changing the notebook's cell structure instead costs a full reload (reinstall anomalib, re-download
+the weights), so prefer changing tracked Python.
 
 ## The threshold rule — built and pre-registered (2026-08-20)
 
@@ -139,18 +211,21 @@ These cannot be pre-written without the data/repo in front of you, and each play
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 
-## Where to pick up (session handoff, 2026-07-31)
+## Where to pick up (session handoff, 2026-08-26)
 
-Neither repo has been pushed since `vlm-anomaly-bench` was pushed on 2026-07-30. As of this note:
-**bench is 4 commits ahead of origin, paper is 20 ahead.** Both working trees are clean and both
-build/test green (bench: 246 tests; paper: pdflatex chain exits 0, 5 pages).
+**Both repos are clean and in sync with `origin/master`** — nothing is waiting to be pushed, which
+was the open item in the previous handoff. Bench: **313 tests green** (~7 s). Paper: `master` at
+`ef39c4b`, abstract and §1–§3 written and reviewed, §4–§6 stubs awaiting M3.
 
-Two candidate next moves, in the order that makes most sense:
+**The next move is the second Colab session**, and it resumes mid-phase rather than at the top:
 
-1. **The first Colab session: PatchCore** (step 1 of the ordered list). Interactive, GPU, executed by
-   a human — not by CPU subagents. It closes M2 and is the ceiling every zero-shot number is measured
-   against.
-2. **Push both repos.** Nothing blocks it; it simply has not been done.
+1. Run notebook cell 1.1 to sync, then **probe stage 10** — the only open correctness question
+   (double preprocessing, see step 1 of the ordered list). Do it before anything is scored: if the
+   model normalises internally, every number produced until now is quietly wrong.
+2. Then the 1.2 smoke test, phase 2 on Vial, and the VisA gate.
+
+Fixes reach that session by being **pushed to `master`** — cell 1.1 hard-resets to `origin/master`
+and prints what it synced. Push before asking for a re-run.
 
 Two items only the author can close, both flagged in the paper's `references.bib` as `\todo` that
 render as red text in the printed bibliography:
