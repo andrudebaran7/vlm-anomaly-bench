@@ -27,12 +27,24 @@ class PatchCoreBackend:
         num_neighbors: int = 9,
         device: str = "cuda",
         num_workers: int = 2,
+        seed: int | None = None,
     ):
         from anomalib.models import Patchcore  # lazy: GPU-only
         from anomalib.engine import Engine
 
         self._device = device
         self._num_workers = num_workers
+        # PatchCore's coreset sampling is stochastic: two fits on byte-identical inputs give
+        # different memory banks and different scores (probe stage 11, 2026-08-26: the same
+        # image scored 202.796432 and then 203.890701 across two runs). Protocol §6 requires
+        # three seeds wherever stochasticity exists, so it has to be controllable from here.
+        #
+        # The default is None -- NOT a silent 0. run_eval.py already records a `seed` in every
+        # shard's provenance without applying it to anything, and a backend that quietly seeded
+        # itself would make that record look true while the two numbers still had nothing to do
+        # with each other. None means "unseeded, and the provenance is the caller's problem";
+        # an int means the run is reproducible and says so.
+        self._seed = seed
         self._model = Patchcore(
             backbone=backbone,
             layers=list(layers),
@@ -107,6 +119,12 @@ class PatchCoreBackend:
             val_split_mode=ValSplitMode.NONE,
             test_split_mode=TestSplitMode.NONE,
         )
+        if self._seed is not None:
+            # workers=True also seeds the DataLoader worker processes, which matters because
+            # the coreset sampler consumes batches in whatever order they arrive.
+            from lightning import seed_everything
+            seed_everything(self._seed, workers=True)
+
         datamodule.setup()
         self._engine.train(model=self._model, datamodule=datamodule)
 
