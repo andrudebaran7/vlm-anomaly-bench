@@ -53,7 +53,9 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
       correctness question: `PreProcessor` is a module *inside* the Patchcore model, so if the
       forward pass re-applies it on top of what `score()` already did, every image is resized and
       ImageNet-normalised twice. No error, just wrong numbers — and the VisA gate would then fail
-      for a reason no traceback points at. `probe_patchcore.run(only="10. double preprocessing")`.
+      for a reason no traceback points at. It is the last stage of `probe_patchcore.run()`, and
+      it needs the stages before it in the same session (they build the model it questions), so
+      run the probe whole rather than jumping to it.
    2. **Phase 1.2 smoke test**, confirmed green end to end. `fit` reached a 2048-vector memory bank
       before the last two fixes (tensor input, device after fit) landed; the assertion that the
       injected defect outscores a normal image has not been seen pass since.
