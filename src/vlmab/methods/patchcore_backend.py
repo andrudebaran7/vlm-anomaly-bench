@@ -3,9 +3,10 @@
 Bridges the repo's injectable seam - fit(train_images) / score(image) -> (float, HxW map) - to
 anomalib, which is directory-and-datamodule oriented. `fit` materialises the streamed normal
 images to a temp directory and runs anomalib's PatchCore training to fill the coreset memory bank;
-`score` pre-processes one image with PatchCore's own transform, runs the trained torch model
-forward, and returns anomalib's RAW pred_score and anomaly_map (protocol v0.2.6 - no per-image
-normalisation; PatchCoreRef upsamples the map to native resolution).
+`score` hands one native-resolution image to the model as a raw [0,1] tensor and lets the model's
+own PreProcessor resize and normalise it - the same single pre-processing `fit` gets - then returns
+anomalib's RAW pred_score and anomaly_map (protocol v0.2.6 - no per-image normalisation;
+PatchCoreRef upsamples the map to native resolution).
 
 anomalib and torch are imported lazily so this module imports in CI (it is never constructed
 there). Hyperparameters come from configs/methods/patchcore_ref.yaml.
@@ -68,7 +69,9 @@ class PatchCoreBackend:
             limit_val_batches=0,
             num_sanity_val_steps=0,
         )
-        self._transform = type(self._model).configure_pre_processor().transform
+        # No pre-processing transform is kept here on purpose. AnomalibModule.forward is
+        #     batch = self.pre_processor(batch) if self.pre_processor else batch
+        # so the model pre-processes whatever it is handed. See score().
         self._fitted = False
 
     def fit(self, train_images: Iterable[np.ndarray]) -> None:
@@ -134,11 +137,23 @@ class PatchCoreBackend:
         if not self._fitted:
             raise RuntimeError("PatchCoreBackend.score called before fit")
 
-        # The pre-processor is a torchvision v2 pipeline that carries NO ToTensor step --
-        # on anomalib 2.6.0 it is Resize([256,256]) + Normalize(imagenet), and Normalize
-        # rejects PIL images outright ("Normalize() does not support PIL images").
-        # So the conversion happens here: HWC uint8 -> CHW float in [0,1], which is the
-        # range the ImageNet mean/std in that Normalize are defined against.
+        # Hand the model a RAW image and let it pre-process. `PreProcessor` is a child module
+        # of the Patchcore LightningModule and AnomalibModule.forward runs it unconditionally:
+        #     batch = self.pre_processor(batch) if self.pre_processor else batch
+        #     batch = self.model(batch)
+        #     return self.post_processor(batch) if self.post_processor else batch
+        # so anything we pre-process here is resized and ImageNet-normalised a SECOND time.
+        #
+        # This was the shipped behaviour until 2026-08-26 and it produced no error, no warning
+        # and a perfectly plausible score: the injected-defect smoke test separated correctly
+        # either way, because normalising twice is monotonic enough to keep the ordering. What
+        # it would have broken is the VisA reproduction gate, with nothing pointing back here.
+        # Measured in probe stage 11: model(pre_processed) equals model.model(normalised twice)
+        # to the last digit, while model.model(pre_processed) equals model(raw).
+        #
+        # Only the conversion HWC uint8 -> CHW float in [0,1] is ours; the pre-processor's
+        # Resize([256,256]) does the rest, exactly as it does for every image during fit. The
+        # image goes in at native resolution for that reason.
         arr = np.asarray(image, dtype=np.uint8)
         if arr.ndim != 3 or arr.shape[2] != 3:
             raise ValueError(
@@ -146,7 +161,7 @@ class PatchCoreBackend:
                 "to 3-channel upstream (protocol §3)"
             )
         tensor = torch.from_numpy(arr).permute(2, 0, 1).float().div_(255.0)
-        tensor = self._transform(tensor).unsqueeze(0).to(self._device)  # 1x3xHxW
+        tensor = tensor.unsqueeze(0).to(self._device)   # 1x3xHxW, raw [0,1]
 
         with torch.no_grad():
             out = self._model(tensor)   # -> InferenceBatch(pred_score, anomaly_map, ...)
