@@ -9,10 +9,10 @@ def _validation_run(tmp_path, split="validation", n=6, size=12):
     """A shard of defect-free rows with real maps on disk, laid out as the runner lays them out.
 
     The map directory name matters: `run_id` is not a shard column, so
-    `<dataset>__<method>__<run_id>__<category>` is the only place the run is recorded and the
-    only place the artifact's provenance can come from.
+    `<dataset>__<method>__<run_id>__<category>__<seed_tag>` is the only place the run is
+    recorded and the only place the artifact's provenance can come from.
     """
-    maps = tmp_path / "maps" / "mvtec_ad2__intensity_baseline__cafe1234__vial"
+    maps = tmp_path / "maps" / "mvtec_ad2__intensity_baseline__cafe1234__vial__seed0"
     maps.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(0)
     rows = []
@@ -92,7 +92,7 @@ def test_calibrate_raises_when_the_run_saved_no_maps(tmp_path):
     results = _validation_run(tmp_path)
     import pandas as pd
 
-    shard = results / "mvtec_ad2__intensity_baseline__vial.parquet"
+    shard = ResultStore(results).path_for("mvtec_ad2", "intensity_baseline", "vial", 0)
     pd.read_parquet(shard).drop(columns=["map_path"]).to_parquet(shard, index=False)
     with pytest.raises(ValueError, match="map_path"):
         _run(["--results", str(results), "--dataset", "mvtec_ad2",

@@ -39,17 +39,18 @@ CALIBRATION_SPLIT = "validation"
 def _run_id_from_maps(map_paths) -> str:
     """Recover the run from the map directory name.
 
-    The runner names it `<dataset>__<method>__<run_id>__<category>` and does **not** write a
-    `run_id` shard column, so this directory name is the only record of which run produced
+    The runner names it `<dataset>__<method>__<run_id>__<category>__<seed_tag>` (the seed_tag
+    suffix was added so two seeds of one config never share a directory) and does **not** write
+    a `run_id` shard column, so this directory name is the only record of which run produced
     these maps -- and the artifact is worth much less without it.
     """
     ids = set()
     for name in {Path(p).parent.name for p in map_paths}:
         parts = name.split("__")
-        if len(parts) != 4:
+        if len(parts) != 5:
             raise ValueError(
                 f"map directory {name!r} does not match the runner's "
-                "<dataset>__<method>__<run_id>__<category> layout, so the run this "
+                "<dataset>__<method>__<run_id>__<category>__<seed_tag> layout, so the run this "
                 "calibration came from cannot be recorded"
             )
         ids.add(parts[2])

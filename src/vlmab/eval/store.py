@@ -21,16 +21,27 @@ IDENTITY_COLUMNS = ("dataset", "method", "category")
 ROW_SCHEMA_COLUMNS = ("image_path", "label", "image_score", "split", "mask_path", "map_path")
 
 
+def seed_tag(seed: int | None) -> str:
+    """The literal that separates one seed's shard and maps from another's.
+
+    Deliberately a readable literal rather than a component of `config_hash`: the seed is a
+    property of one execution, not of the configuration, and a directory name that changed
+    because a hash moved cannot be audited by eye. `unseeded` is a real state — the run applied
+    no seed — and is not the same as seed 0.
+    """
+    return "unseeded" if seed is None else f"seed{seed}"
+
+
 class ResultStore:
     def __init__(self, root: Path):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
 
-    def path_for(self, dataset: str, method: str, category: str) -> Path:
-        return self.root / f"{dataset}__{method}__{category}.parquet"
+    def path_for(self, dataset: str, method: str, category: str, seed: int | None) -> Path:
+        return self.root / f"{dataset}__{method}__{category}__{seed_tag(seed)}.parquet"
 
-    def is_done(self, dataset: str, method: str, category: str) -> bool:
-        return self.path_for(dataset, method, category).is_file()
+    def is_done(self, dataset: str, method: str, category: str, seed: int | None) -> bool:
+        return self.path_for(dataset, method, category, seed).is_file()
 
     def write(
         self,
@@ -68,7 +79,10 @@ class ResultStore:
         for key, value in meta.items():
             df[key] = value
 
-        final = self.path_for(dataset, method, category)
+        # The seed comes from the meta this shard is about to record, so the filename and the
+        # `seed` column cannot disagree. A separate seed argument would be a second value to
+        # keep in step, which is the class of bug this whole change removes.
+        final = self.path_for(dataset, method, category, meta.get("seed"))
         tmp = final.with_suffix(".parquet.tmp")
         df.to_parquet(tmp, index=False)
         tmp.replace(final)
