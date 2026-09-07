@@ -2,7 +2,7 @@
 """Run one method over a dataset, writing per-category result shards.
 
     python scripts/run_eval.py --method intensity_baseline --root data/mvtec_ad2 \
-        --split test_public --results results/shards --seed 0
+        --split test_public --results results/shards
 """
 import argparse
 import sys
@@ -25,15 +25,24 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--split", default="test_public")
     parser.add_argument("--category", default=None)
     parser.add_argument("--maps-dir", default=None, type=Path)
-    parser.add_argument("--seed", default=0, type=int)
+    parser.add_argument(
+        "--seed", default=None, type=int,
+        help="seed to apply to a stochastic method; omit for a method that seeds nothing "
+             "(recorded as unseeded, which is the truth)",
+    )
     parser.add_argument("--device", default="cuda")
     args = parser.parse_args(argv)
 
     try:
-        method = build_method(args.method)
+        method = build_method(args.method, seed=args.seed)
     except KeyError as exc:
         print(exc.args[0])
         print(f"available methods: {available()}")
+        return 1
+    except ValueError as exc:
+        # A method that cannot apply the seed it was handed. Report it the way an unknown
+        # method is reported, rather than a traceback: the run is refused, not broken.
+        print(f"{args.method}: {exc}")
         return 1
 
     dataset = MVTecAD2(args.root)

@@ -17,7 +17,7 @@ from vlmab.methods.patchcore_ref import PatchCoreRef
 from vlmab.methods.saa import SaaRef
 from vlmab.methods.winclip import WinClipRef
 
-_REGISTRY: dict[str, Callable[[], AnomalyMethod]] = {
+_REGISTRY: dict[str, Callable[..., AnomalyMethod]] = {
     "adaclip": AdaClipRef,          # CPU-usable only with an injected backend; prepare() gates the rest
     "anomalyclip": AnomalyClipRef,  # CPU-usable only with an injected backend; prepare() gates the rest
     "intensity_baseline": IntensityBaseline,
@@ -32,7 +32,13 @@ def available() -> list[str]:
     return sorted(_REGISTRY)
 
 
-def build_method(name: str) -> AnomalyMethod:
+def build_method(name: str, seed: int | None = None) -> AnomalyMethod:
+    """Build an adapter by name, handing it the seed the caller asked for.
+
+    The registry does not know which methods are stochastic and must not decide: it forwards,
+    and an adapter that cannot apply a seed refuses it (ValueError) rather than letting a number
+    reach provenance that nothing applied.
+    """
     if name not in _REGISTRY:
         raise KeyError(f"unknown method {name!r}; available: {available()}")
-    return _REGISTRY[name]()
+    return _REGISTRY[name](seed=seed)

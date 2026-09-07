@@ -10,7 +10,7 @@ def test_run_eval_writes_shards_for_a_real_method(tmp_path):
     build_category(tmp_path, "vial")
     results = tmp_path / "results"
     code = main(["--method", "intensity_baseline", "--root", str(tmp_path),
-                 "--split", "test_public", "--results", str(results), "--seed", "0"])
+                 "--split", "test_public", "--results", str(results)])
     assert code == 0
     df = ResultStore(results).load_all()
     assert len(df) > 0
@@ -47,7 +47,7 @@ def test_run_eval_does_not_prepare_a_method_on_a_fully_resumed_run(tmp_path, mon
     build_category(root, "vial")
     results = tmp_path / "results"
     argv = ["--method", "intensity_baseline", "--root", str(root),
-            "--split", "test_public", "--results", str(results), "--seed", "0"]
+            "--split", "test_public", "--results", str(results)]
 
     # First run: does the real work and writes the shard.
     assert main(argv) == 0
@@ -55,7 +55,7 @@ def test_run_eval_does_not_prepare_a_method_on_a_fully_resumed_run(tmp_path, mon
     # Second run against the same --results: every category is already done, so
     # run_eval must not touch prepare()/predict() at all -- swap in a method that
     # raises AssertionError if either is called, and confirm the run still succeeds.
-    monkeypatch.setattr("run_eval.build_method", lambda name: _PrepareForbidden())
+    monkeypatch.setattr("run_eval.build_method", lambda name, seed=None: _PrepareForbidden())
     assert main(argv) == 0
 
 
@@ -86,7 +86,26 @@ def test_run_eval_does_not_mask_a_genuine_runtime_error_from_predict(tmp_path, m
     """A plain RuntimeError raised from inside a real predict() is a genuine bug -- it must
     propagate out of main(), not be caught and misreported as "cannot run here"."""
     build_category(tmp_path, "vial")
-    monkeypatch.setattr("run_eval.build_method", lambda name: _CudaFailure())
+    monkeypatch.setattr("run_eval.build_method", lambda name, seed=None: _CudaFailure())
     with pytest.raises(RuntimeError, match="simulated CUDA failure"):
         main(["--method", "intensity_baseline", "--root", str(tmp_path),
-              "--split", "test_public", "--results", str(tmp_path / "results"), "--seed", "0"])
+              "--split", "test_public", "--results", str(tmp_path / "results")])
+
+
+def test_run_eval_records_no_seed_when_none_was_asked_for(tmp_path):
+    build_category(tmp_path, "vial")
+    results = tmp_path / "results"
+    assert main(["--method", "intensity_baseline", "--root", str(tmp_path),
+                 "--split", "test_public", "--results", str(results)]) == 0
+    df = ResultStore(results).load_all()
+    assert "seed" in df.columns and df["seed"].isna().all()
+
+
+def test_run_eval_reports_a_seed_a_deterministic_method_cannot_apply(tmp_path, capsys):
+    """--seed used to be recorded and applied to nothing. Now the method that cannot apply it
+    says so, and the run refuses rather than writing a shard that claims a seed."""
+    build_category(tmp_path, "vial")
+    code = main(["--method", "intensity_baseline", "--root", str(tmp_path),
+                 "--split", "test_public", "--results", str(tmp_path / "r"), "--seed", "0"])
+    assert code == 1
+    assert "deterministic" in capsys.readouterr().out
