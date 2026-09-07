@@ -25,7 +25,7 @@ from typing import Callable
 
 import numpy as np
 
-from vlmab.methods.base import AnomalyMethod, MethodNotRunnable, Prediction
+from vlmab.methods.base import BackendSeeded, MethodNotRunnable, Prediction
 from vlmab.methods.postprocess import upsample_to
 
 _GRID = 7
@@ -132,12 +132,14 @@ def parse_mllm_response(text: str) -> tuple[float, list[str], bool]:
     return _NO_INFO_SCORE, [], False
 
 
-class QwenMLLM(AnomalyMethod):
+class QwenMLLM(BackendSeeded):
     name = "mllm_qwen"
     zero_shot = True
 
-    def __init__(self, model_client: Callable[[np.ndarray, str], str] | None = None):
+    def __init__(self, model_client: Callable[[np.ndarray, str], str] | None = None,
+                 seed: int | None = None):
         self._client = model_client
+        self._init_seed(model_client, seed)
 
     def prepare(self, device: str = "cuda") -> None:
         """With an injected client there is nothing to load. Otherwise the real Qwen client is

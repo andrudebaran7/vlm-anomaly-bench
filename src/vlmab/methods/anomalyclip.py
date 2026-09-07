@@ -17,16 +17,18 @@ Scores and maps are RAW (protocol v0.2.6): passed through and only upsampled to 
 """
 import numpy as np
 
-from vlmab.methods.base import AnomalyMethod, MethodNotRunnable, Prediction
+from vlmab.methods.base import BackendSeeded, MethodNotRunnable, Prediction
 from vlmab.methods.postprocess import upsample_to
 
 
-class AnomalyClipRef(AnomalyMethod):
+class AnomalyClipRef(BackendSeeded):
     name = "anomalyclip"
     zero_shot = True
 
-    def __init__(self, backend=None):
+    def __init__(self, backend=None, seed: int | None = None):
         self._backend = backend
+        # The backend is what calls seed_everything, so it is what declares the seed.
+        self._init_seed(backend, seed)
 
     def prepare(self, device: str = "cuda") -> None:
         """With an injected backend there is nothing to load. Otherwise the real backend is

@@ -61,3 +61,26 @@ def test_the_deterministic_baseline_declares_no_seed():
 def test_the_deterministic_baseline_refuses_a_seed():
     with pytest.raises(ValueError, match="deterministic"):
         IntensityBaseline(seed=0)
+
+
+from vlmab.methods.adaclip import AdaClipRef
+from vlmab.methods.anomalyclip import AnomalyClipRef
+from vlmab.methods.mllm import QwenMLLM
+from vlmab.methods.patchcore_ref import PatchCoreRef
+from vlmab.methods.saa import SaaRef
+from vlmab.methods.winclip import WinClipRef
+
+#: Every adapter whose stochasticity will live in an injected backend. They are listed
+#: explicitly rather than discovered, so an adapter added without the seed contract fails here
+#: instead of silently opting out of it.
+_BACKEND_ADAPTERS = [AdaClipRef, AnomalyClipRef, PatchCoreRef, QwenMLLM, SaaRef, WinClipRef]
+
+
+@pytest.mark.parametrize("cls", _BACKEND_ADAPTERS, ids=lambda c: c.__name__)
+def test_every_backend_adapter_accepts_a_seed_and_declares_it(cls):
+    assert cls(seed=5).seed == 5
+
+
+@pytest.mark.parametrize("cls", _BACKEND_ADAPTERS, ids=lambda c: c.__name__)
+def test_every_backend_adapter_declares_none_by_default(cls):
+    assert cls().seed is None
