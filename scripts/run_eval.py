@@ -43,7 +43,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # output directory as a bogus category and fail scanning it.
     categories = [args.category] if args.category else dataset.categories()
     store = ResultStore(args.results)
-    meta = run_meta({"method": args.method, "split": args.split}, seed=args.seed)
+    meta = run_meta({"method": args.method, "split": args.split})
 
     # method.prepare() is NOT called here: run_evaluation() owns that decision, calling it
     # only if there is genuinely work left (see its docstring) so a fully-resumed run never

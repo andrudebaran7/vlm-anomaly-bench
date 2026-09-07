@@ -63,7 +63,7 @@ def gpu_name() -> str:
     return str(torch.cuda.get_device_name(0))
 
 
-def run_meta(cfg: Mapping[str, Any], seed: int) -> dict[str, Any]:
+def run_meta(cfg: Mapping[str, Any]) -> dict[str, Any]:
     """The provenance columns stamped onto every result row.
 
     The commit is resolved from `PACKAGE_REPO_ROOT`, not from the process cwd: a Colab
@@ -71,10 +71,13 @@ def run_meta(cfg: Mapping[str, Any], seed: int) -> dict[str, Any]:
     stamp "unknown" onto every row -- or, if cwd happened to be some other checkout, a
     completely unrelated repository's SHA. Either defeats the auditability the
     protocol commits to, on the exact platform this is built for.
+
+    The seed is deliberately NOT here. It is stamped by `run_evaluation` from `method.seed` —
+    the only value that was actually applied. When this function took a seed, `scripts/run_eval.py`
+    passed `--seed` straight through and every shard recorded a number nothing had applied.
     """
     return {
         "config_hash": config_hash(cfg),
         "commit": package_commit(),
-        "seed": int(seed),
         "gpu": gpu_name(),
     }

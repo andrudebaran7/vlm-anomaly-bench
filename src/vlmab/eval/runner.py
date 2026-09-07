@@ -108,6 +108,18 @@ def run_evaluation(
     device: str = "cuda",
 ) -> list[Path]:
     """Evaluate `method` on `dataset`, writing one shard per category. Returns new shards."""
+    # The seed is stamped from the method, which is the only object that knows what was applied.
+    # A caller reaching this with a seed of its own is the original defect walking back in:
+    # store.write()'s shadowing guard does not catch it, because `seed` is a meta key rather
+    # than a row column.
+    if "seed" in meta:
+        raise ValueError(
+            f"meta carries seed={meta['seed']!r}, but the seed is stamped from method.seed "
+            f"({method.name} declares {method.seed!r}) — the only value that was actually "
+            "applied. Remove it from meta."
+        )
+    meta = {**meta, "seed": method.seed}
+
     wanted = list(categories) if categories is not None else dataset.categories()
     todo = [c for c in wanted if not store.is_done(dataset.name, method.name, c)]
     if not todo:

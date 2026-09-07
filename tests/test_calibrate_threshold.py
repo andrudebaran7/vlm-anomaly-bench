@@ -133,7 +133,7 @@ def test_calibrate_runs_end_to_end_on_a_synthetic_mvtec_tree(tmp_path):
     build_category(root, "vial", n_good=3, n_bad=1, size=(12, 10))
     results, maps = tmp_path / "shards", tmp_path / "maps"
     run_evaluation(
-        MVTecAD2(root), NoisyMethod(), ResultStore(results), {"seed": 0},
+        MVTecAD2(root), NoisyMethod(), ResultStore(results), {},
         split="validation", maps_dir=maps, device="cpu",
     )
 
