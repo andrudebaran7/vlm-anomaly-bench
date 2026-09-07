@@ -15,6 +15,17 @@ class IntensityBaseline(AnomalyMethod):
     name = "intensity_baseline"
     zero_shot = True
 
+    def __init__(self, seed: int | None = None):
+        # Deterministic: the same image always yields the same deviation map, so there is no
+        # sampling for a seed to control. Accepting one would put a number into the shard's
+        # provenance that nothing applied — the same falsehood the seed contract exists to
+        # remove, just in a method where it looks harmless.
+        if seed is not None:
+            raise ValueError(
+                f"intensity_baseline is deterministic; seed={seed!r} would be recorded in "
+                "provenance and never applied. Omit it."
+            )
+
     def prepare(self, device: str = "cuda") -> None:
         """No weights to load."""
 
