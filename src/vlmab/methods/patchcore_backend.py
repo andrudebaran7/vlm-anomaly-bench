@@ -180,6 +180,12 @@ class PatchCoreBackend:
                 f"expected an HxWx3 RGB image, got shape {arr.shape}; grayscale is converted "
                 "to 3-channel upstream (protocol §3)"
             )
+        # torch warns here that `arr` is not writable (PIL buffers are read-only) and that
+        # writing through the tensor would be undefined. Nothing does: `.float()` converts
+        # uint8 -> float32, and a float32 tensor cannot alias a uint8 buffer (4 bytes per
+        # element against 1), so it is obliged to allocate. `.div_` then mutates that fresh
+        # copy, never the image. Do NOT silence the warning with `arr.copy()` -- that buys
+        # nothing and adds a second full copy of a 1400x1900x3 array per scored image.
         tensor = torch.from_numpy(arr).permute(2, 0, 1).float().div_(255.0)
         tensor = tensor.unsqueeze(0).to(self._device)   # 1x3xHxW, raw [0,1]
 

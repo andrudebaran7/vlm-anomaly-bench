@@ -175,6 +175,31 @@ picks it up; that is why `patchcore_backend.py` is a tracked `.py` and not a `%%
 Changing the notebook's cell structure instead costs a full reload (reinstall anomalib, re-download
 the weights), so prefer changing tracked Python.
 
+## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
+
+Vial end to end through `run_evaluation` on a Colab T4, anomalib 2.6.0 under **Python 3.13**
+(the 2026-08-21 session did not record its Python version; 2.6.0 resolved again from the
+`>=1.1` range three weeks later, so the unpinned range is stable for now — it is still pinned
+at phase 4).
+
+- **The sanity gate passes:** I-AUROC 0.947 on `regular`, 140 images over 7 lighting conditions
+  at n=20 each, which is the whole of Vial's `test_public`.
+- **The seed reached the sampler and the record:** Lightning printed `Seed set to 0` and the cell
+  printed `declared seed: 0` — the first end-to-end exercise of the seed-provenance work on a real
+  GPU method.
+- **The float16 overflow guard did not fire**, so PatchCore's raw scores stay under 65504 on Vial
+  and no §4 map-scale amendment is needed.
+- **Measured cost, for M3 budgeting:** greedy coreset selection over Vial's 291 train images took
+  **2m19s for 29797 indices** (~213 it/s). Scoring the 140 test images followed.
+- **One warning, benign and annotated in the code:** torch warns that the PIL-backed array is not
+  writable. `.float()` cannot alias a uint8 buffer, so it allocates and `.div_` mutates the copy.
+  See the comment in `score()`; do not "fix" it with `arr.copy()`.
+
+**The numbers are not a result.** Protocol §2: no MVTec AD 2 number is reported until PatchCore
+reproduces its published VisA image-AUROC within ±1.0. They are also a single seed, one draw, of a
+method this repo has measured to be stochastic. Recorded here only so a later run that disagrees
+wildly is visible as a signal.
+
 ## PatchCore is stochastic, and the seed is now wired end to end (2026-08-26, closed 2026-09-07)
 
 The probe's own numbers moved between two runs on byte-identical inputs — the same image scored
