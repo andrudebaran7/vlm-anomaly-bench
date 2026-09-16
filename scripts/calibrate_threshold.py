@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Sequence
 
 import numpy as np
+import pandas as pd
 
 from vlmab.eval.store import ResultStore
 from vlmab.threshold.artifact import write_artifact
@@ -106,6 +107,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{CALIBRATION_SPLIT!r}, which is defect-free, never on test data (protocol §4). "
             f"Point --results at a run made with --split {CALIBRATION_SPLIT}."
         )
+
+    # A threshold is fitted on the maps one run produced. Two seeds pooled fits it on a mixture
+    # no single run ever produces, and calibration would still succeed and write an artifact
+    # that looks pre-registered. Same refusal the metric functions make.
+    if "seed" in df.columns:
+        seeds = sorted({None if pd.isna(s) else s for s in df["seed"].unique()}, key=str)
+        if len(seeds) > 1:
+            raise ValueError(
+                f"the shards under {args.results} pool {len(seeds)} seeds ({seeds}): a threshold "
+                "is calibrated on one run's maps, so pooling seeds fits it on a distribution no "
+                "single run produced. Calibrate each seed separately (protocol §4)."
+            )
     if "map_path" not in df.columns or df["map_path"].isna().all():
         raise ValueError(
             f"the run under {args.results} saved no anomaly maps (no usable map_path column); "

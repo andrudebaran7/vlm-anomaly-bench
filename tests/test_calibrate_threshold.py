@@ -227,3 +227,20 @@ def test_calibrate_prints_the_commit_reminder_at_the_preregistered_alpha(tmp_pat
     captured = capsys.readouterr()
     assert "commit it" in captured.out
     assert captured.err == ""
+
+
+def test_calibrate_refuses_shards_that_pool_two_seeds(tmp_path):
+    """A threshold is fitted on one run's maps. Pooling two seeds fits it on a distribution no
+    single run produced, which is not the pre-registered procedure (protocol §4)."""
+    import pandas as pd
+
+    results = _validation_run(tmp_path)
+    shard = ResultStore(results).path_for("mvtec_ad2", "intensity_baseline", "vial", 0)
+    other = pd.read_parquet(shard)
+    other["seed"] = 1
+    other.to_parquet(
+        ResultStore(results).path_for("mvtec_ad2", "intensity_baseline", "vial", 1), index=False
+    )
+    with pytest.raises(ValueError, match="pool 2 seeds"):
+        _run(["--results", str(results), "--dataset", "mvtec_ad2",
+              "--method", "intensity_baseline", "--out", str(tmp_path / "a.yaml")])
