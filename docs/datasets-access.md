@@ -88,6 +88,22 @@ self-contained. This lines up exactly with the runner's per-category checkpoint 
 (`src/vlmab/eval/runner.py`): one category is simultaneously the download unit, the resume unit
 and the shard unit.
 
+### How a category reaches a Colab session (verified 2026-09-16)
+
+Via **Google Drive**, uploaded once per category, not re-downloaded per session: the archives sit
+behind mvtec.com's registration form, which an unattended session cannot clear. The convention the
+notebooks use is `MyDrive/mvtec_ad2/<category>.tar.gz`, holding the unmodified archive from the
+download page.
+
+Layout inside the archive, read from `vial.tar.gz`: the top level is `<category>/`, `license.txt`
+and `readme.txt`, so `tar -xzf <tar> -C <root>` lands the category at `<root>/<category>` with no
+path surgery. Extract into the clone's `data/` — it is gitignored, so `git reset --hard` in the
+notebook's sync cell leaves it alone — and **never into `/tmp`**, which is tmpfs, i.e. RAM.
+
+One category at a time is what keeps this inside Drive's free 15 GB tier, the same reason the
+per-category split matters above. Verified end to end for Vial: `scripts/prepare_data.py --root
+data/mvtec_ad2 --category vial` prints the counts recorded above and exits 0.
+
 ### The lighting-shift analysis does NOT depend on the evaluation server
 
 `test_public` contains images from **every lighting condition together with pixel ground
