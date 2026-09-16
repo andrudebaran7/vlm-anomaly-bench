@@ -1,0 +1,59 @@
+# Pre-registered reproduction targets for the PatchCore anchor (protocol §2 v0.2.12).
+#
+# Committed before any reproduction run, so the gate cannot be moved after seeing a result.
+#
+# SOURCE — read directly from the PDF, 2026-09-16:
+#   Karsten Roth, Latha Pemula, Joaquin Zepeda, Bernhard Schölkopf, Thomas Brox, Peter Gehler.
+#   "Towards Total Recall in Industrial Anomaly Detection". arXiv:2106.08265 (v1 15 Jun 2021,
+#   v2 5 May 2022; CVPR 2022). **Table S1**, "Anomaly Detection Performance (AUROC) on
+#   MVTec AD", row `PatchCore-10`.
+#
+# The suffix is the coreset subsampling percentage, so `PatchCore-10` is exactly this repo's
+# `coreset_sampling_ratio: 0.1` (configs/methods/patchcore_ref.yaml). This is IMAGE-level
+# AUROC; Table S2 is the pixel-level one and is not this gate.
+#
+# Provenance record: ../vlm-anomaly-paper/docs/verified-literature-facts.md (fourth pass).
+
+method: patchcore_ref
+
+gate:
+  dataset: mvtec_ad          # MVTec AD (classic), not MVTec AD 2 and not VisA
+  metric: i_auroc
+  tolerance: 1.0             # protocol §2: ±1.0 I-AUROC
+  # The published Avg. Pass/fail is on this number, over the mean of the 15 categories.
+  published_mean: 99.0
+  source: "arXiv:2106.08265 Table S1, row PatchCore-10"
+
+# Per-category, same row. Reported alongside the mean as a diagnostic: a mean that passes while
+# one category is 10 points low is a different situation from one that passes evenly, and only
+# the per-category view separates them. Values are percentages, as printed.
+published_per_category:
+  bottle: 100.0
+  cable: 99.4
+  capsule: 97.8
+  carpet: 98.7
+  grid: 97.9
+  hazelnut: 100.0
+  leather: 100.0
+  metal_nut: 100.0
+  pill: 96.0
+  screw: 97.0
+  tile: 98.9
+  toothbrush: 99.7
+  transistor: 100.0
+  wood: 99.0
+  zipper: 99.5
+
+# Secondary check — run and reported, but it cannot fail the method (protocol §2 v0.2.12).
+secondary:
+  dataset: visa
+  metric: i_auroc
+  published_mean: 92.4
+  source: "arXiv:2207.14315 (VisA dataset paper) Table 6, row 'Sup. pre-train', VisA 1-class"
+  caveat: >-
+    PatchCore's own paper predates VisA and reports no VisA number, so this comes from a third
+    party. That source states none of its PatchCore hyperparameters (no resolution, crop or
+    coreset ratio), and its MVTec-AD control in the same row is 99.8 — above every single-model
+    number in PatchCore's own paper (99.0-99.1) and above its 99.6 ensemble. A miss here does
+    not distinguish a wrong implementation from a different setup, which is why it does not gate.
+  averaged_over: 12 objects, 1-class protocol, no per-object breakdown published
