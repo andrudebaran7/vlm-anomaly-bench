@@ -19,8 +19,35 @@ from vlmab.threshold.artifact import VALUE_KEY
 from vlmab.threshold.rules import RULES, thresholds_for
 
 
+def _require_single_seed(df: pd.DataFrame) -> None:
+    """Refuse a frame that pools more than one seed.
+
+    Protocol §6 asks for three seeds reported as mean ± std, which means metrics computed once
+    per seed and combined afterwards. A frame holding three seeds scores every image three times
+    and treats the copies as independent samples: I-AUROC over 3N rows is not the mean of three
+    I-AUROCs, and nothing about the result looks wrong. `ResultStore.load_all()` concatenates
+    every shard under a root, so a three-seed root reaches here as one frame by default -- this
+    is the guard that makes that safe, the same way `threshold_metrics` refuses a frame that
+    pools two categories.
+
+    A frame with no `seed` column passes: the metric tests build bare frames to exercise the
+    mathematics, and every frame `run_evaluation` writes carries the column by construction.
+    """
+    if "seed" not in df.columns:
+        return
+    # NaN is how parquet round-trips an unseeded run's None, and NaN != NaN would make every
+    # unseeded frame look like many distinct seeds. Fold it back to None before counting.
+    seeds = sorted({None if pd.isna(s) else s for s in df["seed"].unique()}, key=str)
+    if len(seeds) > 1:
+        raise ValueError(
+            f"this frame pools {len(seeds)} seeds ({seeds}): metrics are computed one seed at a "
+            "time and combined afterwards (protocol §6), never over the pooled rows"
+        )
+
+
 def image_metrics(df: pd.DataFrame) -> dict[str, float]:
     """I-AUROC, I-AP and I-F1max over a shard's image scores."""
+    _require_single_seed(df)
     labels = df["label"].to_numpy()
     if (labels == LABEL_UNKNOWN).any():
         raise ValueError(
@@ -115,6 +142,7 @@ def pixel_metrics(df: pd.DataFrame, max_bytes: int = 6_000_000_000) -> dict[str,
     allowed. 6 GB separates the two with room on both sides while staying under half of
     Colab's ceiling. Raise it deliberately, against measured free RAM, if a machine can take it.
     """
+    _require_single_seed(df)
     if "map_path" not in df.columns:
         return {"n": 0}
     with_maps = df[df["map_path"].notna()]
@@ -200,6 +228,7 @@ def threshold_metrics(
     Needs ground truth, so it is for `test_public` only. `seg_f1_at` alongside `seg_f1max` in
     a table is fine and is the point; in the same *column* without marking is not (protocol §4).
     """
+    _require_single_seed(df)
     if "map_path" not in df.columns:
         raise ValueError(
             "threshold_metrics needs a map_path column: it scores thresholded anomaly maps, "

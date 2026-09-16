@@ -70,3 +70,22 @@ def test_every_planned_method_is_registered():
         "saa",
         "winclip",
     }
+
+
+def test_build_method_forwards_the_seed_to_the_adapter():
+    from vlmab.methods.patchcore_ref import PatchCoreRef
+
+    method = build_method("patchcore_ref", seed=3)
+    assert isinstance(method, PatchCoreRef) and method.seed == 3
+
+
+def test_build_method_lets_a_deterministic_method_refuse_a_seed():
+    """The registry does not know which methods are stochastic and must not decide: it forwards,
+    and the adapter that knows raises."""
+    with pytest.raises(ValueError, match="deterministic"):
+        build_method("intensity_baseline", seed=0)
+
+
+def test_every_registered_method_builds_without_a_seed():
+    for name in available():
+        assert build_method(name).seed is None

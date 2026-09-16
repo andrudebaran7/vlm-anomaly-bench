@@ -610,3 +610,46 @@ def test_threshold_metrics_refuses_a_dataset_mismatch(tmp_path):
     artifact = _threshold_artifact(tmp_path)  # dataset="mvtec_ad2"
     with pytest.raises(ValueError, match="visa"):
         threshold_metrics(df, artifact, "vial")
+
+
+def _two_seed_frame(builder, tmp_path):
+    """One category scored under two seeds, as ResultStore.load_all() returns it."""
+    a = builder(tmp_path)
+    a["seed"] = 0
+    b = builder(tmp_path)
+    b["seed"] = 1
+    return pd.concat([a, b], ignore_index=True)
+
+
+def test_image_metrics_refuses_a_frame_pooling_two_seeds(tmp_path):
+    """Three seeds pooled is the same image counted three times as independent samples: the
+    number comes out plausible and wrong, with nothing to flag it (protocol §6)."""
+    with pytest.raises(ValueError, match="pools 2 seeds"):
+        image_metrics(_two_seed_frame(_shard, tmp_path))
+
+
+def test_pixel_metrics_refuses_a_frame_pooling_two_seeds(tmp_path):
+    with pytest.raises(ValueError, match="pools 2 seeds"):
+        pixel_metrics(_two_seed_frame(_shard, tmp_path))
+
+
+def test_threshold_metrics_refuses_a_frame_pooling_two_seeds(tmp_path):
+    with pytest.raises(ValueError, match="pools 2 seeds"):
+        threshold_metrics(
+            _two_seed_frame(_threshold_shard, tmp_path), _threshold_artifact(tmp_path), "vial"
+        )
+
+
+def test_aggregate_refuses_a_frame_pooling_two_seeds(tmp_path):
+    with pytest.raises(ValueError, match="pools 2 seeds"):
+        aggregate(_two_seed_frame(_shard, tmp_path))
+
+
+def test_one_seed_is_fine_and_no_seed_column_is_fine(tmp_path):
+    """A real single-seed shard must pass, and so must the bare frames these tests build to
+    exercise the mathematics — every frame the runner writes carries the column, and refusing
+    its absence would only break the fixtures."""
+    one = _shard(tmp_path)
+    one["seed"] = 0
+    assert image_metrics(one)["n"] == len(one)
+    assert image_metrics(_shard(tmp_path))["n"] == 4

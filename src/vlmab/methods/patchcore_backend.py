@@ -44,7 +44,9 @@ class PatchCoreBackend:
         # itself would make that record look true while the two numbers still had nothing to do
         # with each other. None means "unseeded, and the provenance is the caller's problem";
         # an int means the run is reproducible and says so.
-        self._seed = seed
+        # Public: PatchCoreRef reads this to declare, in the shard's provenance, the seed that
+        # was actually applied. A private name would force the adapter to reach through it.
+        self.seed = seed
         self._model = Patchcore(
             backbone=backbone,
             layers=list(layers),
@@ -119,11 +121,11 @@ class PatchCoreBackend:
             val_split_mode=ValSplitMode.NONE,
             test_split_mode=TestSplitMode.NONE,
         )
-        if self._seed is not None:
+        if self.seed is not None:
             # workers=True also seeds the DataLoader worker processes, which matters because
-            # the coreset sampler consumes batches in whatever order they arrive.
+            # the coreset sampler draws inside them.
             from lightning import seed_everything
-            seed_everything(self._seed, workers=True)
+            seed_everything(self.seed, workers=True)
 
         datamodule.setup()
         self._engine.train(model=self._model, datamodule=datamodule)

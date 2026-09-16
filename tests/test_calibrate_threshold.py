@@ -9,10 +9,10 @@ def _validation_run(tmp_path, split="validation", n=6, size=12):
     """A shard of defect-free rows with real maps on disk, laid out as the runner lays them out.
 
     The map directory name matters: `run_id` is not a shard column, so
-    `<dataset>__<method>__<run_id>__<category>` is the only place the run is recorded and the
-    only place the artifact's provenance can come from.
+    `<dataset>__<method>__<run_id>__<category>__<seed_tag>` is the only place the run is
+    recorded and the only place the artifact's provenance can come from.
     """
-    maps = tmp_path / "maps" / "mvtec_ad2__intensity_baseline__cafe1234__vial"
+    maps = tmp_path / "maps" / "mvtec_ad2__intensity_baseline__cafe1234__vial__seed0"
     maps.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(0)
     rows = []
@@ -92,7 +92,7 @@ def test_calibrate_raises_when_the_run_saved_no_maps(tmp_path):
     results = _validation_run(tmp_path)
     import pandas as pd
 
-    shard = results / "mvtec_ad2__intensity_baseline__vial.parquet"
+    shard = ResultStore(results).path_for("mvtec_ad2", "intensity_baseline", "vial", 0)
     pd.read_parquet(shard).drop(columns=["map_path"]).to_parquet(shard, index=False)
     with pytest.raises(ValueError, match="map_path"):
         _run(["--results", str(results), "--dataset", "mvtec_ad2",
@@ -133,7 +133,7 @@ def test_calibrate_runs_end_to_end_on_a_synthetic_mvtec_tree(tmp_path):
     build_category(root, "vial", n_good=3, n_bad=1, size=(12, 10))
     results, maps = tmp_path / "shards", tmp_path / "maps"
     run_evaluation(
-        MVTecAD2(root), NoisyMethod(), ResultStore(results), {"seed": 0},
+        MVTecAD2(root), NoisyMethod(), ResultStore(results), {},
         split="validation", maps_dir=maps, device="cpu",
     )
 
@@ -227,3 +227,20 @@ def test_calibrate_prints_the_commit_reminder_at_the_preregistered_alpha(tmp_pat
     captured = capsys.readouterr()
     assert "commit it" in captured.out
     assert captured.err == ""
+
+
+def test_calibrate_refuses_shards_that_pool_two_seeds(tmp_path):
+    """A threshold is fitted on one run's maps. Pooling two seeds fits it on a distribution no
+    single run produced, which is not the pre-registered procedure (protocol §4)."""
+    import pandas as pd
+
+    results = _validation_run(tmp_path)
+    shard = ResultStore(results).path_for("mvtec_ad2", "intensity_baseline", "vial", 0)
+    other = pd.read_parquet(shard)
+    other["seed"] = 1
+    other.to_parquet(
+        ResultStore(results).path_for("mvtec_ad2", "intensity_baseline", "vial", 1), index=False
+    )
+    with pytest.raises(ValueError, match="pool 2 seeds"):
+        _run(["--results", str(results), "--dataset", "mvtec_ad2",
+              "--method", "intensity_baseline", "--out", str(tmp_path / "a.yaml")])

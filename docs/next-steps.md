@@ -61,13 +61,13 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
       it drives the shipped backend end to end three times — so phase 1 is closed.
    3. **Phase 2** — Vial end to end through the existing runner (notebook cells 21–26). Needs Vial
       fetched into the Colab session first (0.77 GB, `docs/datasets-access.md`); cell 22 leaves
-      that as a placeholder because how it arrives is the executor's call. ⚠️ Cell 24 builds
-      `PatchCoreBackend()` with no seed while `run_meta(..., seed=0)` writes `seed: 0` into the
-      shard — see the seed section below. Phase 2's shard is a plumbing check and must not be
-      reported.
+      that as a placeholder because how it arrives is the executor's call. Cell 24 seeds the backend
+      (`PatchCoreBackend(seed=0)`) and the runner stamps that seed; phase 2's shard is still a
+      plumbing check and must not be reported.
    4. **Phase 3 — the VisA ±1pt gate.** Deliberately not in the notebook: it needs the VisA loader
       and the `PUBLISHED_VISA_IAUROC` table (with its exact source recorded next to it), both listed
-      under *Integration points* below. Writes `results/reproduction/patchcore_visa.md`.
+      under *Integration points* below. Writes `results/reproduction/patchcore_visa.md`. The seed
+      wiring this gate waited on is closed — see the seed section below.
    5. **Phase 4 — freeze provenance.** `configs/methods/patchcore_ref.yaml` still carries the
       `anomalib_version: ">=1.1"` range with "record the resolved version" next to it; the resolved
       version is **2.6.0** (Colab T4, torch 2.11.0+cu128, 2026-08-21). Commit the notebook, confirm
@@ -174,7 +174,7 @@ picks it up; that is why `patchcore_backend.py` is a tracked `.py` and not a `%%
 Changing the notebook's cell structure instead costs a full reload (reinstall anomalib, re-download
 the weights), so prefer changing tracked Python.
 
-## PatchCore is stochastic, and `--seed` is not wired to anything (2026-08-26)
+## PatchCore is stochastic, and the seed is now wired end to end (2026-08-26, closed 2026-09-07)
 
 The probe's own numbers moved between two runs on byte-identical inputs — the same image scored
 202.796432, then 203.890701. PatchCore's greedy coreset sampling is stochastic, and it is the first
@@ -192,14 +192,18 @@ here.
 The default is `None`, deliberately not a silent `0`: see the open item for why a backend that
 quietly seeds itself would make a false record look true.
 
-**Open — a decision, not a task.** `scripts/run_eval.py` accepts `--seed`, passes it to
-`run_meta()`, and writes it into every shard's provenance **without applying it to anything**. For
-`intensity_baseline` that was harmless. For PatchCore a shard would record `seed: 0` over a memory
-bank sampled with no seed at all — provenance that reads true and is not. Wiring it through means
-changing the `AnomalyMethod` interface and touching every adapter, and the right shape depends on
-how the three-seed runs are aggregated (three shard roots? a seed column in the shard?). **Settle
-this before the VisA gate**, because a gate run once, unseeded, under a `seed: 0` record is not the
-pre-registered procedure.
+**Closed 2026-09-07.** A method now declares the seed it applied (`AnomalyMethod.seed`), and
+`run_evaluation` is the only writer of that field — `run_meta` no longer accepts one, so neither
+entry point can record a seed nothing applied. Two further defects were found while fixing it and
+are fixed with it: two seeds resolved to one shard path (so `is_done()` called the second one
+finished and skipped it) and to one anomaly-map directory (`run_id` is `config_hash`, which carries
+no seed, so the second overwrote the first's maps while the first's shard still pointed at them).
+Both now carry a literal `seed<N>` / `unseeded` tag. The metric functions and
+`scripts/calibrate_threshold.py` refuse a frame that pools seeds.
+
+Still not built, deliberately: combining three seeds into mean ± std. That is reporting, it belongs
+with `scripts/make_tables.py` (a `TODO(M5)` stub), and doing it wrong now raises rather than
+publishing. Spec: `docs/superpowers/specs/2026-09-07-seed-provenance-design.md`.
 
 ## The threshold rule — built and pre-registered (2026-08-20)
 
@@ -276,12 +280,12 @@ What that session actually found, in the order it found it:
    `.gitignore` rather than by relaxing the assert.
 3. **`score()` was normalising every image twice**, and had been since the backend was written. See
    the session note above. Nothing downstream would have caught it except the VisA gate.
-4. **PatchCore is stochastic and `--seed` is recorded but never applied.** See the section above.
-   The backend now takes a seed; wiring the runner's is an open decision.
+4. **PatchCore is stochastic and `--seed` was recorded but never applied.** See the section above.
+   Closed 2026-09-07: the backend takes a seed, the method declares it and the runner stamps it.
 
 **The next move is phase 2**: Vial end to end through the runner, in a Colab session, which needs
-Vial fetched into it first. Then the VisA ±1pt gate (phase 3) — but settle the seed wiring before
-that gate runs, or it will not be the pre-registered procedure.
+Vial fetched into it first. Then the VisA ±1pt gate (phase 3); the seed wiring that gate waited on
+is closed (see the seed section above), so nothing but the Colab session stands in front of it.
 
 Fixes reach a live Colab session by being **pushed to `master`** — cell 1.1 hard-resets to
 `origin/master` and prints what it synced. Push before asking for a re-run.

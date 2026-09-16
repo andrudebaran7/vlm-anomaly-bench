@@ -15,13 +15,13 @@ def _rows():
 
 def test_is_done_false_before_write(tmp_path):
     store = ResultStore(tmp_path)
-    assert store.is_done("mvtec_ad2", "winclip", "can") is False
+    assert store.is_done("mvtec_ad2", "winclip", "can", 0) is False
 
 
 def test_write_then_is_done_true(tmp_path):
     store = ResultStore(tmp_path)
     store.write("mvtec_ad2", "winclip", "can", _rows(), {"seed": 0})
-    assert store.is_done("mvtec_ad2", "winclip", "can") is True
+    assert store.is_done("mvtec_ad2", "winclip", "can", 0) is True
 
 
 def test_write_stamps_meta_onto_every_row(tmp_path):
@@ -46,9 +46,9 @@ def test_is_done_ignores_stray_temp_file(tmp_path):
     crash-safety property.
     """
     store = ResultStore(tmp_path)
-    tmp = store.path_for("mvtec_ad2", "winclip", "can").with_suffix(".parquet.tmp")
+    tmp = store.path_for("mvtec_ad2", "winclip", "can", 0).with_suffix(".parquet.tmp")
     tmp.write_bytes(b"half a parquet file")
-    assert store.is_done("mvtec_ad2", "winclip", "can") is False
+    assert store.is_done("mvtec_ad2", "winclip", "can", 0) is False
 
 
 def _crashing_to_parquet(self, path, *args, **kwargs):
@@ -75,9 +75,9 @@ def test_failed_write_leaves_no_final_shard(tmp_path, monkeypatch):
     with pytest.raises(OSError):
         store.write("mvtec_ad2", "winclip", "can", _rows(), {"seed": 0})
 
-    final = store.path_for("mvtec_ad2", "winclip", "can")
+    final = store.path_for("mvtec_ad2", "winclip", "can", 0)
     assert not final.is_file()
-    assert store.is_done("mvtec_ad2", "winclip", "can") is False
+    assert store.is_done("mvtec_ad2", "winclip", "can", 0) is False
 
 
 def test_failed_write_preserves_previous_shard(tmp_path, monkeypatch):
@@ -93,10 +93,10 @@ def test_failed_write_preserves_previous_shard(tmp_path, monkeypatch):
             "winclip",
             "can",
             [{"image_path": "z.png", "label": 1, "image_score": 0.5}],
-            {"seed": 999},
+            {"seed": 0},
         )
 
-    final = store.path_for("mvtec_ad2", "winclip", "can")
+    final = store.path_for("mvtec_ad2", "winclip", "can", 0)
     assert final.is_file()
     reloaded = store.load_all().reset_index(drop=True)
     pd.testing.assert_frame_equal(reloaded, original)
@@ -116,8 +116,8 @@ def test_successful_write_leaves_no_tmp_file_behind(tmp_path):
 def test_is_done_is_scoped_per_method_and_category(tmp_path):
     store = ResultStore(tmp_path)
     store.write("mvtec_ad2", "winclip", "can", _rows(), {"seed": 0})
-    assert store.is_done("mvtec_ad2", "winclip", "fabric") is False
-    assert store.is_done("mvtec_ad2", "saa", "can") is False
+    assert store.is_done("mvtec_ad2", "winclip", "fabric", 0) is False
+    assert store.is_done("mvtec_ad2", "saa", "can", 0) is False
 
 
 def test_load_all_concatenates_every_shard(tmp_path):
@@ -178,3 +178,47 @@ def test_write_rejects_meta_keys_that_shadow_any_column_the_rows_carry(tmp_path)
     rows = [{"image_path": "a.png", "label": 0, "image_score": 0.1, "meta_lighting": "regular"}]
     with pytest.raises(ValueError, match="meta_lighting"):
         store.write("mvtec_ad2", "winclip", "can", rows, {"seed": 0, "meta_lighting": "wrong"})
+
+
+from vlmab.eval.store import seed_tag
+
+
+def test_seed_tag_is_readable_for_both_kinds_of_run():
+    assert seed_tag(0) == "seed0"
+    assert seed_tag(12) == "seed12"
+    assert seed_tag(None) == "unseeded"
+
+
+def test_two_seeds_write_two_shards(tmp_path):
+    store = ResultStore(tmp_path)
+    a = store.write("mvtec_ad2", "patchcore_ref", "vial", _rows(), {"seed": 0})
+    b = store.write("mvtec_ad2", "patchcore_ref", "vial", _rows(), {"seed": 1})
+    assert a != b
+    assert a.name == "mvtec_ad2__patchcore_ref__vial__seed0.parquet"
+    assert b.name == "mvtec_ad2__patchcore_ref__vial__seed1.parquet"
+    assert a.is_file() and b.is_file()
+
+
+def test_a_shard_is_named_for_the_seed_it_records(tmp_path):
+    """write() takes the path's seed from the meta it is about to stamp, so the name and the
+    column cannot disagree — there is no second argument to get out of step."""
+    store = ResultStore(tmp_path)
+    path = store.write("mvtec_ad2", "patchcore_ref", "vial", _rows(), {"seed": 3})
+    assert "seed3" in path.name
+    assert set(pd.read_parquet(path)["seed"]) == {3}
+
+
+def test_a_run_with_no_seed_is_named_unseeded(tmp_path):
+    store = ResultStore(tmp_path)
+    path = store.write("mvtec_ad2", "intensity_baseline", "vial", _rows(), {"seed": None})
+    assert path.name == "mvtec_ad2__intensity_baseline__vial__unseeded.parquet"
+
+
+def test_is_done_is_scoped_per_seed(tmp_path):
+    """The resume trap: without this, a second seed's run finds the first seed's shard, calls
+    the category done, skips it, and leaves a root that reads as two seeds and is one."""
+    store = ResultStore(tmp_path)
+    store.write("mvtec_ad2", "patchcore_ref", "vial", _rows(), {"seed": 0})
+    assert store.is_done("mvtec_ad2", "patchcore_ref", "vial", 0) is True
+    assert store.is_done("mvtec_ad2", "patchcore_ref", "vial", 1) is False
+    assert store.is_done("mvtec_ad2", "patchcore_ref", "vial", None) is False

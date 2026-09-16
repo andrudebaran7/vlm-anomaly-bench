@@ -269,6 +269,11 @@ Three seeds where any stochasticity exists; report mean ± std. No cherry-pickin
 every table reports all categories or states explicitly why one is excluded (e.g., official
 protocol exclusion). Failed runs are reported as failures, not silently dropped.
 
+Each seed is a separate run with its own shard (`…__seed<N>.parquet`) and its own anomaly-map
+directory; the seed recorded in a shard is the seed the method reports having applied, and the
+metric functions refuse a frame that pools seeds. A run that applied no seed records `unseeded`,
+which is not the same as seed 0.
+
 ## 7. What we will NOT do
 
 - No per-dataset prompt tuning after seeing test results.

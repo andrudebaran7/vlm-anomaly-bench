@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Sequence
 
 import numpy as np
+import pandas as pd
 
 from vlmab.eval.store import ResultStore
 from vlmab.threshold.artifact import write_artifact
@@ -39,17 +40,18 @@ CALIBRATION_SPLIT = "validation"
 def _run_id_from_maps(map_paths) -> str:
     """Recover the run from the map directory name.
 
-    The runner names it `<dataset>__<method>__<run_id>__<category>` and does **not** write a
-    `run_id` shard column, so this directory name is the only record of which run produced
+    The runner names it `<dataset>__<method>__<run_id>__<category>__<seed_tag>` (the seed_tag
+    suffix was added so two seeds of one config never share a directory) and does **not** write
+    a `run_id` shard column, so this directory name is the only record of which run produced
     these maps -- and the artifact is worth much less without it.
     """
     ids = set()
     for name in {Path(p).parent.name for p in map_paths}:
         parts = name.split("__")
-        if len(parts) != 4:
+        if len(parts) != 5:
             raise ValueError(
                 f"map directory {name!r} does not match the runner's "
-                "<dataset>__<method>__<run_id>__<category> layout, so the run this "
+                "<dataset>__<method>__<run_id>__<category>__<seed_tag> layout, so the run this "
                 "calibration came from cannot be recorded"
             )
         ids.add(parts[2])
@@ -105,6 +107,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{CALIBRATION_SPLIT!r}, which is defect-free, never on test data (protocol §4). "
             f"Point --results at a run made with --split {CALIBRATION_SPLIT}."
         )
+
+    # A threshold is fitted on the maps one run produced. Two seeds pooled fits it on a mixture
+    # no single run ever produces, and calibration would still succeed and write an artifact
+    # that looks pre-registered. Same refusal the metric functions make.
+    if "seed" in df.columns:
+        seeds = sorted({None if pd.isna(s) else s for s in df["seed"].unique()}, key=str)
+        if len(seeds) > 1:
+            raise ValueError(
+                f"the shards under {args.results} pool {len(seeds)} seeds ({seeds}): a threshold "
+                "is calibrated on one run's maps, so pooling seeds fits it on a distribution no "
+                "single run produced. Calibrate each seed separately (protocol §4)."
+            )
     if "map_path" not in df.columns or df["map_path"].isna().all():
         raise ValueError(
             f"the run under {args.results} saved no anomaly maps (no usable map_path column); "

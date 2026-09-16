@@ -69,3 +69,26 @@ def test_predict_for_a_different_category_than_fitted_is_an_error():
     m.fit(iter([np.zeros((8, 8, 3), dtype=np.uint8)]), "vial")
     with pytest.raises(RuntimeError):
         m.predict(np.zeros((8, 8, 3), dtype=np.uint8), "cable")
+
+
+class _SeededBackend(_FakeBackend):
+    """A backend that applied a seed, like the real PatchCoreBackend(seed=...)."""
+
+    def __init__(self, seed=7):
+        super().__init__()
+        self.seed = seed
+
+
+def test_declares_the_seed_its_backend_applied():
+    assert PatchCoreRef(backend=_SeededBackend(seed=7)).seed == 7
+
+
+def test_a_backend_that_applied_no_seed_declares_none():
+    assert PatchCoreRef(backend=_FakeBackend()).seed is None
+
+
+def test_a_seed_disagreeing_with_the_backend_is_refused():
+    """Two callers each believing they set the seed is the defect this contract removes; it is
+    not resolved by a precedence rule nobody will remember."""
+    with pytest.raises(ValueError, match="disagree"):
+        PatchCoreRef(backend=_SeededBackend(seed=0), seed=1)

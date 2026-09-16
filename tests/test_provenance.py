@@ -89,9 +89,15 @@ def test_gpu_name_always_returns_a_string():
 
 
 def test_run_meta_carries_all_provenance_fields():
-    meta = run_meta({"method": "winclip"}, seed=0)
-    assert set(meta) == {"config_hash", "commit", "seed", "gpu"}
-    assert meta["seed"] == 0
+    meta = run_meta({"method": "winclip"})
+    assert set(meta) == {"config_hash", "commit", "gpu"}
+
+
+def test_run_meta_will_not_take_a_seed():
+    """Provenance has no back door: the seed comes from the method that applied it, stamped by
+    the runner. A caller who can pass one here can make the record disagree with the run."""
+    with pytest.raises(TypeError):
+        run_meta({"method": "winclip"}, seed=0)
 
 
 @pytest.mark.skipif(shutil.which("git") is None, reason="git binary not available")
@@ -115,7 +121,7 @@ def test_run_meta_records_this_repo_head_regardless_of_cwd(monkeypatch, tmp_path
     expected = result.stdout.strip()
 
     monkeypatch.chdir(tmp_path)
-    assert run_meta({"method": "winclip"}, seed=0)["commit"] == expected
+    assert run_meta({"method": "winclip"})["commit"] == expected
 
 
 def test_package_commit_is_unknown_when_root_has_no_git(monkeypatch, tmp_path):
@@ -144,12 +150,12 @@ def test_package_commit_is_unknown_when_root_has_no_git(monkeypatch, tmp_path):
 
     monkeypatch.setattr(provenance, "PACKAGE_REPO_ROOT", nested)
     assert provenance.package_commit() == "unknown"
-    assert provenance.run_meta({"a": 1}, seed=0)["commit"] == "unknown"
+    assert provenance.run_meta({"a": 1})["commit"] == "unknown"
 
 
 def test_run_meta_reads_this_repo_even_when_cwd_is_elsewhere(monkeypatch, tmp_path):
     """On Colab the notebook cwd is /content, not the clone."""
     monkeypatch.chdir(tmp_path)
-    commit = run_meta({"a": 1}, seed=0)["commit"]
+    commit = run_meta({"a": 1})["commit"]
     assert commit == "unknown" or re.fullmatch(r"[0-9a-f]{40}", commit)
     assert commit == git_commit(Path(__file__).resolve().parents[1])

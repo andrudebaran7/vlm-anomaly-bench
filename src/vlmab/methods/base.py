@@ -27,6 +27,13 @@ class AnomalyMethod:
 
     name: str = "base"
     zero_shot: bool = True
+    #: The seed this method applied to its own stochasticity, or None if it applied none.
+    #
+    # NOT "the seed the caller asked for". `run_evaluation` stamps this value into every shard's
+    # provenance, so a method that declares a seed it did not apply produces a record that reads
+    # true and is not — which is worse than no record. A deterministic method declares None and
+    # refuses a seed; a method whose stochasticity lives in a backend declares the backend's.
+    seed: int | None = None
 
     def prepare(self, device: str = "cuda") -> None:
         """Load weights/checkpoints. Called once."""
@@ -40,3 +47,38 @@ class AnomalyMethod:
 
     def predict(self, image: np.ndarray, category: str) -> Prediction:
         raise NotImplementedError
+
+
+class BackendSeeded(AnomalyMethod):
+    """An adapter whose stochasticity lives in an injected backend.
+
+    The backend is what calls into the library that samples, so the backend is what applies the
+    seed and therefore what declares it. The adapter only passes the declaration on.
+
+    Call `_init_seed(backend, seed)` from the adapter's `__init__`.
+    """
+
+    _declared_seed: int | None = None
+
+    def _init_seed(self, backend, seed: int | None) -> None:
+        if backend is None:
+            # Nothing has been constructed that could apply anything, and prepare() will raise
+            # MethodNotRunnable before this method scores a sample. Keep what the caller asked
+            # for so a backend built from it later has something to be checked against.
+            self._declared_seed = seed
+            return
+        # getattr, not attribute access: the adapter tests inject fake backends written before
+        # seeds existed, and those declare None rather than exploding.
+        backend_seed = getattr(backend, "seed", None)
+        if seed is not None and seed != backend_seed:
+            raise ValueError(
+                f"{type(self).__name__} was given seed={seed!r} but its backend applies "
+                f"seed={backend_seed!r}; the two disagree and this adapter cannot make the "
+                "backend use the other one. Seed the backend at construction and leave this "
+                "argument out."
+            )
+        self._declared_seed = backend_seed
+
+    @property
+    def seed(self) -> int | None:
+        return self._declared_seed

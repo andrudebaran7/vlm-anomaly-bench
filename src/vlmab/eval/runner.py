@@ -32,7 +32,7 @@ import numpy as np
 
 from vlmab.datasets.base import AnomalyDataset
 from vlmab.eval.provenance import config_hash
-from vlmab.eval.store import ResultStore
+from vlmab.eval.store import ResultStore, seed_tag
 from vlmab.methods.base import AnomalyMethod
 
 _UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
@@ -53,6 +53,11 @@ def run_id(meta: Mapping[str, Any]) -> str:
     anything recorded about them get different directories, and two runs that are
     identical in every recorded respect are genuinely interchangeable. What we must
     not do is fall back to a constant, which would reintroduce the collision.
+
+    The seed is NOT folded into this hash. It is appended to the directory name as a readable
+    `seed<N>` / `unseeded` tag instead, because `config_hash` describes a configuration and the
+    seed describes one execution of it — and because a directory whose name changed for a
+    visible reason can be audited, while one whose hash moved cannot.
     """
     existing = meta.get("config_hash")
     return str(existing) if existing else config_hash(meta)
@@ -108,8 +113,20 @@ def run_evaluation(
     device: str = "cuda",
 ) -> list[Path]:
     """Evaluate `method` on `dataset`, writing one shard per category. Returns new shards."""
+    # The seed is stamped from the method, which is the only object that knows what was applied.
+    # A caller reaching this with a seed of its own is the original defect walking back in:
+    # store.write()'s shadowing guard does not catch it, because `seed` is a meta key rather
+    # than a row column.
+    if "seed" in meta:
+        raise ValueError(
+            f"meta carries seed={meta['seed']!r}, but the seed is stamped from method.seed "
+            f"({method.name} declares {method.seed!r}) — the only value that was actually "
+            "applied. Remove it from meta."
+        )
+    meta = {**meta, "seed": method.seed}
+
     wanted = list(categories) if categories is not None else dataset.categories()
-    todo = [c for c in wanted if not store.is_done(dataset.name, method.name, c)]
+    todo = [c for c in wanted if not store.is_done(dataset.name, method.name, c, method.seed)]
     if not todo:
         return []
 
@@ -133,6 +150,7 @@ def run_evaluation(
             category_maps = (
                 Path(maps_dir)
                 / f"{dataset.name}__{method.name}__{run_id(meta)}__{category}"
+                  f"__{seed_tag(method.seed)}"
             )
         # Created lazily on first write: a category that yields no samples must not
         # touch the filesystem before store.write() rejects it as empty.
