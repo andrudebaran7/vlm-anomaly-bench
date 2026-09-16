@@ -232,3 +232,22 @@ def test_the_tolerance_boundary_is_inclusive(tmp_path):
     out = tmp_path / "r.md"
     assert main(["--results", str(results), "--targets", str(TARGETS), "--out", str(out)]) == 0
     assert "-1.00, tolerance ±1.0" in out.read_text()
+
+
+def test_a_refusal_exits_2_not_1_so_it_is_not_read_as_a_failed_gate(tmp_path):
+    """0 PASS, 1 FAIL, 2 refused. A run that could not be scored is not a method that missed
+    its target, and a caller that treats them alike would record a FAIL that never happened."""
+    import subprocess
+
+    results = tmp_path / "shards"
+    _run(ResultStore(results), _all_at(1.0), method="winclip")     # method mismatch
+    script = Path(__file__).resolve().parents[1] / "scripts" / "reproduction_gate.py"
+    proc = subprocess.run(
+        [sys.executable, str(script), "--results", str(results),
+         "--targets", str(TARGETS), "--out", str(tmp_path / "r.md")],
+        capture_output=True, text=True,
+    )
+    assert proc.returncode == 2
+    assert "refusing to score this run" in proc.stderr
+    assert "winclip" in proc.stderr
+    assert "Traceback" not in proc.stderr

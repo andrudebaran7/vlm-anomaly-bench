@@ -15,9 +15,10 @@ be recomputed from the shards without a GPU.
         --targets configs/reproduction/patchcore_ref.yaml \\
         --out results/reproduction/patchcore_mvtec_ad.md
 
-Exit code is 0 on PASS and 1 on FAIL, so a notebook cell or a CI job cannot print a failing
-verdict and carry on. A FAIL is a legitimate outcome, not a crash: the report is still written.
-`--which secondary` scores the secondary target instead, and always exits 0 — protocol §2
+Exit codes: **0 PASS, 1 FAIL, 2 refused** — so a notebook cell or a CI job cannot print a
+failing verdict and carry on, and a run that could not be scored at all is never mistaken for a
+method that missed its target. A FAIL is a legitimate outcome, not a crash: the report is still
+written. `--which secondary` scores the secondary target instead and never exits 1 — protocol §2
 v0.2.12 fixes that it is reported with its caveat and cannot fail the method.
 """
 import argparse
@@ -219,4 +220,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # Exit codes: 0 PASS, 1 FAIL, 2 refused. A refusal is neither a verdict nor a crash -- the
+    # run could not be scored at all -- so it must not be confused with FAIL, and in a notebook
+    # a bare traceback buries the one line that says why.
+    try:
+        sys.exit(main())
+    except (ValueError, FileNotFoundError, KeyError) as exc:
+        print(f"refusing to score this run:\n\n  {exc}", file=sys.stderr)
+        sys.exit(2)
