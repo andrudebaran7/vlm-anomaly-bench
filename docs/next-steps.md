@@ -59,9 +59,10 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    2. ~~**Phase 1.2 smoke test.**~~ **Green 2026-08-26** on the corrected path: normal 16.11 <
       anomalous 69.24, map (256, 256). Probe stage 12 covers the same ground with more of it —
       it drives the shipped backend end to end three times — so phase 1 is closed.
-   3. **Phase 2** — Vial end to end through the existing runner (notebook cells 21–26). Needs Vial
-      fetched into the Colab session first (0.77 GB, `docs/datasets-access.md`); cell 22 leaves
-      that as a placeholder because how it arrives is the executor's call. Cell 24 seeds the backend
+   3. **Phase 2** — Vial end to end through the existing runner (notebook cells 21–26). Cell 22
+      now fetches the category from Drive (`MyDrive/mvtec_ad2/<category>.tar.gz`, uploaded once
+      per category — `docs/datasets-access.md`); the placeholder is gone, but **the upload itself
+      is still a manual prerequisite** and Vial is 0.77 GB. Cell 24 seeds the backend
       (`PatchCoreBackend(seed=0)`) and the runner stamps that seed; phase 2's shard is still a
       plumbing check and must not be reported.
    4. **Phase 3 — the VisA ±1pt gate.** Deliberately not in the notebook: it needs the VisA loader
@@ -255,6 +256,8 @@ stubs awaiting M3. Two things there that this repo's work must stay consistent w
   and the remaining fields to fill on first login are in `docs/datasets-access.md`.
 - **Dataset downloads for the grid:** only Vial (0.77 GB) is on disk. The rest of MVTec AD 2 is
   fetched per category on Colab when M3 runs (largest: Fabric, 10 GB); never into `/tmp` (tmpfs).
+  The route is Drive, one category at a time, uploaded once each — notebook cell 22 and
+  `docs/datasets-access.md`.
 
 ## Integration points every Colab playbook leaves to the executor
 
