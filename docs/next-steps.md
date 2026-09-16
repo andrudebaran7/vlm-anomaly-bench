@@ -214,6 +214,27 @@ published one, a dataset or method mismatch, and pooled seeds; exit codes are **
 per-category targets exist for. Provenance:
 `../vlm-anomaly-paper/docs/verified-literature-facts.md`, fourth pass.
 
+## The CenterCrop risk is now measured, not hypothesised (2026-09-16)
+
+The phase-3 run prints its coreset size per category, and those numbers settle the open
+pre-processing question without a separate experiment.
+
+Every category yields **exactly 102.4 coreset points per training image** — the implied train
+counts come out as clean integers matching MVTec AD's published ones (bottle 209, cable 224,
+capsule 219, carpet 280, grid 264, hazelnut 391, leather 245, metal_nut 220, pill 267, screw 320,
+tile 230, toothbrush 60). Two things follow:
+
+1. `coreset_sampling_ratio: 0.1` is genuinely applied, uniformly, across every category — not
+   merely passed to a constructor that ignored it.
+2. `102.4 / 0.1 = 1024` patches per image, i.e. a **32x32 feature grid**, which is what a
+   **256x256 input** produces. Classic PatchCore's `Resize(256) -> CenterCrop(224)` would give
+   28x28 = **784**.
+
+So the adapter runs **31% more patches per image than classic PatchCore, over the full frame
+rather than the centre crop**. This is the anomalib 2.6.0 pre-processor (`Resize([256,256]) +
+Normalize`, no CenterCrop) recorded in the 2026-08-21 session note, now quantified. If the gate
+misses, this is the measured difference to attribute it to; if it passes, it passes despite it.
+
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 
 Vial end to end through `run_evaluation` on a Colab T4, anomalib 2.6.0 under **Python 3.13**
