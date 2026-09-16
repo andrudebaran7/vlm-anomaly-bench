@@ -65,13 +65,11 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
       is still a manual prerequisite** and Vial is 0.77 GB. Cell 24 seeds the backend
       (`PatchCoreBackend(seed=0)`) and the runner stamps that seed; phase 2's shard is still a
       plumbing check and must not be reported.
-   4. **Phase 3 — the reproduction gate. Built and in the notebook (2026-09-16), cells 3.1–3.4.**
-      The gate is **MVTec AD classic at 99.0 ± 1.0 I-AUROC**, not VisA — protocol §2 v0.2.12; see
-      the section below for why. Everything CPU is done: both loaders, the committed targets, and
-      `scripts/reproduction_gate.py`, which scores a finished run without a GPU. What remains is
-      one Colab session: upload the 15 `.tar.xz` to `MyDrive/mvtec_ad/`, run cells 3.1–3.3, then
-      3.4 for the VisA secondary check. Writes `results/reproduction/patchcore_mvtec_ad.md` and
-      `patchcore_visa.md`.
+   4. **Phase 3 — RAN 2026-09-16 and the gate FAILED by 0.057. Open, see its section below.**
+      Cells 3.1–3.4 in the notebook.
+      The gate is **MVTec AD classic at 99.0 ± 1.0 I-AUROC**, not VisA — protocol §2 v0.2.12.
+      Result committed at `results/reproduction/patchcore_mvtec_ad.md`. The VisA secondary check
+      (cell 3.4) was **not run** — the session ended first.
    5. **Phase 4 — freeze provenance.** `configs/methods/patchcore_ref.yaml` still carries the
       `anomalib_version: ">=1.1"` range with "record the resolved version" next to it; the resolved
       version is **2.6.0** (Colab T4, torch 2.11.0+cu128, 2026-08-21). Commit the notebook, confirm
@@ -213,6 +211,53 @@ published one, a dataset or method mismatch, and pooled seeds; exit codes are **
 2 refused**. It flags categories outside tolerance even when the mean passes — the case the
 per-category targets exist for. Provenance:
 `../vlm-anomaly-paper/docs/verified-literature-facts.md`, fourth pass.
+
+## The gate FAILED by 0.057, and the decision is deferred (2026-09-16)
+
+**Measured mean I-AUROC 97.94 against a published 99.0 — delta -1.057 against a ±1.0 tolerance.**
+Full table: `results/reproduction/patchcore_mvtec_ad.md` (committed; a FAIL that lives only in a
+closed session's scrollback is the same as no gate at all). Seed 0, Tesla T4, anomalib 2.6.0,
+commit 647ca0b.
+
+**One category decides the verdict.** `toothbrush` came in at 90.83 against a published 99.7, and
+its -8.87 contributes **-0.591 of the -1.057** shortfall. Had toothbrush alone matched its
+published figure the mean would be 98.53 — a comfortable PASS. The next four contributors are far
+smaller: pill -0.141, cable -0.133, carpet -0.074, zipper -0.065. Ten of the fifteen categories
+are inside ±1.0 and three are exact.
+
+`toothbrush` is also the extreme of the set: **60 training images**, against 209 for the next
+smallest, and a 42-image test split where one image moves I-AUROC by about 0.3 points.
+
+### Two candidate causes, both pre-registered BEFORE this run
+
+Neither is a post-hoc excuse, and the distinction matters — protocol §7 forbids tuning after
+seeing results, so what may be changed is only what was already written down as suspect.
+
+1. **Only one seed was run, and §6 requires three.** PatchCore is stochastic; that was measured
+   on 2026-08-26, and the whole seed-provenance apparatus was built for it. A miss of 0.057 with
+   the seed spread unmeasured is not yet a verdict — it is a result awaiting two more runs.
+   **This is owed regardless of what else is decided**: no reported number may come from one seed.
+2. **The CenterCrop deviation**, recorded 2026-08-21 as "suspect number one if the ±1pt gate
+   misses" and quantified today (see the section below): the adapter runs a 32x32 patch grid from
+   a 256x256 input where classic PatchCore's `Resize(256) -> CenterCrop(224)` gives 28x28.
+
+### What is owed next, and one gap in the tooling
+
+**The decision is the author's and is deliberately open**: accept the FAIL and flag PatchCore as
+not-reproduced in every table (protocol §2), or investigate. The cheapest investigation by a wide
+margin is a **~3 minute probe on `toothbrush` alone** with the classic pre-processor, since that
+one category flips the verdict and its 60 training images make it the fastest to fit.
+
+Whatever is chosen, **both runs get recorded, not just a passing one.**
+
+**Tooling gap found by this run:** `scripts/reproduction_gate.py` scores a single seed and refuses
+a root that pools seeds — correctly — but there is therefore no way to score the three-seed run
+§6 requires. It needs seed selection, and a mode that reports mean ± std across seeds. That is CPU
+work, not yet done.
+
+**Session state:** the Colab session was closed after 3.3. The shards were copied to
+`MyDrive/reproduction/` so the gate can be re-scored, and a single category re-run, without
+repeating the whole 40-minute fit.
 
 ## The CenterCrop risk is now measured, not hypothesised (2026-09-16)
 
