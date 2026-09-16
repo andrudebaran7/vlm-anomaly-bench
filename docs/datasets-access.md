@@ -190,8 +190,73 @@ reintroduce exactly the saturation this study exists to escape.
   (bucket `amazon-visual-anomaly`, region `us-west-2`; published 2022-09-22).
 - Content: 10,821 images (9,621 normal, 1,200 anomalous), 12 classes across 3 domains.
 
+### Verified directory layout (read from `VisA_20220922.tar`, 2026-09-16)
+
+Downloaded over plain HTTPS — no AWS CLI and no account needed, the `s3 cp` line above is one
+route of two:
+
+    https://amazon-visual-anomaly.s3.us-west-2.amazonaws.com/VisA_20220922.tar
+
+Size on download: **1,929,840,640 bytes**, byte-exact with the HTTP HEAD recorded 2026-07-23.
+
+    <root>/split_csv/1cls.csv        the one-class protocol  <- the authority
+    <root>/split_csv/2cls_highshot.csv, 2cls_fewshot.csv     the two-class protocols
+    <root>/<object>/Data/Images/Normal/0000.JPG
+    <root>/<object>/Data/Images/Anomaly/000.JPG
+    <root>/<object>/Data/Masks/Anomaly/000.png
+    <root>/<object>/image_anno.csv   per-object annotations, not needed by the loader
+    <root>/LICENSE-DATASET
+
+- `1cls.csv` columns: `object,split,label,image,mask`. `split` is `train` or `test`; `label` is
+  `normal` or `anomaly`; `image` and `mask` are paths relative to the root. **The mask field is
+  empty on every normal row** and a real path on every anomalous one.
+- Images are uppercase `.JPG`, masks lowercase `.png`.
+- **Counts read from the CSV: 8,659 train normal; 962 test normal; 1,200 test anomalous;
+  12 objects.** Total 10,821 and 9,621 normal, which reproduces the paper's stated figures, and
+  8,659/9,621 = 90.0%, which reproduces its one-class protocol ("assigning 90% normal images to
+  train set while 10% normal images and all anomalous samples are grouped as test set").
+- Objects: candle, capsules, cashew, chewinggum, fryum, macaroni1, macaroni2, pcb1, pcb2, pcb3,
+  pcb4, pipe_fryum.
+- Sample resolution (candle): 1168x1284 RGB. Not uniform across objects — record per object if
+  one ever matters.
+- **The splits exist only in that CSV.** The directory tree cannot reconstruct the 90/10 normal
+  split, so `split_csv/1cls.csv` is not optional and the loader raises naming it when absent.
+- There is **no validation split.** Threshold calibration needs one and runs on MVTec AD 2.
+- Loader: `src/vlmab/datasets/visa.py`. `tests/test_visa.py` carries two opt-in tests that run
+  only where the archive is on disk and assert the counts above.
+
+
 **MVTec AD (classic)** — >5,000 images, 15 object and texture categories, from the MVTec
-research page (form + license). Download size not published; record it here on download.
+research page (form + license). **This is PatchCore's pass/fail gate** (protocol §2 v0.2.12):
+its own paper reports 99.0 image-AUROC for PatchCore-10%, the coreset ratio this repo runs.
+
+### Verified directory layout (read from `bottle.tar.xz`, 2026-09-16)
+
+Downloaded **per category**, like MVTec AD 2, and the archives are **`.tar.xz`** here rather
+than `.tar.gz` — `tar -xf` detects either, but a hard-coded `-z` will fail.
+
+    <root>/<category>/train/good/000.png
+    <root>/<category>/test/good/000.png
+    <root>/<category>/test/<defect_type>/000.png
+    <root>/<category>/ground_truth/<defect_type>/000_mask.png
+    <root>/<category>/license.txt, readme.txt
+
+- The top level of each archive is `<category>/`, so `tar -xf <tar> -C <root>` needs no path
+  surgery — same as MVTec AD 2 and VisA.
+- `test/` holds `good` plus **one directory per defect type**; `ground_truth/` mirrors those
+  defect directories and has **no `good`**, because normal test images have no mask.
+- **File stems restart at 000 inside every defect directory**, so a mask is located by
+  `ground_truth/<defect>/<stem>_mask.png` — never by the stem alone.
+- **There is no `validation` split.** Threshold calibration needs one and runs on MVTec AD 2;
+  `scripts/calibrate_threshold.py` refuses any split but `validation`, so it cannot be pointed
+  here by accident.
+- Counts verified for **bottle**: 209 train, 83 test (20 good + 63 anomalous over broken_large
+  20, broken_small 22, contamination 21), 63 masks, images 900x900 RGB. These are MVTec AD's
+  published figures.
+- Per-category download sizes seen so far (`.tar.xz`): bottle 0.16 GB, cable 0.50 GB,
+  capsule 0.40 GB, carpet 0.74 GB. Record the rest as they are downloaded; total not yet known.
+- Loader: `src/vlmab/datasets/mvtec_ad.py`. `tests/test_mvtec_ad.py` carries one opt-in test
+  that runs only where `bottle` is on disk.
 
 ## Other freely-accessible AD benchmarks — candidates, not committed
 

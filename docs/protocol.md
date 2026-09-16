@@ -37,6 +37,31 @@ overlap table required in the paper).
   numbers (tolerance ±1.0 I-AUROC). If we can't reproduce a method's published VisA/MVTec numbers,
   its frontier results are flagged as such in every table.
 
+  **Which of the two is the pass/fail gate is fixed per method, and fixed by one rule: the
+  reproduction target must come from the method's own paper, at the configuration this repo
+  runs.** Where both datasets satisfy that, both are gates. Where only one does, the other is
+  still run and reported, with its discrepancy recorded, but it cannot fail the method. The
+  reason is that a gate is only evidence when a miss means "our implementation is wrong"; a
+  number taken from a third-party paper that does not state its own configuration cannot
+  distinguish that from "their setup differed", and a criterion that cannot distinguish them is
+  not a criterion.
+
+  - **PatchCore → MVTec AD (classic) is the gate; VisA is a secondary check.** PatchCore's paper
+    (arXiv:2106.08265, v2 May 2022) predates the VisA dataset (arXiv:2207.14315, July 2022) and
+    therefore reports no VisA number. Its MVTec AD image-AUROC is **99.0 for PatchCore-10%**,
+    where the suffix is the coreset subsampling ratio and 10% is exactly this repo's
+    `coreset_sampling_ratio: 0.1`. **Gate: 99.0 ± 1.0 I-AUROC, mean over the 15 categories.**
+    The only primary source for PatchCore on VisA is the VisA dataset paper's Table 6 (image
+    AU-ROC 92.4, 1-class, averaged over 12 objects, no per-object breakdown); it does not state
+    the resolution, crop or coreset ratio it used, and its MVTec-AD control in the same row is
+    99.8, above every single-model number in PatchCore's own paper and above its 99.6 ensemble.
+    VisA is run and reported with that caveat attached.
+  - Every other method's gate is settled the same way when its own paper is read, and recorded
+    here before its Colab run.
+
+  Provenance for all of the above: `../vlm-anomaly-paper/docs/verified-literature-facts.md`,
+  fourth pass, both PDFs read directly.
+
 ## 3. Methods & implementations
 
 Priority order: (1) official code, pinned commit; (2) anomalib implementation, pinned version;
@@ -386,3 +411,14 @@ which is not the same as seed 0.
   `seg_f1_at` only for the global-threshold rules — `per_image_robust_z` searches a non-nested
   per-image space and is not bounded by the oracle. No existing metric changed.
   Rationale: docs/superpowers/specs/2026-08-20-threshold-rule-design.md
+- 2026-09-16 — v0.2.12. §2 now fixes, per method, which reproduction dataset is the pass/fail
+  gate and which is a reported secondary check, under one rule: the target must come from the
+  method's own paper at the configuration this repo runs. Forced by reading both primary sources
+  for PatchCore: its own paper predates VisA by two months and reports no VisA number, so the
+  playbook's "from each method's own paper" was unsatisfiable there. PatchCore's gate becomes
+  MVTec AD classic at **99.0 ± 1.0 I-AUROC** (PatchCore-10%, matching this repo's coreset ratio);
+  its VisA number (92.4, VisA paper Table 6) is run and reported with the caveat that the source
+  states none of its PatchCore hyperparameters and its MVTec-AD control sits 0.7-0.8 points above
+  PatchCore's own published figures. No metric definition changed and no existing number is
+  affected; what changed is which miss is allowed to fail a method.
+  Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (fourth pass)

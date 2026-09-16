@@ -3,13 +3,17 @@
 
     python scripts/run_eval.py --method intensity_baseline --root data/mvtec_ad2 \
         --split test_public --results results/shards
+
+    # a reproduction run against MVTec AD classic (protocol §2), whose split is "test"
+    python scripts/run_eval.py --method patchcore_ref --dataset mvtec_ad \
+        --root data/mvtec_ad --split test --results runs/repro --seed 0
 """
 import argparse
 import sys
 from pathlib import Path
 from typing import Sequence
 
-from vlmab.datasets.mvtec_ad2 import MVTecAD2
+from vlmab.datasets.registry import available as available_datasets, build_dataset
 from vlmab.eval.provenance import run_meta
 from vlmab.eval.runner import run_evaluation
 from vlmab.eval.store import ResultStore
@@ -21,6 +25,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--method", required=True)
     parser.add_argument("--root", required=True, type=Path)
+    parser.add_argument(
+        "--dataset", default="mvtec_ad2",
+        help="which loader reads --root; the name is stamped into every shard and is what\n"
+             "the reproduction gate matches its targets against",
+    )
     parser.add_argument("--results", required=True, type=Path)
     parser.add_argument("--split", default="test_public")
     parser.add_argument("--category", default=None)
@@ -45,7 +54,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"{args.method}: {exc}")
         return 1
 
-    dataset = MVTecAD2(args.root)
+    try:
+        dataset = build_dataset(args.dataset, args.root)
+    except KeyError as exc:
+        print(exc.args[0])
+        print(f"available datasets: {available_datasets()}")
+        return 1
     # Resolved before ResultStore exists: ResultStore.__init__ creates --results on disk, and
     # if --results is nested inside --root (as it legitimately can be, e.g. in a tmp-dir test),
     # dataset.categories() called any later would pick up that now-existing, category-less
