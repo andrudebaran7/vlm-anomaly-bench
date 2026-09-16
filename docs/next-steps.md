@@ -186,7 +186,10 @@ at phase 4).
   at n=20 each, which is the whole of Vial's `test_public`.
 - **The seed reached the sampler and the record:** Lightning printed `Seed set to 0` and the cell
   printed `declared seed: 0` — the first end-to-end exercise of the seed-provenance work on a real
-  GPU method.
+  GPU method. Both paths carry the tag, checked by eye on the live session:
+  `mvtec_ad2__patchcore_ref__vial__seed0.parquet` and a map directory
+  `mvtec_ad2__patchcore_ref__12f01db684db__vial__seed0`, so a second seed can neither be mistaken
+  for done nor overwrite the first's maps.
 - **The float16 overflow guard did not fire**, so PatchCore's raw scores stay under 65504 on Vial
   and no §4 map-scale amendment is needed.
 - **Measured cost, for M3 budgeting:** greedy coreset selection over Vial's 291 train images took
