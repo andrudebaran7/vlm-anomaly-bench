@@ -57,3 +57,9 @@ secondary:
     number in PatchCore's own paper (99.0-99.1) and above its 99.6 ensemble. A miss here does
     not distinguish a wrong implementation from a different setup, which is why it does not gate.
   averaged_over: 12 objects, 1-class protocol, no per-object breakdown published
+
+# How many categories the published mean covers. The gate refuses a run that does not have all
+# of them: a mean over a subset is not the number the paper printed, and comparing the two
+# would pass or fail on which categories happened to finish.
+gate_n_categories: 15
+secondary_n_categories: 12
