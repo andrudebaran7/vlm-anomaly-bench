@@ -190,6 +190,42 @@ reintroduce exactly the saturation this study exists to escape.
   (bucket `amazon-visual-anomaly`, region `us-west-2`; published 2022-09-22).
 - Content: 10,821 images (9,621 normal, 1,200 anomalous), 12 classes across 3 domains.
 
+### Verified directory layout (read from `VisA_20220922.tar`, 2026-09-16)
+
+Downloaded over plain HTTPS — no AWS CLI and no account needed, the `s3 cp` line above is one
+route of two:
+
+    https://amazon-visual-anomaly.s3.us-west-2.amazonaws.com/VisA_20220922.tar
+
+Size on download: **1,929,840,640 bytes**, byte-exact with the HTTP HEAD recorded 2026-07-23.
+
+    <root>/split_csv/1cls.csv        the one-class protocol  <- the authority
+    <root>/split_csv/2cls_highshot.csv, 2cls_fewshot.csv     the two-class protocols
+    <root>/<object>/Data/Images/Normal/0000.JPG
+    <root>/<object>/Data/Images/Anomaly/000.JPG
+    <root>/<object>/Data/Masks/Anomaly/000.png
+    <root>/<object>/image_anno.csv   per-object annotations, not needed by the loader
+    <root>/LICENSE-DATASET
+
+- `1cls.csv` columns: `object,split,label,image,mask`. `split` is `train` or `test`; `label` is
+  `normal` or `anomaly`; `image` and `mask` are paths relative to the root. **The mask field is
+  empty on every normal row** and a real path on every anomalous one.
+- Images are uppercase `.JPG`, masks lowercase `.png`.
+- **Counts read from the CSV: 8,659 train normal; 962 test normal; 1,200 test anomalous;
+  12 objects.** Total 10,821 and 9,621 normal, which reproduces the paper's stated figures, and
+  8,659/9,621 = 90.0%, which reproduces its one-class protocol ("assigning 90% normal images to
+  train set while 10% normal images and all anomalous samples are grouped as test set").
+- Objects: candle, capsules, cashew, chewinggum, fryum, macaroni1, macaroni2, pcb1, pcb2, pcb3,
+  pcb4, pipe_fryum.
+- Sample resolution (candle): 1168x1284 RGB. Not uniform across objects — record per object if
+  one ever matters.
+- **The splits exist only in that CSV.** The directory tree cannot reconstruct the 90/10 normal
+  split, so `split_csv/1cls.csv` is not optional and the loader raises naming it when absent.
+- There is **no validation split.** Threshold calibration needs one and runs on MVTec AD 2.
+- Loader: `src/vlmab/datasets/visa.py`. `tests/test_visa.py` carries two opt-in tests that run
+  only where the archive is on disk and assert the counts above.
+
+
 **MVTec AD (classic)** — >5,000 images, 15 object and texture categories, from the MVTec
 research page (form + license). Download size not published; record it here on download.
 
