@@ -227,7 +227,36 @@ Size on download: **1,929,840,640 bytes**, byte-exact with the HTTP HEAD recorde
 
 
 **MVTec AD (classic)** — >5,000 images, 15 object and texture categories, from the MVTec
-research page (form + license). Download size not published; record it here on download.
+research page (form + license). **This is PatchCore's pass/fail gate** (protocol §2 v0.2.12):
+its own paper reports 99.0 image-AUROC for PatchCore-10%, the coreset ratio this repo runs.
+
+### Verified directory layout (read from `bottle.tar.xz`, 2026-09-16)
+
+Downloaded **per category**, like MVTec AD 2, and the archives are **`.tar.xz`** here rather
+than `.tar.gz` — `tar -xf` detects either, but a hard-coded `-z` will fail.
+
+    <root>/<category>/train/good/000.png
+    <root>/<category>/test/good/000.png
+    <root>/<category>/test/<defect_type>/000.png
+    <root>/<category>/ground_truth/<defect_type>/000_mask.png
+    <root>/<category>/license.txt, readme.txt
+
+- The top level of each archive is `<category>/`, so `tar -xf <tar> -C <root>` needs no path
+  surgery — same as MVTec AD 2 and VisA.
+- `test/` holds `good` plus **one directory per defect type**; `ground_truth/` mirrors those
+  defect directories and has **no `good`**, because normal test images have no mask.
+- **File stems restart at 000 inside every defect directory**, so a mask is located by
+  `ground_truth/<defect>/<stem>_mask.png` — never by the stem alone.
+- **There is no `validation` split.** Threshold calibration needs one and runs on MVTec AD 2;
+  `scripts/calibrate_threshold.py` refuses any split but `validation`, so it cannot be pointed
+  here by accident.
+- Counts verified for **bottle**: 209 train, 83 test (20 good + 63 anomalous over broken_large
+  20, broken_small 22, contamination 21), 63 masks, images 900x900 RGB. These are MVTec AD's
+  published figures.
+- Per-category download sizes seen so far (`.tar.xz`): bottle 0.16 GB, cable 0.50 GB,
+  capsule 0.40 GB, carpet 0.74 GB. Record the rest as they are downloaded; total not yet known.
+- Loader: `src/vlmab/datasets/mvtec_ad.py`. `tests/test_mvtec_ad.py` carries one opt-in test
+  that runs only where `bottle` is on disk.
 
 ## Other freely-accessible AD benchmarks — candidates, not committed
 
