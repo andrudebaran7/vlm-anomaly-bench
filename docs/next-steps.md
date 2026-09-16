@@ -65,10 +65,13 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
       is still a manual prerequisite** and Vial is 0.77 GB. Cell 24 seeds the backend
       (`PatchCoreBackend(seed=0)`) and the runner stamps that seed; phase 2's shard is still a
       plumbing check and must not be reported.
-   4. **Phase 3 — the VisA ±1pt gate.** Deliberately not in the notebook: it needs the VisA loader
-      and the `PUBLISHED_VISA_IAUROC` table (with its exact source recorded next to it), both listed
-      under *Integration points* below. Writes `results/reproduction/patchcore_visa.md`. The seed
-      wiring this gate waited on is closed — see the seed section below.
+   4. **Phase 3 — the reproduction gate. Built and in the notebook (2026-09-16), cells 3.1–3.4.**
+      The gate is **MVTec AD classic at 99.0 ± 1.0 I-AUROC**, not VisA — protocol §2 v0.2.12; see
+      the section below for why. Everything CPU is done: both loaders, the committed targets, and
+      `scripts/reproduction_gate.py`, which scores a finished run without a GPU. What remains is
+      one Colab session: upload the 15 `.tar.xz` to `MyDrive/mvtec_ad/`, run cells 3.1–3.3, then
+      3.4 for the VisA secondary check. Writes `results/reproduction/patchcore_mvtec_ad.md` and
+      `patchcore_visa.md`.
    5. **Phase 4 — freeze provenance.** `configs/methods/patchcore_ref.yaml` still carries the
       `anomalib_version: ">=1.1"` range with "record the resolved version" next to it; the resolved
       version is **2.6.0** (Colab T4, torch 2.11.0+cu128, 2026-08-21). Commit the notebook, confirm
@@ -174,6 +177,42 @@ Colab. A fix is delivered by **pushing it to `master`**, where notebook cell 1.1
 picks it up; that is why `patchcore_backend.py` is a tracked `.py` and not a `%%writefile` cell.
 Changing the notebook's cell structure instead costs a full reload (reinstall anomalib, re-download
 the weights), so prefer changing tracked Python.
+
+## PatchCore's gate is MVTec AD classic, not VisA (2026-09-16, protocol v0.2.12)
+
+Found by reading both primary sources for the ±1pt gate, and it changed the acceptance criterion
+for M2.
+
+**PatchCore's own paper cannot report VisA.** arXiv:2106.08265 v2 is May 2022; the VisA dataset
+(arXiv:2207.14315) is July 2022. The playbook's "the published-numbers table, from each method's
+own paper" was unsatisfiable for this pairing.
+
+**The only primary source for PatchCore on VisA is weak.** The VisA dataset paper's Table 6 gives
+image AU-ROC 92.4 (1-class, averaged over 12 objects), but it is the only PatchCore result in that
+paper — the per-object appendix tables are all PaDiM — it states none of its PatchCore
+hyperparameters (no resolution, crop or coreset ratio), and its MVTec-AD control in the same row
+is **99.8**, above every single-model number in PatchCore's own paper (99.0-99.1) and above its
+99.6 ensemble. A miss against 92.4 would not distinguish a wrong implementation from a different
+setup, and a criterion that cannot distinguish those is not a criterion.
+
+**MVTec AD classic is the strong gate and was already in §2.** PatchCore's own paper, Table S1,
+row `PatchCore-10` — and that suffix is the coreset subsampling ratio, so it is exactly this
+repo's `coreset_sampling_ratio: 0.1`. **99.0 ± 1.0 I-AUROC, mean over the 15 categories.**
+
+Protocol §2 v0.2.12 generalises the rule rather than special-casing PatchCore: the target must
+come from the method's own paper at the configuration this repo runs; where only one dataset
+satisfies that, the other is still run and reported with its discrepancy but cannot fail the
+method. **Settle this per method, from its own paper, before its Colab run** — the other four have
+not been read yet.
+
+What was built with it, all CPU and all committed: `datasets/visa.py` and `datasets/mvtec_ad.py`
+(both verified against the real archives), `datasets/registry.py` plus `run_eval.py --dataset`,
+the pre-registered `configs/reproduction/patchcore_ref.yaml` (mean **and** the 15 per-category
+values), and `scripts/reproduction_gate.py`. The gate refuses a category set that is not the
+published one, a dataset or method mismatch, and pooled seeds; exit codes are **0 PASS, 1 FAIL,
+2 refused**. It flags categories outside tolerance even when the mean passes — the case the
+per-category targets exist for. Provenance:
+`../vlm-anomaly-paper/docs/verified-literature-facts.md`, fourth pass.
 
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 
@@ -290,9 +329,13 @@ stubs awaiting M3. Two things there that this repo's work must stay consistent w
 ## Integration points every Colab playbook leaves to the executor
 
 These cannot be pre-written without the data/repo in front of you, and each playbook marks them:
-- **The VisA loader** over VisA's split CSV (its format is VisA-specific).
-- **The published-numbers table** for the ±1pt gate (`PUBLISHED_*_VISA_IAUROC`), from each method's
-  own paper — record the exact source next to the table.
+- ~~**The VisA loader**~~ — **built 2026-09-16** (`src/vlmab/datasets/visa.py`), against the real
+  archive. `src/vlmab/datasets/mvtec_ad.py` was built with it, and both are in the dataset registry
+  so `run_eval.py --dataset` reaches them.
+- **The published-numbers table**, from each method's own paper — record the exact source next to
+  it. **Done for PatchCore** (`configs/reproduction/patchcore_ref.yaml`). For the other four,
+  read the paper first: PatchCore's case showed the table cannot be assumed to exist, and which
+  dataset may gate a method is now a §2 v0.2.12 decision recorded before its Colab run.
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 
@@ -314,9 +357,10 @@ What that session actually found, in the order it found it:
 4. **PatchCore is stochastic and `--seed` was recorded but never applied.** See the section above.
    Closed 2026-09-07: the backend takes a seed, the method declares it and the runner stamps it.
 
-**The next move is phase 2**: Vial end to end through the runner, in a Colab session, which needs
-Vial fetched into it first. Then the VisA ±1pt gate (phase 3); the seed wiring that gate waited on
-is closed (see the seed section above), so nothing but the Colab session stands in front of it.
+**The next move is phase 3**, and it is one Colab session with nothing left to design: upload the
+15 MVTec AD classic `.tar.xz` to `MyDrive/mvtec_ad/`, then run notebook cells 3.1–3.4. Phase 2
+closed green on 2026-09-16 (see its section above). A PASS closes M2 and unblocks phase 4, the
+first real threshold calibration, and M3.
 
 Fixes reach a live Colab session by being **pushed to `master`** — cell 1.1 hard-resets to
 `origin/master` and prints what it synced. Push before asking for a re-run.
