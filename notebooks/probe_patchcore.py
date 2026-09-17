@@ -59,6 +59,25 @@ def run(keep_going: bool = False, only: str | None = None) -> dict[str, Any]:
     return ctx
 
 
+def synthetic_images(ctx: dict[str, Any]) -> list:
+    """The 20 synthetic normal images the fitting stages use, built once into `ctx`.
+
+    Factored out because stage 13 is run ALONE from notebook cell 3b.0 -- `run(only=...)` skips
+    stage 2, which is what normally fills `ctx`. A stage that depended on stage 2 anyway would
+    fail with a KeyError reading like "the stage was renamed", and that stage is the only thing
+    standing between the author and a 40-minute run of wrong numbers.
+    """
+    if "images" not in ctx:
+        import numpy as np
+
+        rng = np.random.default_rng(0)
+        images = [rng.integers(90, 110, (256, 256, 3), dtype=np.uint8) for _ in range(20)]
+        ctx["images"] = images
+        ctx["anom"] = images[0].copy()
+        ctx["anom"][40:80, 40:80] = 255
+    return ctx["images"]
+
+
 # --------------------------------------------------------------------------------------------
 # Stages. Order matters: each one may only depend on what earlier stages put in ctx.
 # --------------------------------------------------------------------------------------------
@@ -98,14 +117,9 @@ def _signatures(ctx):
 def _materialise(ctx):
     import tempfile
     from pathlib import Path
-    import numpy as np
     from PIL import Image
 
-    rng = np.random.default_rng(0)
-    images = [rng.integers(90, 110, (256, 256, 3), dtype=np.uint8) for _ in range(20)]
-    ctx["images"] = images
-    ctx["anom"] = images[0].copy()
-    ctx["anom"][40:80, 40:80] = 255
+    images = synthetic_images(ctx)
 
     ctx["tmp"] = tempfile.TemporaryDirectory()
     good = Path(ctx["tmp"].name) / "good"
@@ -575,11 +589,14 @@ def _classic_preprocessing(ctx):
     """
     from vlmab.methods.patchcore_backend import PatchCoreBackend, preprocess_spec
 
+    # Cell 3b.0 runs this stage alone, so stage 2 has not run. Build the corpus here.
+    images = synthetic_images(ctx)
+
     def coreset_rows(backend):
         bank = backend._model.model.memory_bank
         return int(bank.shape[0])
 
-    n = len(ctx["images"])
+    n = len(images)
     ratio = 0.1
     results = {}
     for name in ("anomalib", "classic"):
@@ -592,7 +609,7 @@ def _classic_preprocessing(ctx):
             print(f"  pre_processor type : {type(pre).__name__}")
             print(f"  pre_processor attrs: {[a for a in dir(pre) if not a.startswith('_')]}")
             print(f"  transform          : {transform}")
-        b.fit(iter(ctx["images"]))
+        b.fit(iter(images))
         rows = coreset_rows(b)
         expected = round(preprocess_spec(name)["patches_per_image"] * n * ratio)
         results[name] = (rows, expected)
