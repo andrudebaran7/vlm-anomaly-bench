@@ -347,6 +347,47 @@ which is where phase 3 actually executes, and that is also what gives the classi
 showing `run_eval.py --method patchcore_ref` is aspirational for the same reason; it is not new,
 and it is not fixed here.)
 
+## Probe stage 13 passed (2026-09-17) — the PreProcessor API is now in the verified record
+
+Run on a Colab T4, anomalib 2.6.0 under Python 3.13, seed 0. **This is the first time anomalib's
+pre-processor API has been observed rather than inferred**, so all of it is recorded here.
+
+**The untouched transform, printed verbatim:**
+
+```
+Compose(
+    Resize(size=[256, 256], interpolation=InterpolationMode.BILINEAR, antialias=True)
+    Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225], inplace=False)
+)
+```
+
+Two steps, no CenterCrop, and the resize is to a fixed `[256, 256]` — not shorter-side-256.
+That confirms the 2026-08-21 session note from the object itself, and the ImageNet constants are
+now attested rather than assumed.
+
+**The API the backend reaches through is real:** `model.pre_processor` is a `PreProcessor`
+(a Lightning callback — it carries `on_train_batch_start`, `setup`, `state_key` alongside the
+`nn.Module` surface) and it exposes **`transform`**. The defensive introspection in
+`_apply_classic_preprocessing` was the right call and cost nothing: it now runs against an API
+that has been seen. Lightning lists `pre_processor` as child module 0 of the LightningModule
+during `fit`, which is why one assignment reaches both `fit` and `score`.
+
+**The measurement, which is the part that matters:**
+
+| preprocess | coreset rows (20 images, ratio 0.1) | per image | grid |
+|---|---|---|---|
+| `anomalib` | 2048 | 102.4 | 32x32 |
+| `classic`  | 1568 |  78.4 | 28x28 |
+
+Both hit their predicted values exactly. The 102.4 reproduces the figure measured across all 15
+categories on 2026-09-16, on 20 synthetic images instead — so the per-image patch count is a
+property of the transform, not of the data, exactly as `preprocess_spec` assumes.
+
+**Benign noise in that output, recorded so the next session does not chase it:** "Total length of
+`DataLoader` across ranks is zero" (ValSplitMode/TestSplitMode NONE, expected), "Found 174
+module(s) in eval mode at the start of training" and "`configure_optimizers` returned `None`"
+(PatchCore does not train), and the unauthenticated HF Hub warning for the 276 MB timm backbone.
+
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 
 Vial end to end through `run_evaluation` on a Colab T4, anomalib 2.6.0 under **Python 3.13**
