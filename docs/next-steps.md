@@ -606,18 +606,28 @@ These cannot be pre-written without the data/repo in front of you, and each play
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 
-## Where to pick up (session handoff, 2026-09-17)
+## Where to pick up (session handoff, 2026-09-17, after the phase 3b session)
 
-**The next move is one Colab session with nothing left to design: notebook cells 3b.0 → 3b.1 →
-3b.2.** Upload is already done (the 15 MVTec AD classic `.tar.xz` in `MyDrive/mvtec_ad/`, cell
-3.1 extracts them). Run 3b.0 first and stop if it fails — it is the one-minute check that stands
-between you and a 40-minute run of wrong numbers. 3b.2 prints the two gate reports side by side
-with the toothbrush row called out, which is the comparison this whole phase was opened for.
+**Phase 3b is done and its question is answered: the CenterCrop hypothesis is refuted** (section
+above). Both gate reports are committed. Nothing about phase 3b needs re-running.
 
-Then, whichever configuration wins, **cells 3b.3 for seeds 1 and 2** — no number from either
-report is reportable on one seed (§6), and `--all-seeds` now exists to score them.
+**The next move is cell 3b.3 — three seeds on the `anomalib` configuration**, and it is the last
+pre-registered cause standing. The miss is **0.060**, the seed spread has never been measured on
+real data, and §6 forbids reporting any of this on one seed. Read 3b.3's markdown before running:
+it names the choice about where seed 0 comes from, which is the only thing left to decide.
 
-Both repos clean and in sync with `origin/master`; bench: 426 tests green on Python 3.11.
+Setup for that session, in order: phase 0 entire (fresh runtime — cells under "Phase 0", then
+the restart-recovery cell if Colab asks), **1.1** (hard sync), **3.1** (extract from Drive), then
+3b.3 and its scoring cell. Skip phase 1's other cells, phase 2, phase 3.2/3.3, and all of 3b.
+Budget ~2 h for `SEEDS = (0, 1, 2)`; the runner is resumable, so a dropped session costs one
+category.
+
+Then the gate decision comes back, informed rather than open: accept the FAIL and flag PatchCore
+as not-reproduced in every table (§2), or keep going. Phase 3.4 (the VisA secondary check) has
+still never been run and is independent of all of this.
+
+Both repos clean and in sync with `origin/master`; bench: 429 tests green on Python 3.11 and
+3.13.
 
 Older handoff (2026-08-26, after the second Colab session) follows.
 
