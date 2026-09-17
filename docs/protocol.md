@@ -299,6 +299,21 @@ directory; the seed recorded in a shard is the seed the method reports having ap
 metric functions refuse a frame that pools seeds. A run that applied no seed records `unseeded`,
 which is not the same as seed 0.
 
+**How the seeds combine into a verdict (v0.2.13).** Metrics are computed once per seed. The
+reported centre is the **mean of the per-seed means**, and the spread is their **sample standard
+deviation** (ddof=1) — that pair is the "mean ± std" above. The std is **reported and never
+gates**: the pre-registered criterion in §2 is on the mean, and failing a run whose mean ± std
+band reaches outside the tolerance would be a second criterion that was never registered. How
+many seeds a multi-seed score must cover is pre-registered per method alongside the category
+count (`n_seeds` in `configs/reproduction/<method>.yaml`), for the same reason the category count
+is: two seeds averaged and printed as "mean ± std" look exactly like a compliant result.
+
+**A configuration is not a seed.** Two runs that differ in anything but the seed — the
+pre-processing transform, the backbone, the coreset ratio — are different configurations of the
+method, not repeats of one, and their results may never be averaged together or written to one
+results root. `scripts/reproduction_gate.py` refuses a root whose shards disagree about the
+pre-processing that produced them.
+
 ## 7. What we will NOT do
 
 - No per-dataset prompt tuning after seeing test results.
@@ -422,3 +437,13 @@ which is not the same as seed 0.
   PatchCore's own published figures. No metric definition changed and no existing number is
   affected; what changed is which miss is allowed to fail a method.
   Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (fourth pass)
+- 2026-09-17 — v0.2.13. §6 settles how three seeds become one verdict, a question §6 left
+  open and the failed PatchCore gate of 2026-09-16 made urgent: the centre is the mean of the
+  per-seed means, the spread is their sample std, and **the std is reported and never gates**
+  — the criterion in §2 is on the mean, so a band-based rule would be a second criterion
+  nobody registered. The required seed count is now pre-registered per method (`n_seeds`)
+  next to the category count. §6 also records what was previously only implicit: a run that
+  differs in anything but the seed is a different configuration, never a repeat, and the two
+  may not share a results root. No metric definition changed and no existing number moves;
+  what changed is that a three-seed score now has one defined meaning instead of three
+  plausible ones.

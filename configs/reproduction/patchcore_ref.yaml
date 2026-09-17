@@ -63,3 +63,9 @@ secondary:
 # would pass or fail on which categories happened to finish.
 gate_n_categories: 15
 secondary_n_categories: 12
+
+# How many seeds a multi-seed score must cover (protocol §6). Pre-registered here for the
+# same reason the category count is: two seeds averaged and printed as "mean ± std" look
+# exactly like a compliant result, and the gate cannot tell them apart unless the number it
+# expects was written down first.
+n_seeds: 3

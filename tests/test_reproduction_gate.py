@@ -24,7 +24,8 @@ CATEGORIES = [
 TARGETS = Path(__file__).resolve().parents[1] / "configs" / "reproduction" / "patchcore_ref.yaml"
 
 
-def _shard(store, category, i_auroc, dataset="mvtec_ad", method="patchcore_ref", n=20):
+def _shard(store, category, i_auroc, dataset="mvtec_ad", method="patchcore_ref", n=20,
+           seed=0, preprocess=None):
     """A shard whose image scores realise `i_auroc` exactly.
 
     I-AUROC is the fraction of (normal, anomalous) pairs ranked correctly, so with `half`
@@ -48,7 +49,10 @@ def _shard(store, category, i_auroc, dataset="mvtec_ad", method="patchcore_ref",
             score = float(half + i)               # above every normal
         rows.append({"image_path": f"/a/{i}.png", "label": 1, "image_score": score,
                      "split": "test", "mask_path": None, "map_path": None})
-    store.write(dataset, method, category, rows, {"seed": 0, "commit": "abc1234"})
+    meta = {"seed": seed, "commit": "abc1234"}
+    if preprocess is not None:
+        meta["preprocess"] = preprocess
+    store.write(dataset, method, category, rows, meta)
 
 
 def test_the_fixture_realises_the_auroc_it_is_asked_for(tmp_path):
@@ -251,3 +255,160 @@ def test_a_refusal_exits_2_not_1_so_it_is_not_read_as_a_failed_gate(tmp_path):
     assert "refusing to score this run" in proc.stderr
     assert "winclip" in proc.stderr
     assert "Traceback" not in proc.stderr
+
+
+# --- multi-seed scoring (protocol §6: three seeds, mean ± std) -----------------------------
+
+
+def _seeded_run(results, per_seed):
+    """One root holding several seeds: {seed: {category: auroc}}."""
+    store = ResultStore(results)
+    for seed, per_category in per_seed.items():
+        for cat, auroc in per_category.items():
+            _shard(store, cat, auroc, seed=seed)
+    return store
+
+
+def test_seed_selects_one_seed_out_of_a_root_that_holds_several(tmp_path):
+    """Without a selection such a root refuses (pooled seeds). `--seed 0` must score seed 0
+    alone, so a disputed verdict can be recomputed one seed at a time from shards that are
+    already on disk."""
+    results = tmp_path / "shards"
+    _seeded_run(results, {0: _all_at(1.0), 1: _all_at(0.5)})
+    out = tmp_path / "r.md"
+    assert main(["--results", str(results), "--targets", str(TARGETS), "--out", str(out),
+                 "--seed", "0"]) == 0
+    assert "PASS" in out.read_text()
+
+
+def test_seed_selects_the_failing_seed_too(tmp_path):
+    """The complement of the test above. If `--seed` silently scored everything, or always the
+    first shard, the pair would not both hold."""
+    results = tmp_path / "shards"
+    _seeded_run(results, {0: _all_at(1.0), 1: _all_at(0.5)})
+    out = tmp_path / "r.md"
+    assert main(["--results", str(results), "--targets", str(TARGETS), "--out", str(out),
+                 "--seed", "1"]) == 1
+    assert "FAIL" in out.read_text()
+
+
+def test_all_seeds_reports_the_mean_of_the_per_seed_means_with_their_std(tmp_path):
+    """Protocol §6 asks for three seeds reported as mean ± std, and the verdict is on the mean
+    of the per-seed means. Seeds at 98/99/100 give a mean of exactly 99.0 and a sample std of
+    exactly 1.0, so both numbers are pinned rather than eyeballed."""
+    results = tmp_path / "shards"
+    _seeded_run(results, {0: _all_at(0.98), 1: _all_at(0.99), 2: _all_at(1.0)})
+    out = tmp_path / "r.md"
+    assert main(["--results", str(results), "--targets", str(TARGETS), "--out", str(out),
+                 "--all-seeds"]) == 0
+    text = out.read_text()
+    assert "99.00 ± 1.00" in text
+    for seed in ("seed0", "seed1", "seed2"):
+        assert seed in text
+
+
+def test_all_seeds_never_lets_the_spread_change_the_verdict(tmp_path):
+    """The std is reported, not gated. The run above has a std of 1.00, so a rule that failed a
+    band reaching outside ±1.0 would flip this to FAIL — that rule was considered and rejected,
+    and this test is what stops it arriving by accident."""
+    results = tmp_path / "shards"
+    _seeded_run(results, {0: _all_at(0.98), 1: _all_at(0.99), 2: _all_at(1.0)})
+    out = tmp_path / "r.md"
+    assert main(["--results", str(results), "--targets", str(TARGETS), "--out", str(out),
+                 "--all-seeds"]) == 0
+    assert "PASS" in out.read_text()
+
+
+def test_all_seeds_fails_when_the_mean_of_means_misses(tmp_path):
+    """The complement: the spread is irrelevant but the centre is not."""
+    results = tmp_path / "shards"
+    _seeded_run(results, {0: _all_at(0.90), 1: _all_at(0.90), 2: _all_at(0.90)})
+    out = tmp_path / "r.md"
+    assert main(["--results", str(results), "--targets", str(TARGETS), "--out", str(out),
+                 "--all-seeds"]) == 1
+    assert "FAIL" in out.read_text()
+
+
+def test_all_seeds_refuses_a_root_holding_a_different_number_of_seeds_than_pre_registered(tmp_path):
+    """§6 asks for three. Two seeds averaged and printed as "mean ± std" would look exactly
+    like a compliant result while resting on a spread of one degree of freedom, so the count
+    is pre-registered in the targets file and checked here rather than trusted."""
+    results = tmp_path / "shards"
+    _seeded_run(results, {0: _all_at(0.99), 1: _all_at(0.99)})
+    with pytest.raises(ValueError, match="3 seeds"):
+        main(["--results", str(results), "--targets", str(TARGETS),
+              "--out", str(tmp_path / "r.md"), "--all-seeds"])
+
+
+def test_all_seeds_refuses_when_one_seed_is_missing_a_category(tmp_path):
+    """A seed short of a category has a mean over a different set than its siblings, so the
+    combined number is over neither. Checked per seed, not on the pooled frame."""
+    results = tmp_path / "shards"
+    short = _all_at(0.99)
+    short.pop("zipper")
+    _seeded_run(results, {0: _all_at(0.99), 1: short, 2: _all_at(0.99)})
+    with pytest.raises(ValueError, match="zipper"):
+        main(["--results", str(results), "--targets", str(TARGETS),
+              "--out", str(tmp_path / "r.md"), "--all-seeds"])
+
+
+def test_seed_and_all_seeds_together_refuse_rather_than_one_winning_silently(tmp_path):
+    """They ask for opposite things. Whichever won, the report would be titled as the other."""
+    results = tmp_path / "shards"
+    _seeded_run(results, {0: _all_at(0.99), 1: _all_at(0.99), 2: _all_at(0.99)})
+    with pytest.raises(ValueError, match="--seed"):
+        main(["--results", str(results), "--targets", str(TARGETS),
+              "--out", str(tmp_path / "r.md"), "--all-seeds", "--seed", "0"])
+
+
+def test_a_root_pooling_two_preprocessings_refuses(tmp_path):
+    """The realistic failure mode, not a hypothetical one: shards are copied between Drive
+    folders to re-score them, and `run_id` keys map directories on `config_hash` while the
+    shard filename carries only dataset/method/category/seed. Two pre-processings under one
+    root therefore average an adapter against a differently-configured version of itself."""
+    results = tmp_path / "shards"
+    store = ResultStore(results)
+    _run(store, _all_at(1.0), preprocess="anomalib")
+    for cat in CATEGORIES:
+        other = pd.read_parquet(store.path_for("mvtec_ad", "patchcore_ref", cat, 0))
+        other["preprocess"] = "classic"
+        other.to_parquet(results / f"copied__{cat}.parquet", index=False)
+    with pytest.raises(ValueError, match="preprocess"):
+        main(["--results", str(results), "--targets", str(TARGETS),
+              "--out", str(tmp_path / "r.md")])
+
+
+def test_the_report_records_the_preprocessing_that_produced_the_shards(tmp_path):
+    """The 32x32-vs-28x28 grid is the measured difference the gate failure of 2026-09-16 turns
+    on. A verdict that does not say which pre-processing produced it cannot be compared with
+    the other one."""
+    results = tmp_path / "shards"
+    _run(ResultStore(results), _all_at(1.0), preprocess="classic")
+    out = tmp_path / "r.md"
+    main(["--results", str(results), "--targets", str(TARGETS), "--out", str(out)])
+    assert "preprocess" in out.read_text() and "classic" in out.read_text()
+
+
+def test_unseeded_is_selectable_and_is_not_the_same_as_seed_zero(tmp_path):
+    """`unseeded` is a real state — the run applied no seed — and the store already names it
+    apart from `seed0`. If --seed folded the two together, a run nothing seeded would be
+    scored, and reported, as a reproducible one."""
+    store = ResultStore(tmp_path / "shards")
+    for cat in CATEGORIES:
+        _shard(store, cat, 1.0, seed=None)
+        _shard(store, cat, 0.5, seed=0)
+    args = ["--results", str(tmp_path / "shards"), "--targets", str(TARGETS)]
+    assert main(args + ["--out", str(tmp_path / "u.md"), "--seed", "unseeded"]) == 0
+    assert main(args + ["--out", str(tmp_path / "z.md"), "--seed", "0"]) == 1
+
+
+def test_all_seeds_gives_every_category_its_own_spread(tmp_path):
+    """The per-category table is where an uneven reproduction is diagnosed, and across seeds the
+    diagnosis needs the spread too: one category swinging three points between seeds is a
+    different finding from one that is steadily low."""
+    results = tmp_path / "shards"
+    _seeded_run(results, {0: _all_at(0.98), 1: _all_at(0.99), 2: _all_at(1.0)})
+    out = tmp_path / "r.md"
+    main(["--results", str(results), "--targets", str(TARGETS), "--out", str(out),
+          "--all-seeds"])
+    assert "| bottle | 99.00 ± 1.00 |" in out.read_text()

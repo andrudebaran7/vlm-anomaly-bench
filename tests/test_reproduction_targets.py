@@ -52,3 +52,9 @@ def test_every_gate_number_carries_its_source():
     assert "arXiv:2106.08265" in cfg["gate"]["source"]
     assert "arXiv:2207.14315" in cfg["secondary"]["source"]
     assert cfg["secondary"]["caveat"].strip()
+
+
+def test_the_number_of_seeds_is_pre_registered():
+    """Protocol §6 asks for three seeds reported as mean ± std. The gate enforces that count,
+    so the count has to be written down before the run rather than read off it."""
+    assert _load()["n_seeds"] == 3
