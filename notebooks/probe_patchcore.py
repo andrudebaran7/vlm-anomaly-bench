@@ -549,3 +549,68 @@ def _seed_control(ctx):
         return "same-seed reproducible, but the seed changes nothing -- read the NOTE"
     return (f"reproducible under a fixed seed (delta {abs(a1 - a2):.2e}), and seed=1 moves it "
             f"by {abs(a1 - other):.4f}")
+
+
+@stage("13. the classic pre-processor",
+       "preprocess='classic' reaches the model, and its coreset holds 784 patches per image "
+       "against the anomalib transform's 1024")
+def _classic_preprocessing(ctx):
+    """Does `preprocess='classic'` actually change what the model sees? Measured, not assumed.
+
+    Two things are being verified at once, and only the second one is worth trusting:
+
+    1. **The API.** anomalib 2.6.0's PreProcessor API is NOT in this repo's verified record --
+       the 2026-08-21 session verified the Engine. So this stage PRINTS what is really there
+       (the pre_processor's type, its transform, the steps inside it) before anything depends
+       on it. Read that output; do not read the docs.
+    2. **The consequence.** The claim that matters is not "a CenterCrop is in the pipeline" but
+       "the model extracts a 28x28 grid instead of 32x32". Those come apart if the transform is
+       assigned somewhere the forward pass never looks -- which would produce a complete,
+       plausible, wrong 40-minute run. The coreset size is the observable that separates them:
+       `coreset_sampling_ratio` of `patches_per_image * n_images`.
+
+    Grounding: the 2026-09-16 reproduction run printed exactly 102.4 coreset points per training
+    image across all 15 categories, i.e. 1024 patches at ratio 0.1. Classic PatchCore's
+    Resize(256) -> CenterCrop(224) should give 784.
+    """
+    from vlmab.methods.patchcore_backend import PatchCoreBackend, preprocess_spec
+
+    def coreset_rows(backend):
+        bank = backend._model.model.memory_bank
+        return int(bank.shape[0])
+
+    n = len(ctx["images"])
+    ratio = 0.1
+    results = {}
+    for name in ("anomalib", "classic"):
+        b = PatchCoreBackend(seed=0, num_workers=2, preprocess=name,
+                             coreset_sampling_ratio=ratio)
+        if name == "anomalib":
+            # Print the untouched API once, before the classic branch has replaced anything.
+            pre = getattr(b._model, "pre_processor", None)
+            transform = getattr(pre, "transform", None)
+            print(f"  pre_processor type : {type(pre).__name__}")
+            print(f"  pre_processor attrs: {[a for a in dir(pre) if not a.startswith('_')]}")
+            print(f"  transform          : {transform}")
+        b.fit(iter(ctx["images"]))
+        rows = coreset_rows(b)
+        expected = round(preprocess_spec(name)["patches_per_image"] * n * ratio)
+        results[name] = (rows, expected)
+        ctx[f"coreset_{name}"] = rows
+        print(f"  {name:9s}: coreset {rows} rows, expected {expected} "
+              f"({rows / n:.1f} per image)")
+
+    for name, (rows, expected) in results.items():
+        assert rows == expected, (
+            f"preprocess={name!r} filled a coreset of {rows} rows where {expected} was expected "
+            f"({rows / n:.1f} patches per image at ratio {ratio}, against "
+            f"{preprocess_spec(name)['patches_per_image'] / 10:.1f}). The transform this backend "
+            "believes it applied is not the one the forward pass used. Do NOT run the 15-category "
+            "fit until this matches -- it would produce a full set of plausible, wrong numbers."
+        )
+    assert results["classic"][0] < results["anomalib"][0], (
+        "the two pre-processings produced the same coreset size, so preprocess= changed nothing "
+        "the model actually sees."
+    )
+    return (f"classic {results['classic'][0]} rows vs anomalib {results['anomalib'][0]} -- "
+            f"{100 * (results['anomalib'][0] / results['classic'][0] - 1):.0f}% fewer patches")

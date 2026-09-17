@@ -25,11 +25,48 @@ class PatchCoreRef(BackendSeeded):
     name = "patchcore_ref"
     zero_shot = False
 
-    def __init__(self, backend=None, seed: int | None = None):
+    def __init__(self, backend=None, seed: int | None = None,
+                 preprocess: str | None = None):
         self._backend = backend
         self._fitted_category = None
         # The backend is what calls seed_everything, so it is what declares the seed.
         self._init_seed(backend, seed)
+        self._init_preprocess(backend, preprocess)
+
+    def _init_preprocess(self, backend, preprocess: str | None) -> None:
+        """Declare the pre-processing the backend actually applied.
+
+        The seed's lesson, applied to the other half of the configuration: the backend is
+        what builds the transform, so the backend is what declares it. A value invented
+        here would put a pre-processing into every shard's provenance that nothing ran --
+        which is the defect the seed work already had to undo once.
+
+        Deliberately NOT on the shared `BackendSeeded` contract: the 256x256-vs-224x224
+        question is anomalib's PatchCore pre-processor specifically, and the other five
+        adapters have no such choice to declare.
+        """
+        if backend is None:
+            # Nothing that could apply anything exists yet, and prepare() refuses before
+            # this method scores. Keep what was asked for so a backend built from it later
+            # has something to be checked against.
+            self._declared_preprocess = preprocess
+            return
+        # getattr, not attribute access: the fake backends in the adapter tests predate
+        # this seam and declare nothing rather than exploding.
+        applied = getattr(backend, "preprocess", None)
+        if preprocess is not None and preprocess != applied:
+            raise ValueError(
+                f"PatchCoreRef was given preprocess={preprocess!r} but its backend applies "
+                f"{applied!r}; the two disagree and this adapter cannot make the backend use "
+                "the other one. Choose the pre-processing at backend construction and leave "
+                "this argument out."
+            )
+        self._declared_preprocess = applied
+
+    @property
+    def preprocess(self) -> str | None:
+        """Which pre-processing produced this run, for the shard's provenance."""
+        return self._declared_preprocess
 
     def prepare(self, device: str = "cuda") -> None:
         """With an injected backend there is nothing to load. Otherwise the real anomalib backend

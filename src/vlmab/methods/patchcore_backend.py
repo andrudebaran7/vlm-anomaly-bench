@@ -17,6 +17,46 @@ from typing import Iterable
 
 import numpy as np
 
+#: The backbone's effective stride over the layer2/layer3 features PatchCore concatenates.
+#: MEASURED, not assumed: the 2026-09-16 reproduction run printed 102.4 coreset points per
+#: training image at `coreset_sampling_ratio: 0.1`, i.e. 1024 patches from a 256x256 input,
+#: i.e. a 32x32 grid -- 256 / 32 = 8.
+_FEATURE_STRIDE = 8
+
+#: The two pre-processings this backend can run. `anomalib` is what anomalib 2.6.0 does on its
+#: own (`Resize([256, 256]) + Normalize`, recorded in the 2026-08-21 Colab session) and is the
+#: default because it is what every number measured so far came from. `classic` is what
+#: PatchCore's paper describes and what the 2026-09-16 gate failure pre-registered as suspect.
+PREPROCESS_CHOICES = ("anomalib", "classic")
+
+
+def preprocess_spec(name: str) -> dict:
+    """What a named pre-processing does, and the patch count that follows from it.
+
+    Separate from the backend class, and dependency-free, for two reasons: it is the only part
+    of this module CPU can test, and the patch count is what a Colab cell checks against BEFORE
+    paying for a 40-minute fit. A run that silently used the other transform would still print
+    a plausible number -- that is precisely how the double-normalisation bug survived for five
+    days -- so the check has to be on something measurable, and this is where that number is
+    defined once.
+    """
+    if name not in PREPROCESS_CHOICES:
+        raise ValueError(
+            f"unknown preprocess {name!r}; choices are {list(PREPROCESS_CHOICES)}. This is "
+            "checked before anomalib is imported so a typo in a notebook cell fails at once "
+            "rather than after a fit."
+        )
+    # Classic PatchCore (arXiv:2106.08265 §4.1): resize the short side to 256, then centre-crop
+    # to 224. anomalib 2.6.0 resizes the whole frame to 256x256 and never crops.
+    center_crop = 224 if name == "classic" else None
+    side = center_crop or 256
+    return {
+        "name": name,
+        "resize": 256,
+        "center_crop": center_crop,
+        "patches_per_image": (side // _FEATURE_STRIDE) ** 2,
+    }
+
 
 class PatchCoreBackend:
     def __init__(
@@ -28,7 +68,12 @@ class PatchCoreBackend:
         device: str = "cuda",
         num_workers: int = 2,
         seed: int | None = None,
+        preprocess: str = "anomalib",
     ):
+        # BEFORE the lazy import, so a typo fails in a millisecond rather than after the
+        # install, the weights and a 40-minute fit.
+        spec = preprocess_spec(preprocess)
+
         from anomalib.models import Patchcore  # lazy: GPU-only
         from anomalib.engine import Engine
 
@@ -86,7 +131,64 @@ class PatchCoreBackend:
         # No pre-processing transform is kept here on purpose. AnomalibModule.forward is
         #     batch = self.pre_processor(batch) if self.pre_processor else batch
         # so the model pre-processes whatever it is handed. See score().
+        #
+        # Public, like `seed`, and for the same reason: PatchCoreRef reads it to declare in
+        # every shard's provenance which pre-processing actually ran.
+        self.preprocess = spec["name"]
+        if spec["center_crop"] is not None:
+            self._apply_classic_preprocessing(spec)
         self._fitted = False
+
+    def _apply_classic_preprocessing(self, spec: dict) -> None:
+        """Replace the model's own transform with classic PatchCore's Resize -> CenterCrop.
+
+        It goes through the PreProcessor anomalib itself built on the model, and reuses that
+        object's own Normalize, rather than importing a PreProcessor class by a path taken
+        from a documentation snippet. anomalib 2.6.0's Engine API was verified on 2026-08-21;
+        its PreProcessor API was NOT, and this backend has already been bitten five separate
+        times by a call that looked reasonable and had never been run. Probe stage 13 prints
+        the real API before any fit is paid for.
+
+        Both halves of the model see this: `pre_processor` is a child module of the
+        LightningModule, so `fit` gets it through anomalib's own pipeline and `score` gets it
+        through `forward`. A transform applied to only one of them would build the memory
+        bank at one resolution and query it at another.
+
+        **Consequence for pixel metrics, recorded rather than discovered later:** a centre
+        crop means the anomaly map covers only the middle 224/256 of the frame, and
+        PatchCoreRef then upsamples it across the WHOLE native image. The reproduction gate
+        is image-level I-AUROC and is unaffected; any pixel-level number from a `classic`
+        run would be spatially wrong, and this is why the choice is recorded per shard.
+        """
+        from torchvision.transforms.v2 import CenterCrop, Compose, Resize
+
+        pre = getattr(self._model, "pre_processor", None)
+        transform = getattr(pre, "transform", None)
+        if transform is None:
+            raise RuntimeError(
+                f"preprocess='classic' cannot be applied: the model's pre_processor is "
+                f"{pre!r}, which exposes no `transform` to replace. Run probe stage 13 "
+                "(notebooks/probe_patchcore.py) to print the real API on the installed "
+                "anomalib, and fix this from what it prints -- not from the docs."
+            )
+        # Carry over anomalib's OWN Normalize instead of re-stating ImageNet's constants:
+        # those constants are not in this repo's verified record, and a second copy of them
+        # is a second thing that can drift from what the untouched path applies.
+        steps = list(getattr(transform, "transforms", [transform]))
+        normalize = [t for t in steps if type(t).__name__ == "Normalize"]
+        if not normalize:
+            raise RuntimeError(
+                f"preprocess='classic' cannot be applied: the model's transform is {steps}, "
+                "which contains no Normalize to carry over. Dropping normalisation silently "
+                "would produce a complete run of plausible, wrong numbers."
+            )
+        # Resize with a single int takes the SHORT side to 256 and preserves aspect, which
+        # is what the paper describes; Resize([256, 256]) -- anomalib's own -- does not.
+        pre.transform = Compose([
+            Resize(spec["resize"], antialias=True),
+            CenterCrop(spec["center_crop"]),
+            *normalize,
+        ])
 
     def fit(self, train_images: Iterable[np.ndarray]) -> None:
         import torch

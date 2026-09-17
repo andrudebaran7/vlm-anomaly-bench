@@ -3,9 +3,20 @@ zero_shot: false
 # Reference anchor (Roth et al., CVPR 2022). Provenance: anomalib implementation (protocol §3
 # priority 2). The exact anomalib version is pinned and recorded here on first Colab run.
 source: anomalib
-anomalib_version: ">=1.1"        # exact pin resolved at integration; record the resolved version
+# Resolved on the Colab T4 of 2026-08-21 (torch 2.11.0+cu128) and frozen here: every measured
+# number in this repo ran on it, and the five ways 2.6.0 contradicts its own documentation
+# (docs/next-steps.md, session note) are specific to this version.
+anomalib_version: "2.6.0"
 backbone: wide_resnet50_2         # canonical PatchCore backbone
 layers: [layer2, layer3]          # mid-level feature layers
 coreset_sampling_ratio: 0.1       # 10% greedy coreset
 num_neighbors: 9
 fit_split: train                  # memory bank from the defect-free train split
+
+# Which pre-processing the backend applies. `anomalib` is 2.6.0's own Resize([256,256]) +
+# Normalize -- a 32x32 patch grid over the full frame -- and is what every number measured so
+# far came from, including the 2026-09-16 gate run. `classic` is PatchCore's own
+# Resize(256) -> CenterCrop(224), a 28x28 grid, pre-registered on 2026-08-21 as the suspect if
+# the gate missed. Recorded per shard, because the two are different configurations of the
+# method and their numbers must never be averaged together.
+preprocess: anomalib

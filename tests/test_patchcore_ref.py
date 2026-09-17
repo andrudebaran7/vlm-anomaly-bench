@@ -92,3 +92,37 @@ def test_a_seed_disagreeing_with_the_backend_is_refused():
     not resolved by a precedence rule nobody will remember."""
     with pytest.raises(ValueError, match="disagree"):
         PatchCoreRef(backend=_SeededBackend(seed=0), seed=1)
+
+
+class _PreprocessingBackend(_FakeBackend):
+    """A backend that declares which pre-processing it applied, as the real one does."""
+
+    def __init__(self, preprocess):
+        super().__init__()
+        self.preprocess = preprocess
+
+
+def test_the_adapter_declares_the_preprocessing_its_backend_applied():
+    """The seed's lesson, applied to the other half of the configuration: the backend is what
+    builds the transform, so the backend is what declares it and the adapter only passes it on.
+    A value the adapter invented would put a pre-processing into provenance that nothing ran."""
+    assert PatchCoreRef(backend=_PreprocessingBackend("classic")).preprocess == "classic"
+
+
+def test_a_backend_that_declares_nothing_leaves_the_adapter_declaring_nothing():
+    """The fakes in this file predate the seam. None is the honest answer for them — not a
+    default that would make an unknown pre-processing look like the anomalib one."""
+    assert PatchCoreRef(backend=_FakeBackend()).preprocess is None
+
+
+def test_asking_for_a_preprocessing_the_backend_does_not_apply_refuses():
+    """Exactly the seed guard's shape. The adapter cannot make the backend use the other one,
+    so the only safe outcome is to refuse rather than record the wrong one."""
+    with pytest.raises(ValueError, match="classic"):
+        PatchCoreRef(backend=_PreprocessingBackend("anomalib"), preprocess="classic")
+
+
+def test_without_a_backend_the_requested_preprocessing_is_kept_for_later_checking():
+    """Mirrors the seed: nothing has been constructed that could apply anything, and prepare()
+    refuses before this method scores — so keep what was asked for."""
+    assert PatchCoreRef(preprocess="classic").preprocess == "classic"
