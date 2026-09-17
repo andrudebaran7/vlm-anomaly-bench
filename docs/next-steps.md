@@ -481,6 +481,73 @@ has never been measured on real data, could plausibly cover it. That measurement
 regardless of what is decided about the gate: **no reported number may come from one seed**, not
 even the number behind "PatchCore is flagged as not reproduced".
 
+## The options for the next session, written down before it starts (2026-09-17)
+
+The three-seed run is owed and is not one of the options — §6 forbids reporting any number from
+one seed, including the number behind "PatchCore is flagged as not reproduced". What follows is
+everything that *is* a choice, in the order it arrives.
+
+### Decision 1 — before running: where seed 0 comes from
+
+Detailed in cell 3b.3's markdown. `SEEDS = (0, 1, 2)` re-runs all three (~2 h, identical
+provenance); `SEEDS = (1, 2)` reuses the 2026-09-16 shards from `MyDrive/reproduction/` (~80 min,
+seed 0's provenance asymmetric to its siblings). The reused shards are numerically valid: the
+`anomalib` path is untouched by the pre-processing work, because `preprocess_spec("anomalib")`
+returns `center_crop: None` and never modifies the model.
+
+### Decision 2 — after the three seeds: the gate verdict
+
+Score with `--all-seeds`. The verdict is on the **mean of the per-seed means**; the std is
+reported and never gates (§6 v0.2.13). Three outcomes:
+
+**(a) The mean lands within ±1.0 → PASS.** M2 closes. PatchCore becomes the unflagged full-shot
+anchor, phase 4 finishes (commit the notebook, confirm CI), and M3 — the full MVTec AD 2 grid —
+unblocks. Note that a PASS reached this way is a PASS *despite* the pre-processing deviation, not
+because it was fixed; §3.2 of the paper already says why that is worth stating.
+
+**(b) The mean still misses → FAIL, and the choice is between two honest endings.**
+
+- **Accept it.** PatchCore is flagged as not-reproduced in every table it appears in (§2). It
+  still functions as the comparison anchor — the flag is a disclosure, not a disqualification —
+  and WinCLIP starts immediately. This is the cheapest ending and it costs nothing in
+  credibility, which is the whole reason §2 says "flag, don't drop".
+- **Keep investigating**, under the constraint below.
+
+**(c) The seeds disagree wildly** (a large std, some seeds passing and some failing). The verdict
+is still on the mean, so this does not change the outcome — but it would be a finding in its own
+right about PatchCore's stability at this coreset ratio, and it belongs in the paper's §5.5
+whatever the verdict is.
+
+### If the choice is "keep investigating": what §7 allows
+
+**Both pre-registered causes are now spent.** CenterCrop is refuted; the seed will have been
+measured. Anything further is a post-hoc hypothesis, and §7 does not forbid testing one — it
+forbids *tuning* and it forbids reporting only the tests that helped. A new cause is legitimate
+if it is **written down and dated before its test runs**, and if its outcome is recorded either
+way. So the candidates below are pre-registered here, on **2026-09-17**, before any of them has
+been run:
+
+1. **The backbone weights may not be the paper's.** The 3b.1 log shows anomalib fetching
+   `model.safetensors` (276 MB) from the HuggingFace Hub, which is timm's loading path, whereas
+   the original PatchCore uses torchvision's ImageNet `wide_resnet50_2`. Those are different
+   checkpoints from different training recipes, and PatchCore is entirely a function of its
+   frozen features — so this is the largest remaining unexamined difference between our anchor
+   and the paper's. **It needs a VERIFY step before it means anything**: print the resolved timm
+   model id and checkpoint source in Colab, and compare against torchvision's. Do not act on the
+   inference above; it is read off a download line, not off the library.
+2. **The tolerance may be too tight for this particular mean.** `toothbrush` has 42 test images,
+   where one image moves its I-AUROC by about 0.3 points, and it contributed more than half the
+   original miss. A ±1.0 tolerance on a 15-category mean containing a category that granular may
+   be measuring sampling noise. **This one may be reported but must not be acted on**: the
+   tolerance was pre-registered, and widening it after seeing a miss is precisely what §7
+   forbids. It is a limitation for §5.5, not a fix.
+
+### Independent of all of the above
+
+**Phase 3.4, the VisA secondary check, has still never been run.** It does not gate (§2 v0.2.12)
+and it is cheap relative to a 15-category fit. It adds a second, independent reading of the same
+implementation, which is worth having before deciding (b) either way.
+
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 
 Vial end to end through `run_evaluation` on a Colab T4, anomalib 2.6.0 under **Python 3.13**
@@ -622,9 +689,10 @@ the restart-recovery cell if Colab asks), **1.1** (hard sync), **3.1** (extract 
 Budget ~2 h for `SEEDS = (0, 1, 2)`; the runner is resumable, so a dropped session costs one
 category.
 
-Then the gate decision comes back, informed rather than open: accept the FAIL and flag PatchCore
-as not-reproduced in every table (§2), or keep going. Phase 3.4 (the VisA secondary check) has
-still never been run and is independent of all of this.
+Then the gate decision comes back, informed rather than open. **The full decision tree — both
+choices, all three outcomes, and the two post-hoc causes pre-registered on 2026-09-17 so that
+testing them later stays legitimate — is written out in "The options for the next session" below.
+Read that section before deciding anything.**
 
 Both repos clean and in sync with `origin/master`; bench: 429 tests green on Python 3.11 and
 3.13.
