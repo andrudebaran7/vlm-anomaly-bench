@@ -13,7 +13,7 @@ that cost and what it means for the four methods behind it.
 
 - **Evaluation core:** image/pixel metrics (P-AUROC, AU-PRO, SegF1), provenance, a crash-safe
   result store, a resumable runner with per-sample latency, per-category `fit` for full-shot
-  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.12**.
+  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.13**.
 - **MVTec AD 2 data path:** loader (verified against the real Vial archive), layout verification
   (`scripts/prepare_data.py`), and the run_eval CLI. Native-resolution, raw-scale maps (v0.2.6).
 - **Method adapters — CPU halves done and registered** (each wraps an injectable backend; without
@@ -66,14 +66,16 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
       (`PatchCoreBackend(seed=0)`) and the runner stamps that seed; phase 2's shard is still a
       plumbing check and must not be reported.
    4. **Phase 3 — RAN 2026-09-16 and the gate FAILED by 0.057. Open, see its section below.**
-      Cells 3.1–3.4 in the notebook.
+      Cells 3.1–3.4 in the notebook. **Phase 3b (cells 3b.0–3b.3) is the decided next move**: the
+      same 15 categories with `preprocess="classic"`, then the three seeds §6 requires.
       The gate is **MVTec AD classic at 99.0 ± 1.0 I-AUROC**, not VisA — protocol §2 v0.2.12.
       Result committed at `results/reproduction/patchcore_mvtec_ad.md`. The VisA secondary check
       (cell 3.4) was **not run** — the session ended first.
-   5. **Phase 4 — freeze provenance.** `configs/methods/patchcore_ref.yaml` still carries the
-      `anomalib_version: ">=1.1"` range with "record the resolved version" next to it; the resolved
-      version is **2.6.0** (Colab T4, torch 2.11.0+cu128, 2026-08-21). Commit the notebook, confirm
-      both CI jobs stay green.
+   5. ~~**Phase 4 — freeze provenance.**~~ **Half done 2026-09-17.**
+      `configs/methods/patchcore_ref.yaml` now pins `anomalib_version: "2.6.0"` (Colab T4, torch
+      2.11.0+cu128, 2026-08-21) instead of the `">=1.1"` range, and a test holds it to an exact
+      pin. What remains is mechanical: commit the notebook after the 3b session and confirm both
+      CI jobs stay green.
 2. **WinCLIP Colab phases (A–D)** — the Colab half of
    `docs/superpowers/plans/2026-07-24-winclip-zeroshot-adapter.md`. First zero-shot method; anomalib
    backend. Watch: if it misses the VisA gate, the likely cause is anomalib's prompt ensemble
@@ -243,17 +245,28 @@ seeing results, so what may be changed is only what was already written down as 
 
 ### What is owed next, and one gap in the tooling
 
-**The decision is the author's and is deliberately open**: accept the FAIL and flag PatchCore as
-not-reproduced in every table (protocol §2), or investigate. The cheapest investigation by a wide
-margin is a **~3 minute probe on `toothbrush` alone** with the classic pre-processor, since that
-one category flips the verdict and its 60 training images make it the fastest to fit.
+**Decided 2026-09-17: investigate, over all 15 categories.** The author chose the full grid
+rather than the ~3-minute `toothbrush`-only probe: a 15-category run with the classic
+pre-processor produces a gate score *directly comparable* to the failed one, where a single
+category would only have said whether toothbrush moves, not whether the mean does. It costs the
+session (~40 minutes of fit) on a hypothesis that is not yet confirmed; that trade was made with
+the alternative on the table.
 
-Whatever is chosen, **both runs get recorded, not just a passing one.**
+**Both runs get recorded, not just a passing one.** The phase-3 FAIL at
+`results/reproduction/patchcore_mvtec_ad.md` is not overwritten; the classic run writes to
+`patchcore_mvtec_ad_classic.md`.
 
-**Tooling gap found by this run:** `scripts/reproduction_gate.py` scores a single seed and refuses
-a root that pools seeds — correctly — but there is therefore no way to score the three-seed run
-§6 requires. It needs seed selection, and a mode that reports mean ± std across seeds. That is CPU
-work, not yet done.
+**The tooling for it is built and on `master` (2026-09-17), so the next Colab session designs
+nothing** — see "The classic pre-processor is now a switch" below.
+
+**Tooling gap found by this run — CLOSED 2026-09-17.** `scripts/reproduction_gate.py` scored a
+single seed and refused a root that pools seeds — correctly — leaving no way to score the
+three-seed run §6 requires. It now takes `--seed N` (and `--seed unseeded`, which is not seed 0)
+to score one seed out of such a root, and `--all-seeds` to score each separately and report the
+**mean of the per-seed means ± their sample std**. The std is reported and never gates; §6 v0.2.13
+settles that, because §6 asked for "mean ± std" without saying which number the verdict is on.
+The required seed count is pre-registered as `n_seeds: 3` in the targets file, next to the
+category count, and `--all-seeds` refuses a root holding any other number.
 
 **Session state:** the Colab session was closed after 3.3. The shards were copied to
 `MyDrive/reproduction/` so the gate can be re-scored, and a single category re-run, without
@@ -279,6 +292,60 @@ So the adapter runs **31% more patches per image than classic PatchCore, over th
 rather than the centre crop**. This is the anomalib 2.6.0 pre-processor (`Resize([256,256]) +
 Normalize`, no CenterCrop) recorded in the 2026-08-21 session note, now quantified. If the gate
 misses, this is the measured difference to attribute it to; if it passes, it passes despite it.
+
+## The classic pre-processor is now a switch, and the gate can score three seeds (2026-09-17)
+
+CPU work, on `master`, 426 tests green. It exists so the next Colab session runs cells and reads
+numbers instead of designing anything.
+
+**`PatchCoreBackend(preprocess=...)`** takes `"anomalib"` (the default — 2.6.0's own
+`Resize([256,256]) + Normalize`, a 32x32 grid, which is what every number measured so far came
+from) or `"classic"` (PatchCore's `Resize(256) -> CenterCrop(224)`, a 28x28 grid). The name is
+validated **before** the lazy anomalib import, so a typo in a notebook cell fails in a
+millisecond instead of after the install, the weights and a 40-minute fit.
+
+Three things about how it is built are deliberate:
+
+- **It does not import a `PreProcessor` class from a documentation path.** anomalib 2.6.0's
+  Engine API was verified on 2026-08-21; its PreProcessor API was not, and this backend has been
+  bitten five separate times by a call that looked reasonable and had never been run. The classic
+  branch reaches the PreProcessor anomalib itself built on the model and reuses that object's own
+  `Normalize`, rather than re-stating ImageNet's constants from memory. If the shape it expects
+  is not there, it raises naming what it actually found.
+- **`preprocess` is declared by the backend and passed on by the adapter**, exactly like `seed`,
+  and `PatchCoreRef` refuses a declared value its backend does not apply. This is the seed defect
+  — a number in provenance that nothing applied — kept from walking back in through the other
+  half of the configuration. It is NOT on the shared `BackendSeeded` contract: the
+  256-vs-224 question is anomalib's PatchCore pre-processor specifically, and the other five
+  adapters have no such choice to declare.
+- **Probe stage 13 checks the consequence, not the API.** It fits 20 synthetic images under both
+  pre-processings and compares coreset sizes, which must be 784 patches per image for `classic`
+  against 1024 for `anomalib`. A transform assigned somewhere the forward pass never looks would
+  pass an API check and still produce a complete, plausible, wrong run. Cell 3b.0 runs it and
+  asserts before 3b.1 is allowed to start.
+
+**Recorded now rather than discovered later:** a centre crop means the anomaly map covers only
+the middle 224/256 of the frame, and `PatchCoreRef` then upsamples it across the **whole** native
+image. The reproduction gate is image-level I-AUROC and is unaffected. **Any pixel-level number
+from a `classic` run would be spatially wrong** — which is one more reason the choice is recorded
+per shard.
+
+**`scripts/reproduction_gate.py`** gained `--seed N` (and `--seed unseeded`, which is not seed 0)
+and `--all-seeds`; see the tooling-gap paragraph above. It also now refuses a root whose shards
+disagree about `preprocess`. That is not hypothetical: the shard filename carries only
+dataset/method/category/seed, `run_id` keys map directories on `config_hash`, and the 2026-09-16
+shards were copied into `MyDrive/reproduction/` to be re-scored — two pre-processings reach one
+root the moment someone copies the wrong folder.
+
+**One thing the approved design did not survive contact with:** `run_eval.py` was to gain a
+`--preprocess` flag. It did not, because the CLI cannot run PatchCore at all — `build_method()`
+constructs adapters by name and cannot inject a backend, so `patchcore_ref` from the CLI always
+has `backend=None` and `prepare()` raises `MethodNotRunnable`. A flag there could never take
+effect. The `preprocess` key goes into the `run_meta({...})` cfg in the notebook cell instead,
+which is where phase 3 actually executes, and that is also what gives the classic run its own
+`config_hash` and therefore its own map directory. (The usage example in the gate's docstring
+showing `run_eval.py --method patchcore_ref` is aspirational for the same reason; it is not new,
+and it is not fixed here.)
 
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 
@@ -405,7 +472,20 @@ These cannot be pre-written without the data/repo in front of you, and each play
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 
-## Where to pick up (session handoff, 2026-08-26, after the second Colab session)
+## Where to pick up (session handoff, 2026-09-17)
+
+**The next move is one Colab session with nothing left to design: notebook cells 3b.0 → 3b.1 →
+3b.2.** Upload is already done (the 15 MVTec AD classic `.tar.xz` in `MyDrive/mvtec_ad/`, cell
+3.1 extracts them). Run 3b.0 first and stop if it fails — it is the one-minute check that stands
+between you and a 40-minute run of wrong numbers. 3b.2 prints the two gate reports side by side
+with the toothbrush row called out, which is the comparison this whole phase was opened for.
+
+Then, whichever configuration wins, **cells 3b.3 for seeds 1 and 2** — no number from either
+report is reportable on one seed (§6), and `--all-seeds` now exists to score them.
+
+Both repos clean and in sync with `origin/master`; bench: 426 tests green on Python 3.11.
+
+Older handoff (2026-08-26, after the second Colab session) follows.
 
 **Phase 1 of the PatchCore playbook is closed.** The backend is built, verified stage by stage on a
 Colab T4 (anomalib 2.6.0, torch 2.11.0+cu128), and reproducible under a fixed seed. Both repos are
