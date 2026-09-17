@@ -542,11 +542,36 @@ been run:
    tolerance was pre-registered, and widening it after seeing a miss is precisely what §7
    forbids. It is a limitation for §5.5, not a fix.
 
-### Independent of all of the above
+### VisA — deferred into the same session (decided 2026-09-17)
 
-**Phase 3.4, the VisA secondary check, has still never been run.** It does not gate (§2 v0.2.12)
-and it is cheap relative to a 15-category fit. It adds a second, independent reading of the same
-implementation, which is worth having before deciding (b) either way.
+**Phase 3.4, the VisA secondary check, has still never been run**, and the author chose on
+2026-09-17 to run it in the seeds session rather than on its own. It is now one typed line —
+`!python scripts/run_visa_secondary.py`, a tracked script rather than notebook JSON, so a fix to
+it reaches a live session through cell 1.1.
+
+**It is not cheap.** An earlier note in this file called it "cheap relative to a 15-category fit";
+that was wrong and is corrected here. VisA's one-class split carries **8,659 train normals across
+12 objects** against MVTec AD classic's 3,629 across 15, plus 2,162 test images — roughly **two
+hours**, comparable to the MVTec grid rather than a fraction of it.
+
+**Order the session so a drop costs the least.** Both runs are resumable per category, but they
+are not equally important:
+
+1. **Setup** — phase 0, cell 1.1, cell 3.1 (~15 min).
+2. **The three seeds on MVTec first.** They decide M2 and the gate verdict. `SEEDS = (0, 1, 2)`
+   is ~2 h, `(1, 2)` with seed 0 restored from Drive is ~80 min.
+3. **VisA last**, at seed 0 (~2 h). It is informational: it gives a second independent reading of
+   the same implementation, which is worth having before choosing between the two endings under
+   Decision 2, but it cannot change the verdict.
+
+Total 3.5–4.5 hours, which is a long session for a free T4. Putting the seeds first means a drop
+costs the reading, not the decision.
+
+**One consequence to accept going in:** §2 v0.2.12 says VisA is *reported*, with its caveat. A
+reported number falls under §6 like any other, so a complete VisA figure eventually needs three
+seeds too — another ~4 h. Seed 0 alone is a first reading that tells you whether the
+implementation is in the right region; it is not the number that goes in a table, and the script
+takes `--seed` for the rest when that matters.
 
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 
