@@ -388,6 +388,47 @@ property of the transform, not of the data, exactly as `preprocess_spec` assumes
 module(s) in eval mode at the start of training" and "`configure_optimizers` returned `None`"
 (PatchCore does not train), and the unauthenticated HF Hub warning for the 276 MB timm backbone.
 
+## Phase 3b.1 ran: all 15 categories under the classic pre-processor (2026-09-17)
+
+Colab T4, anomalib 2.6.0, Python 3.13, seed 0, `preprocess=classic`, into
+`results/reproduction/mvtec_ad_classic/`. Every category printed
+`done (seed 0, preprocess classic)`.
+
+**The coreset sizes confirm the transform reached all fifteen, not just the first.** The sampler's
+progress bar totals `rows - 1` (established twice in stage 13: 2047→2048, 1567→1568), so the
+coreset size is recoverable from the log, and every category lands on **78.4 points per training
+image** — the classic 28x28 grid — against the 102.4 the anomalib transform gave on 2026-09-16:
+
+| category | coreset rows | per image | anomalib would have given |
+|---|---|---|---|
+| bottle | 16385 | 78.4 | 21401 |
+| cable | 17561 | 78.4 | 22937 |
+| capsule | 17169 | 78.4 | 22425 |
+| carpet | 21952 | 78.4 | 28672 |
+| grid | 20697 | 78.4 | 27033 |
+| hazelnut | 30654 | 78.4 | 40038 |
+| leather | 19208 | 78.4 | 25088 |
+| metal_nut | 17248 | 78.4 | 22528 |
+| pill | 20932 | 78.4 | 27340 |
+| screw | 25088 | 78.4 | 32768 |
+| tile | 18032 | 78.4 | 23552 |
+| toothbrush | 4704 | 78.4 | 6144 |
+| transistor | 16699 | 78.4 | 21811 |
+| wood | 19364 | 78.4 | 25292 |
+| zipper | 18816 | 78.4 | 24576 |
+
+284,509 coreset points in total, against 371,605 under the anomalib transform. This is a
+**per-category** check, and it is the one that matters: a switch that silently applied to the
+first backend only would have passed stage 13 and then produced fourteen categories of wrong
+numbers.
+
+**It also completes the train-count record.** The 2026-09-16 note derived twelve counts from the
+coreset sizes and left three out; the same arithmetic gives **transistor 213, wood 247,
+zipper 240**, which are MVTec AD's published figures. All fifteen are now accounted for.
+
+**Cost:** the coreset fits ran 3s (toothbrush, 60 images) to 2m29s (hazelnut, 391), consistent
+with the 30-60 minute budget the cell states.
+
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 
 Vial end to end through `run_evaluation` on a Colab T4, anomalib 2.6.0 under **Python 3.13**
