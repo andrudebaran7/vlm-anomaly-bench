@@ -9,7 +9,7 @@
 
 **Status:** protocol frozen at v0.2.13 (see [`docs/protocol.md`](docs/protocol.md)); the evaluation
 core — metrics, resumable runner, MVTec AD 2 loader and lighting-grouped aggregation — is built and
-tested (427 of 427 tests passing, no dataset or GPU required), verified end-to-end
+tested (428 of 428 tests passing, no dataset or GPU required), verified end-to-end
 against the real MVTec AD 2 layout. The CPU-testable half of every method adapter is done; only the
 Colab GPU backends remain before the first results. No results computed yet.
 
