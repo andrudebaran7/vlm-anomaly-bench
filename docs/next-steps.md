@@ -239,9 +239,11 @@ seeing results, so what may be changed is only what was already written down as 
    on 2026-08-26, and the whole seed-provenance apparatus was built for it. A miss of 0.057 with
    the seed spread unmeasured is not yet a verdict — it is a result awaiting two more runs.
    **This is owed regardless of what else is decided**: no reported number may come from one seed.
-2. **The CenterCrop deviation**, recorded 2026-08-21 as "suspect number one if the ±1pt gate
-   misses" and quantified today (see the section below): the adapter runs a 32x32 patch grid from
-   a 256x256 input where classic PatchCore's `Resize(256) -> CenterCrop(224)` gives 28x28.
+   **This is now the only one of the two still standing** — see the refutation section below.
+2. ~~**The CenterCrop deviation**~~ — **REFUTED 2026-09-17.** Recorded 2026-08-21 as "suspect
+   number one if the ±1pt gate misses", quantified 2026-09-16 and tested 2026-09-17: running the
+   classic transform gives **93.41**, i.e. it misses by 4.590 instead of 0.060. See the
+   refutation section below.
 
 ### What is owed next, and one gap in the tooling
 
@@ -428,6 +430,56 @@ zipper 240**, which are MVTec AD's published figures. All fifteen are now accoun
 
 **Cost:** the coreset fits ran 3s (toothbrush, 60 images) to 2m29s (hazelnut, 391), consistent
 with the 30-60 minute budget the cell states.
+
+## The CenterCrop hypothesis is REFUTED (2026-09-17, phase 3b.2)
+
+**Pre-registered 2026-08-21 as "suspect number one if the ±1pt gate misses". Tested 2026-09-17.
+The answer is no, and it is not close.**
+
+| | anomalib (2026-09-16) | classic (2026-09-17) |
+|---|---|---|
+| mean I-AUROC | **97.94** | **93.41** |
+| misses the ±1.0 gate by | 0.060 | 4.590 |
+
+Report committed at `results/reproduction/patchcore_mvtec_ad_classic.md`, beside the phase-3 one.
+Seed 0, Tesla T4, anomalib 2.6.0, commit `51c6404`.
+
+**The failure is structured, not uniform.** Twelve of fifteen categories barely move (|delta| <
+2.3). Three collapse:
+
+| category | anomalib | classic | delta |
+|---|---|---|---|
+| capsule | 98.44 | **58.20** | **-40.24** |
+| screw | 97.32 | **80.28** | **-17.04** |
+| toothbrush | 90.83 | **84.44** | **-6.39** |
+
+Those three are exactly the categories whose object is elongated or reaches the frame edge — the
+capsule lies diagonally with its ends toward the corners, the screw is a thin diagonal whose tip
+sits near the border, the toothbrush carries its bristle head at one end. `CenterCrop(224)` from
+256 discards 12.5% of every edge, i.e. the region those categories are discriminated on. That is
+a *hypothesis for the mechanism*, offered as such; the refutation itself does not depend on it.
+
+**What this does and does not settle.**
+
+- **Settled:** the CenterCrop deviation does not explain the 0.057 miss. Removing the deviation
+  costs 4.5 points rather than recovering 0.06. The repo stays on the `anomalib` pre-processing,
+  which is already its default — nothing is changed in response to a result, and nothing needs to
+  be (protocol §7).
+- **Also settled, and worth stating because it is counter-intuitive:** the 31% extra patches over
+  the full frame are not a handicap here. They are why three categories work at all.
+- **NOT settled:** our `classic` does not reproduce the paper's classic. The paper reports 99.0
+  *with* a crop, including capsule 97.8 and screw 97.0, where ours gives 58.20 and 80.28. Either
+  our classic is unfaithful in some way not yet found, or the paper's pipeline differs elsewhere
+  such that the crop is harmless there. **This question is not opened.** Chasing it would mean
+  tuning an implementation against a target after seeing its score, which is exactly what §7
+  forbids; the pre-registered question was asked and answered, and the answer does not depend on
+  which of those two readings is right.
+
+**The one pre-registered cause left standing is the seed.** Only one was run and §6 requires
+three. The anomalib configuration misses by **0.060** — small enough that the seed spread, which
+has never been measured on real data, could plausibly cover it. That measurement is owed
+regardless of what is decided about the gate: **no reported number may come from one seed**, not
+even the number behind "PatchCore is flagged as not reproduced".
 
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 
