@@ -13,7 +13,7 @@ that cost and what it means for the four methods behind it.
 
 - **Evaluation core:** image/pixel metrics (P-AUROC, AU-PRO, SegF1), provenance, a crash-safe
   result store, a resumable runner with per-sample latency, per-category `fit` for full-shot
-  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.13**.
+  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.14**.
 - **MVTec AD 2 data path:** loader (verified against the real Vial archive), layout verification
   (`scripts/prepare_data.py`), and the run_eval CLI. Native-resolution, raw-scale maps (v0.2.6).
 - **Method adapters — CPU halves done and registered** (each wraps an injectable backend; without
@@ -78,8 +78,12 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
       CI jobs stay green.
 2. **WinCLIP Colab phases (A–D)** — the Colab half of
    `docs/superpowers/plans/2026-07-24-winclip-zeroshot-adapter.md`. First zero-shot method; anomalib
-   backend. Watch: if it misses the VisA gate, the likely cause is anomalib's prompt ensemble
-   differing from the paper (a §3 priority-2-source risk) — flag it if so.
+   backend. **Its targets are read and pre-registered (2026-09-18) — see the section below.**
+   Nothing about the acceptance criterion is left to the session: two gates, 91.8 on MVTec AD and
+   78.1 on VisA, with per-category values for both. Watch: if it misses, the likely cause is
+   anomalib's prompt ensemble differing from the paper (a §3 priority-2-source risk) — which is
+   now a **count** (154 normal / 88 anomaly prompts) to check in phase A, not a suspicion to
+   raise afterwards.
 3. **AnomalyCLIP Colab phases (A–D)** — the Colab half of
    `docs/superpowers/plans/2026-07-25-anomalyclip-zeroshot-adapter.md`. Uses the **official repo**
    (anomalib does not ship it), so its backend is derived from the repo's `test.py` at a pinned
@@ -579,6 +583,70 @@ seeds too — another ~4 h. Seed 0 alone is a first reading that tells you wheth
 implementation is in the right region; it is not the number that goes in a table, and the script
 takes `--seed` for the rest when that matters.
 
+## WinCLIP's gate is read and pre-registered — and it is TWO gates (2026-09-18, protocol v0.2.14)
+
+CPU work, done while the PatchCore seeds session ran, because it does not depend on that verdict:
+WinCLIP is the next method either way. **The paper was read directly** (arXiv:2303.14814v1 PDF,
+21 pages) and recorded in `../vlm-anomaly-paper/docs/verified-literature-facts.md` (fifth pass)
+**before** anything was written into a config — the ordering this project got wrong three times
+before it stuck.
+
+**The outcome is the opposite of PatchCore's.** PatchCore's paper predates VisA, so it had one
+gate and one weak secondary check. WinCLIP's is CVPR 2023, postdates VisA, and reports both
+benchmarks zero-shot at the backbone and window scales this repo runs. Under §2's rule — the
+target must come from the method's own paper at the configuration this repo runs — **both
+qualify, so both gate it**:
+
+| | published (Table 1, `0-shot`, `WinCLIP (ours)`) | per-category source |
+|---|---|---|
+| MVTec AD classic (15) | **91.8** ± 1.0 I-AUROC | Table 10, column `K=0` |
+| VisA (12) | **78.1** ± 1.0 I-AUROC | Table 16, column `K=0` |
+
+All 27 per-category values are in `configs/reproduction/winclip.yaml`. Both lists were summed and
+divided: 91.81 and 78.06, which round to the printed means — a transcription check, kept by
+`test_winclip_per_category_numbers_average_to_their_published_means`.
+
+**This confirms a number that had been carrying a warning label.** The paper repo's
+"SEARCH-REPORTED BUT NOT PRIMARY-VERIFIED" list held WinCLIP's VisA 78.1 from a search summary.
+It was right — and it stays struck through rather than deleted, because one correct summary is
+not a reason to trust the next. AnomalyCLIP's 82.1 is still on that list, unread.
+
+**Three things the paper settled that the plan carried as open risks:**
+
+1. **The prompt ensemble is countable.** Figure 6 lists 7 normal state words, 4 anomaly state
+   words and 22 templates, so the paper's ensemble is **154 normal and 88 anomaly prompts**.
+   The plan named "anomalib's ensemble may differ from the paper" as the likely cause of a miss;
+   it is now a count to check in phase A, before scoring, instead of a suspicion raised after.
+2. **The pre-trained weights are a real open question.** The paper uses **LAION-400M** CLIP
+   ViT-B/16+; what anomalib resolves to has never been observed. `configs/methods/winclip.yaml`
+   now records both, the second as `unverified_until_first_colab_run`. This is WinCLIP's version
+   of the backbone question still open for PatchCore — same architecture, different pre-training,
+   entirely different frozen features.
+3. **Table 7's VisA 78.9 is not the target.** It is the `+ specific states` ablation, which adds
+   per-object defect words for PCB2/PCB4/Pipe fryum — the per-category prompt content §3 forbids
+   us to write. It sits in the targets file under `not_the_target` precisely because it is higher
+   than the real target and would be the tempting number to chase.
+
+**Whether WinCLIP owes three seeds is a pre-registered measurement, not an assumption.** §6 says
+three "where any stochasticity exists". The paper's 0-shot rows all carry ±0.0, but its five seeds
+vary *shot sampling*, which zero-shot has none of — evidence about its pipeline, not ours. The
+targets file pre-registers the procedure: run one category twice at two seeds; bit-identical image
+scores mean one run is reportable with that measurement recorded beside it, anything else means
+three seeds and `--all-seeds`. PatchCore is the standing reminder that a seed can be recorded
+without being applied.
+
+**The tooling gap this opened, and how it was closed.** `configs/reproduction/*.yaml` could
+express one `gate` and one non-gating `secondary`, with the per-category map at the top level — a
+shape that assumed one gate per method. `--which` now names a target block, and a block declares
+`gates:` itself and may carry its own `per_category`/`n_categories`. **PatchCore's file is
+untouched and loads exactly as before** (the legacy top-level keys are still read, and a test pins
+that), which mattered because its three-seed run was in flight when this landed. Calling WinCLIP's
+second dataset `secondary` would have been the cheap fix, and would have recorded it as the thing
+§2 says cannot fail a method.
+
+**Cost, for the session that runs it:** two full grids, not one — 15 MVTec AD categories plus 12
+VisA objects, and VisA's one-class split is the larger of the two (8,659 train normals).
+
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 
 Vial end to end through `run_evaluation` on a Colab T4, anomalib 2.6.0 under **Python 3.13**
@@ -698,9 +766,11 @@ These cannot be pre-written without the data/repo in front of you, and each play
   archive. `src/vlmab/datasets/mvtec_ad.py` was built with it, and both are in the dataset registry
   so `run_eval.py --dataset` reaches them.
 - **The published-numbers table**, from each method's own paper — record the exact source next to
-  it. **Done for PatchCore** (`configs/reproduction/patchcore_ref.yaml`). For the other four,
-  read the paper first: PatchCore's case showed the table cannot be assumed to exist, and which
-  dataset may gate a method is now a §2 v0.2.12 decision recorded before its Colab run.
+  it. **Done for PatchCore** (`configs/reproduction/patchcore_ref.yaml`) **and for WinCLIP**
+  (`configs/reproduction/winclip.yaml`). For the remaining three — AnomalyCLIP, AdaCLIP, SAA+ —
+  read the paper first: PatchCore's case showed the table cannot be assumed to exist, WinCLIP's
+  showed it can also be richer than expected, and which dataset may gate a method is a §2 v0.2.12
+  decision recorded before its Colab run.
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 

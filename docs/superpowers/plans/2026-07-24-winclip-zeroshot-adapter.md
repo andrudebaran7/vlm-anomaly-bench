@@ -9,7 +9,16 @@
 >
 > For the CPU tasks only: REQUIRED SUB-SKILL: superpowers:subagent-driven-development.
 
-**Goal:** Build the WinCLIP zero-shot adapter over an injectable backend (CPU-testable), then implement and validate the real anomalib WinCLIP backend on Colab against the ±1pt VisA reproduction gate.
+**Goal:** Build the WinCLIP zero-shot adapter over an injectable backend (CPU-testable), then implement and validate the real anomalib WinCLIP backend on Colab against the ±1pt reproduction gates.
+
+> **AMENDED 2026-09-18 — there are TWO gates, not one.** This plan was written before protocol §2
+> v0.2.12, and says "the VisA gate" throughout. WinCLIP's own paper was read on 2026-09-18 and it
+> reports **both** MVTec AD (91.8) and VisA (78.1) zero-shot image-AUROC at the configuration this
+> repo runs, so both are pass/fail gates (§2 v0.2.14). Targets, including per-category values for
+> all 15 and all 12, are pre-registered in `configs/reproduction/winclip.yaml`; score each root
+> with `scripts/reproduction_gate.py --which gate_mvtec_ad` / `--which gate_visa`. Read
+> `../vlm-anomaly-paper/docs/verified-literature-facts.md` (fifth pass) before the Colab session.
+> Wherever the text below says "the VisA gate", read "either gate".
 
 **Architecture:** WinCLIP is zero-shot — no fit, it slots into the existing `AnomalyMethod` contract with just `prepare` + `predict`. The adapter `WinClipRef` wraps a backend with a single `score(image, category) -> (raw_score, raw_map)`; the category is passed through because it is the object noun in WinCLIP's handcrafted prompt ensemble (verbatim from the paper, protocol §3), which changes the text embeddings. anomalib and CLIP are reached only through the injected backend, so the adapter is fully CPU-tested with a fake and the real CLIP forward is GPU-only. Raw score and map are passed through and the map upsampled to native resolution (protocol v0.2.6).
 
@@ -20,9 +29,12 @@
 - CPU tasks: every test passes with only `numpy scipy scikit-learn pandas pyarrow pillow pytest`. No test and no module imported at load time may require torch, anomalib, transformers, open_clip or any YAML library. anomalib/CLIP are reached only through the injected backend.
 - WinCLIP is **zero-shot** (`zero_shot = True`): no fit path. WinCLIP+ (few-shot) is out of scope — a separate plan.
 - **Prompts verbatim from the WinCLIP paper** (protocol §3): no prompt tuning, no per-category prompt engineering. anomalib's WinClip encodes the paper's ensemble; the `class_name` is the only per-category knob and is set to the MVTec AD 2 category noun, consistent across the fixed ensemble.
-- **Provenance is anomalib** (protocol §3 priority 2 — the official code's ensemble reproduced by anomalib). The §2 VisA reproduction gate is the check that this reproduction is faithful. Record the resolved anomalib version in `configs/methods/winclip.yaml`.
+- **Provenance is anomalib** (protocol §3 priority 2 — the official code's ensemble reproduced by anomalib). The §2 reproduction gates are the check that this reproduction is faithful. Record the resolved anomalib version in `configs/methods/winclip.yaml`.
+- **The prompt ensemble is now countable, so check it instead of suspecting it.** The paper's Figure 6 lists **7 normal state words × 22 templates = 154 normal prompts** and **4 anomaly state words × 22 templates = 88 anomaly prompts** (verified 2026-09-18). anomalib's ensemble differing from the paper is this plan's named priority-2 risk; in Colab phase A, count what anomalib builds and compare against those two numbers *before* scoring anything, rather than reaching for the ensemble after a gate misses.
+- **The pre-trained weights are an open VERIFY, not an assumption.** The paper uses **LAION-400M** CLIP ViT-B/16+ (§5). What anomalib's WinClip resolves to has never been observed; `configs/methods/winclip.yaml` carries `pretrained_resolved: unverified_until_first_colab_run`. Same architecture with different pre-training is a different model, and WinCLIP is entirely a function of its frozen features — this is the WinCLIP analogue of the backbone question left open for PatchCore.
 - Anomaly maps and scores are RAW (protocol v0.2.6); `WinClipRef` upsamples the map to the input image's native resolution (protocol §4). Never per-image normalise.
-- **The §2 VisA reproduction gate is a hard acceptance criterion**: no MVTec AD 2 number until WinCLIP reproduces its published zero-shot VisA image-AUROC within ±1.0 through this adapter and this repo's metrics. A miss flags the method in every table.
+- **The §2 reproduction gates are a hard acceptance criterion**: no MVTec AD 2 number until WinCLIP reproduces **both** its published zero-shot MVTec AD image-AUROC (91.8) and its VisA one (78.1) within ±1.0, through this adapter and this repo's metrics. A miss on either flags the method in every table. Budget for two full grids, not one — 15 categories plus 12 objects.
+- **Whether three seeds are owed is a measurement, not an assumption.** §6 asks for three "where any stochasticity exists". The paper's 0-shot rows carry ±0.0, but its seeds vary shot sampling, which zero-shot has none of — that is evidence about the paper's pipeline, not ours. `configs/reproduction/winclip.yaml` pre-registers the deciding procedure: run one category twice at two seeds, and if the image scores are bit-identical, one run is reportable with that measurement recorded beside it; otherwise three seeds and `--all-seeds`.
 
 ## Files
 

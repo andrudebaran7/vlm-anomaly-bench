@@ -58,3 +58,77 @@ def test_the_number_of_seeds_is_pre_registered():
     """Protocol §6 asks for three seeds reported as mean ± std. The gate enforces that count,
     so the count has to be written down before the run rather than read off it."""
     assert _load()["n_seeds"] == 3
+
+
+# --- WinCLIP -----------------------------------------------------------------------------
+# Two gating blocks rather than one gate and one secondary check, because WinCLIP's own paper
+# (arXiv:2303.14814, CVPR 2023) postdates the VisA dataset and reports both benchmarks at the
+# configuration this repo runs. Protocol §2 v0.2.14.
+
+WINCLIP = TARGETS.parent / "winclip.yaml"
+
+
+def _winclip():
+    with open(WINCLIP) as fh:
+        return yaml.safe_load(fh)
+
+
+def test_winclip_per_category_numbers_average_to_their_published_means():
+    """Tables 10 and 16 print the per-category values; Table 1 prints their means. If our
+    transcription of the 15 + 12 values does not reproduce 91.8 and 78.1, a cell was copied
+    wrong -- and a mistyped gate is one nobody would notice from the verdict."""
+    cfg = _winclip()
+    for block, n, published in (("gate_mvtec_ad", 15, 91.8), ("gate_visa", 12, 78.1)):
+        per_cat = cfg[block]["per_category"]
+        assert len(per_cat) == n, f"{block} should hold {n} categories"
+        mean = sum(per_cat.values()) / len(per_cat)
+        assert abs(mean - published) < 0.1, (
+            f"{block}: per-category mean {mean:.3f} does not reproduce the published {published}"
+        )
+        assert cfg[block]["published_mean"] == published
+
+
+def test_both_winclip_blocks_gate():
+    """The whole point of the WinCLIP entry. Demoting either to a non-gating check would
+    silently remove a criterion its own paper supports (protocol §2 v0.2.14)."""
+    cfg = _winclip()
+    assert cfg["gate_mvtec_ad"]["gates"] is True
+    assert cfg["gate_visa"]["gates"] is True
+    assert cfg["gate_mvtec_ad"]["dataset"] == "mvtec_ad"
+    assert cfg["gate_visa"]["dataset"] == "visa"
+    assert cfg["gate_mvtec_ad"]["metric"] == cfg["gate_visa"]["metric"] == "i_auroc"
+    assert cfg["gate_mvtec_ad"]["tolerance"] == cfg["gate_visa"]["tolerance"] == 1.0
+
+
+def test_winclip_targets_are_the_zero_shot_ones_at_the_backbone_the_repo_runs():
+    """Table 1 has 0-shot, 1-, 2- and 4-shot blocks for the same method name. Taking a k-shot
+    row would gate our zero-shot adapter against WinCLIP+."""
+    cfg = _winclip()
+    for block in ("gate_mvtec_ad", "gate_visa"):
+        assert "0-shot" in cfg[block]["source"]
+        assert "arXiv:2303.14814" in cfg[block]["source"]
+    with open(WINCLIP.parent.parent / "methods" / "winclip.yaml") as fh:
+        method = yaml.safe_load(fh)
+    assert method["k_shot"] == 0
+    assert method["zero_shot"] is True
+    # The paper's default is LAION-400M CLIP with ViT-B/16+ at 240^2 (Section 5, Appendix A).
+    assert method["backbone"] == "ViT-B-16-plus-240"
+    assert method["scales"] == [2, 3]          # small-scale 2x2, mid-scale 3x3 in ViT patches
+
+
+def test_the_specific_states_ablation_is_recorded_as_not_the_target():
+    """Table 7's VisA 78.9 beats the headline 78.1 and would be the tempting number to chase.
+    It comes from per-category defect words, which protocol §3 forbids us to write."""
+    cfg = _winclip()
+    assert cfg["not_the_target"]["visa_specific_states"] == 78.9
+    assert cfg["gate_visa"]["published_mean"] < cfg["not_the_target"]["visa_specific_states"]
+
+
+def test_winclip_pre_registers_how_the_seed_question_gets_settled():
+    """Protocol §6 is conditional ("where any stochasticity exists") and whether this adapter
+    has any is unknown. The config has to carry the deciding procedure, not just a count, or
+    the answer becomes a choice made after seeing a result."""
+    cfg = _winclip()
+    assert cfg["n_seeds"] == 3
+    text = WINCLIP.read_text()
+    assert "bit-identical" in text and "--all-seeds" in text

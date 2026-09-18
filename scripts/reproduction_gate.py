@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Score a finished reproduction run against its pre-registered targets (protocol §2 v0.2.12).
+"""Score a finished reproduction run against its pre-registered targets (protocol §2 v0.2.14).
 
 This never runs a method. Running is GPU work; this is the CPU half — read the shards, compute
 I-AUROC per category, compare against `configs/reproduction/<method>.yaml`, write the verdict.
@@ -24,8 +24,10 @@ gates -- the pre-registered criterion in §2 is on the mean (§6 v0.2.13).
 Exit codes: **0 PASS, 1 FAIL, 2 refused** — so a notebook cell or a CI job cannot print a
 failing verdict and carry on, and a run that could not be scored at all is never mistaken for a
 method that missed its target. A FAIL is a legitimate outcome, not a crash: the report is still
-written. `--which secondary` scores the secondary target instead and never exits 1 — protocol §2
-v0.2.12 fixes that it is reported with its caveat and cannot fail the method.
+written. `--which` names the target block to score and defaults to `gate`. A block that declares
+`gates: false` — PatchCore's VisA `secondary` — is reported with its caveat and never exits 1,
+which is what protocol §2 v0.2.12 fixes for a target taken from someone else's paper. A method
+whose own paper reports both datasets has two *gating* blocks instead, scored one per root.
 """
 import argparse
 import datetime as dt
@@ -99,19 +101,58 @@ def _check_single_preprocess(df, results: Path) -> None:
         )
 
 
+#: Legacy layout: PatchCore's file keeps its per-category map and category counts at the top
+#: level, because when it was written one method could have only one gate and one secondary
+#: check. A block that carries its own `per_category`/`n_categories` overrides these.
+_LEGACY_KEYS = {
+    "gate": ("published_per_category", "gate_n_categories"),
+    "secondary": (None, "secondary_n_categories"),
+}
+
+
 def _load_targets(path: Path, which: str) -> dict:
+    """Read one named target block.
+
+    `which` names a top-level block rather than choosing between two fixed ones, because
+    **a method can have more than one gate.** PatchCore has exactly one (its paper predates
+    VisA, protocol §2 v0.2.12); WinCLIP's own paper reports both MVTec-AD and VisA at the
+    configuration this repo runs, so both gate it and both have published per-category values.
+    Calling the second one `secondary` would have recorded it as the thing §2 says cannot fail
+    a method, which is the opposite of true for WinCLIP.
+
+    A block declares `gates: true|false` itself. The two historical names keep their old
+    meaning when it is absent, so `configs/reproduction/patchcore_ref.yaml` is read exactly as
+    before and does not have to be reopened to add a method.
+    """
     with open(path) as fh:
         cfg = yaml.safe_load(fh)
-    if which == "gate":
-        target = dict(cfg["gate"])
-        target["per_category"] = cfg.get("published_per_category", {})
-        target["n_categories"] = cfg["gate_n_categories"]
-        target["gates"] = True
-    else:
-        target = dict(cfg["secondary"])
-        target["per_category"] = {}
-        target["n_categories"] = cfg["secondary_n_categories"]
-        target["gates"] = False
+    if which not in cfg or not isinstance(cfg[which], dict):
+        available = sorted(k for k, v in cfg.items() if isinstance(v, dict) and "dataset" in v)
+        raise ValueError(
+            f"{path} has no target block named {which!r}. It holds: {available}. "
+            "`--which` names a block in the targets file; a method with two gates has two."
+        )
+    target = dict(cfg[which])
+    legacy_per_category, legacy_n = _LEGACY_KEYS.get(which, (None, None))
+    if "per_category" not in target:
+        target["per_category"] = cfg.get(legacy_per_category, {}) if legacy_per_category else {}
+    if "n_categories" not in target:
+        if legacy_n is None or legacy_n not in cfg:
+            raise ValueError(
+                f"the target block {which!r} in {path} states no `n_categories`, and there is "
+                "no legacy top-level count for it. The published mean is over a fixed number "
+                "of categories and the gate refuses any other set, so the count cannot be "
+                "inferred from whatever finished running (protocol §2)."
+            )
+        target["n_categories"] = cfg[legacy_n]
+    target.setdefault("gates", which == "gate")
+    if target["per_category"] and len(target["per_category"]) != target["n_categories"]:
+        raise ValueError(
+            f"the target block {which!r} in {path} lists {len(target['per_category'])} "
+            f"per-category values but claims n_categories={target['n_categories']}. Those "
+            "disagree, and the gate would then refuse or accept a run on whichever it read "
+            "first."
+        )
     target["method"] = cfg["method"]
     target["n_seeds"] = cfg["n_seeds"]
     return target
@@ -304,7 +345,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--targets", required=True, type=Path,
                         help="configs/reproduction/<method>.yaml")
     parser.add_argument("--out", required=True, type=Path, help="markdown report to write")
-    parser.add_argument("--which", default="gate", choices=("gate", "secondary"))
+    parser.add_argument(
+        "--which", default="gate",
+        help="the target block in the targets file to score (default: `gate`). A method whose "
+             "own paper reports both reproduction datasets has two gating blocks, e.g. "
+             "`--which gate_visa`; a block that does not gate never exits 1.")
     parser.add_argument(
         "--seed", default=None,
         help="score this seed alone out of a root that holds several (protocol §6 runs "

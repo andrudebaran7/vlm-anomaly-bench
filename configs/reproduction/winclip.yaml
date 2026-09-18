@@ -1,0 +1,93 @@
+# Pre-registered reproduction targets for the WinCLIP zero-shot adapter (protocol §2 v0.2.14).
+#
+# Committed before any WinCLIP reproduction run, so the gate cannot be moved after seeing a
+# result.
+#
+# SOURCE — PDF downloaded from arXiv and read directly, 2026-09-18:
+#   Jongheon Jeong, Yang Zou, Taewan Kim, Dongqing Zhang, Avinash Ravichandran, Onkar Dabeer.
+#   "WinCLIP: Zero-/Few-Shot Anomaly Classification and Segmentation". arXiv:2303.14814v1,
+#   26 Mar 2023 (CVPR 2023). AWS AI Labs / KAIST.
+#   Means: **Table 1**, `0-shot` block, row `WinCLIP (ours)`, column AUROC.
+#   Per-category: **Table 10** (MVTec-AD) and **Table 16** (VisA), column `K=0`, which
+#   Appendix D states are the subset-level values behind Table 1.
+#
+# TWO GATES, and that is the difference from PatchCore. WinCLIP's paper postdates the VisA
+# dataset and reports both benchmarks at the configuration this repo runs, so §2's rule —
+# "the target must come from the method's own paper, at the configuration this repo runs" —
+# is satisfied by both, and both can fail the method. Neither is a `secondary` block.
+#
+# Provenance record: ../vlm-anomaly-paper/docs/verified-literature-facts.md, fifth pass.
+
+method: winclip
+
+gate_mvtec_ad:
+  dataset: mvtec_ad
+  metric: i_auroc
+  tolerance: 1.0             # protocol §2: ±1.0 I-AUROC
+  gates: true
+  published_mean: 91.8
+  source: "arXiv:2303.14814 Table 1, 0-shot, WinCLIP (ours), MVTec-AD AUROC"
+  n_categories: 15
+  # Table 10, column K=0. The paper prints "Metal nut"; the key is the loader's directory name.
+  per_category:
+    bottle: 99.2
+    cable: 86.5
+    capsule: 72.9
+    carpet: 100.0
+    grid: 98.8
+    hazelnut: 93.9
+    leather: 100.0
+    metal_nut: 97.1
+    pill: 79.1
+    screw: 83.3
+    tile: 100.0
+    toothbrush: 87.5
+    transistor: 88.0
+    wood: 99.4
+    zipper: 91.5
+
+gate_visa:
+  dataset: visa
+  metric: i_auroc
+  tolerance: 1.0
+  gates: true
+  published_mean: 78.1
+  source: "arXiv:2303.14814 Table 1, 0-shot, WinCLIP (ours), VisA AUROC"
+  n_categories: 12
+  # Table 16, column K=0. The paper prints "Macaroni1", "PCB1", "Pipe fryum"; the keys are the
+  # object directory names verified against the real archive (docs/datasets-access.md).
+  per_category:
+    candle: 95.4
+    capsules: 85.0
+    cashew: 92.1
+    chewinggum: 96.5
+    fryum: 80.3
+    macaroni1: 76.2
+    macaroni2: 63.7
+    pcb1: 73.6
+    pcb2: 51.2
+    pcb3: 73.4
+    pcb4: 79.6
+    pipe_fryum: 69.7
+
+# NOT the target, recorded so it cannot be picked up by mistake: Table 7 reports VisA 78.9 for
+# "WinCLIP + specific states", an ablation that adds task-specific defect words for PCB2, PCB4
+# and Pipe fryum. That is per-category prompt content we would be writing, which protocol §3
+# forbids. The target is 78.1, with the paper's generic state words.
+not_the_target:
+  visa_specific_states: 78.9
+  source: "arXiv:2303.14814 Table 7"
+
+# Protocol §6 asks for three seeds "where any stochasticity exists". Whether WinCLIP zero-shot
+# has any is NOT yet known for this adapter, and the pre-registered procedure for deciding is:
+#
+#   Run the same category twice at two different seeds, before any number is reported. If the
+#   image scores are bit-identical, the adapter is deterministic, §6's condition does not apply,
+#   and one run is the reportable number — with that measurement recorded next to it. If they
+#   differ at all, three seeds, scored with `--all-seeds`, exactly as for PatchCore.
+#
+# Writing the procedure down now is what keeps either outcome from being a choice made after
+# seeing a result. The paper's own 0-shot rows carry ±0.0 over its 5 seeds, but that is evidence
+# about ITS pipeline (its seeds vary shot sampling, which zero-shot has none of), not about ours
+# — and PatchCore is the standing reminder that a seed can be recorded without being applied.
+n_seeds: 3

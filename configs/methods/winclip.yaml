@@ -5,7 +5,14 @@ zero_shot: true
 # reproduction gate is the check). Record the resolved anomalib version on first Colab run.
 source: anomalib
 anomalib_version: ">=1.1"        # exact pin resolved at integration; record the resolved version
-backbone: ViT-B-16-plus-240      # WinCLIP's CLIP backbone
+backbone: ViT-B-16-plus-240      # WinCLIP's CLIP backbone (paper §5: ViT-B/16+, 240^2 input)
+# The paper's weights, read from the PDF 2026-09-18: "we use the LAION-400M based CLIP with
+# ViT-B/16+ unless otherwise noted" (arXiv:2303.14814 §5). anomalib's WinClip picks its own
+# pre-trained tag and OURS HAS NEVER BEEN OBSERVED -- VERIFY it in Colab phase A and record what
+# it resolves to. Different pre-training on the same architecture is a different model, and
+# WinCLIP is entirely a function of its frozen CLIP features.
+pretrained_paper: laion400m
+pretrained_resolved: unverified_until_first_colab_run
 k_shot: 0                        # zero-shot; WinCLIP+ (few-shot) is a separate plan
 scales: [2, 3]                   # multi-scale window sizes
 class_name: per_category         # the object noun in the prompt ensemble = the MVTec AD 2 category

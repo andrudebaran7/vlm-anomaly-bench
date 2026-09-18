@@ -56,8 +56,18 @@ overlap table required in the paper).
     the resolution, crop or coreset ratio it used, and its MVTec-AD control in the same row is
     99.8, above every single-model number in PatchCore's own paper and above its 99.6 ensemble.
     VisA is run and reported with that caveat attached.
+  - **WinCLIP → both MVTec AD (classic) and VisA are gates.** Its paper (arXiv:2303.14814,
+    CVPR 2023) postdates the VisA dataset and reports both benchmarks, zero-shot, at the
+    backbone and window scales this repo runs (LAION-400M CLIP ViT-B/16+ at 240², window
+    scales 2×2 and 3×3 in ViT patch units). Table 1, `0-shot`, row `WinCLIP (ours)`:
+    **MVTec AD 91.8 ± 1.0** and **VisA 78.1 ± 1.0** image-AUROC, with the per-category values
+    from Tables 10 and 16 pre-registered alongside each mean. Because §2's rule is satisfied by
+    both, both can fail the method — WinCLIP has no `secondary` block, and a miss on either is
+    a miss. **Not the target:** Table 7's VisA 78.9 is the `+ specific states` ablation, which
+    adds per-object defect words; taking it would import exactly the prompt content §3 forbids
+    us to write.
   - Every other method's gate is settled the same way when its own paper is read, and recorded
-    here before its Colab run.
+    here before its Colab run. **Still owed: AnomalyCLIP, AdaCLIP, SAA+.**
 
   Provenance for all of the above: `../vlm-anomaly-paper/docs/verified-literature-facts.md`,
   fourth pass, both PDFs read directly.
@@ -447,3 +457,15 @@ pre-processing that produced them.
   may not share a results root. No metric definition changed and no existing number moves;
   what changed is that a three-seed score now has one defined meaning instead of three
   plausible ones.
+- 2026-09-18 — v0.2.14. §2 records WinCLIP's reproduction gate, read from its own paper before
+  its Colab run as v0.2.12 requires, and in doing so exercises the general rule for the first
+  time since PatchCore. The outcome is the opposite of PatchCore's: WinCLIP's paper postdates
+  VisA and reports **both** benchmarks at the configuration this repo runs, so **both gate it**
+  (MVTec AD 91.8, VisA 78.1, zero-shot image-AUROC, ±1.0), with per-category targets for all 15
+  and all 12. This is the first method with more than one gate, so the targets schema gained a
+  named-block form — a block declares `gates:` itself instead of being one of a fixed `gate` /
+  `secondary` pair, and calling WinCLIP's second dataset `secondary` would have recorded it as
+  something §2 says cannot fail a method. PatchCore's file and its verdicts are untouched: the
+  legacy top-level keys still load exactly as before. No metric definition changed and no
+  existing number moves.
+  Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (fifth pass)

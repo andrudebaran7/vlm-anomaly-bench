@@ -412,3 +412,103 @@ def test_all_seeds_gives_every_category_its_own_spread(tmp_path):
     main(["--results", str(results), "--targets", str(TARGETS), "--out", str(out),
           "--all-seeds"])
     assert "| bottle | 99.00 ± 1.00 |" in out.read_text()
+
+
+# --- the targets schema carries more than one gate --------------------------------------
+# PatchCore has one gate and one non-gating secondary check; WinCLIP's own paper reports both
+# reproduction datasets at the configuration this repo runs, so it has two gates (protocol §2
+# v0.2.14). `--which` names a block rather than choosing between two fixed ones.
+
+def _targets_file(tmp_path, body):
+    path = tmp_path / "targets.yaml"
+    path.write_text(body)
+    return path
+
+
+TWO_GATES = """
+method: winclip
+gate_a:
+  dataset: mvtec_ad
+  metric: i_auroc
+  tolerance: 1.0
+  gates: true
+  published_mean: 91.8
+  source: "paper table 1"
+  n_categories: 2
+  per_category: {bottle: 91.8, cable: 91.8}
+gate_b:
+  dataset: visa
+  metric: i_auroc
+  tolerance: 1.0
+  gates: true
+  published_mean: 78.1
+  source: "paper table 1"
+  n_categories: 2
+  per_category: {candle: 78.1, pcb1: 78.1}
+n_seeds: 3
+"""
+
+
+def test_a_targets_file_can_hold_two_gating_blocks(tmp_path):
+    from reproduction_gate import _load_targets
+
+    path = _targets_file(tmp_path, TWO_GATES)
+    a = _load_targets(path, "gate_a")
+    b = _load_targets(path, "gate_b")
+    assert (a["dataset"], a["gates"], len(a["per_category"])) == ("mvtec_ad", True, 2)
+    assert (b["dataset"], b["gates"], len(b["per_category"])) == ("visa", True, 2)
+    assert a["method"] == b["method"] == "winclip"
+
+
+def test_the_real_winclip_targets_load_as_two_gates():
+    """Not a synthetic fixture: the committed, pre-registered file itself."""
+    from reproduction_gate import _load_targets
+
+    real = Path(__file__).resolve().parents[1] / "configs" / "reproduction" / "winclip.yaml"
+    mvtec = _load_targets(real, "gate_mvtec_ad")
+    visa = _load_targets(real, "gate_visa")
+    assert mvtec["gates"] and visa["gates"]
+    assert (mvtec["n_categories"], visa["n_categories"]) == (15, 12)
+    assert (mvtec["published_mean"], visa["published_mean"]) == (91.8, 78.1)
+
+
+def test_patchcores_legacy_layout_still_loads_unchanged():
+    """The top-level `published_per_category` / `gate_n_categories` keys predate the second
+    gate. A method added later must not force the pre-registered file to be reopened."""
+    from reproduction_gate import _load_targets
+
+    gate = _load_targets(TARGETS, "gate")
+    secondary = _load_targets(TARGETS, "secondary")
+    assert gate["gates"] is True and len(gate["per_category"]) == 15
+    assert secondary["gates"] is False and secondary["per_category"] == {}
+    assert secondary["n_categories"] == 12
+
+
+def test_an_unknown_block_is_refused_and_says_what_the_file_holds(tmp_path):
+    from reproduction_gate import _load_targets
+
+    path = _targets_file(tmp_path, TWO_GATES)
+    with pytest.raises(ValueError, match="no target block named 'gate'"):
+        _load_targets(path, "gate")
+    with pytest.raises(ValueError, match="gate_a"):
+        _load_targets(path, "gate")
+
+
+def test_a_block_whose_category_count_disagrees_with_its_list_is_refused(tmp_path):
+    """Two statements of the same fact in one block. Whichever the gate read first would
+    decide whether a run is refused, so a file that states both must agree."""
+    from reproduction_gate import _load_targets
+
+    path = _targets_file(tmp_path, TWO_GATES.replace("n_categories: 2\n  per_category: {bottle",
+                                                     "n_categories: 3\n  per_category: {bottle"))
+    with pytest.raises(ValueError, match="disagree"):
+        _load_targets(path, "gate_a")
+
+
+def test_a_block_that_states_no_category_count_is_refused(tmp_path):
+    """Inferring it from whatever finished running is exactly what the count exists to stop."""
+    from reproduction_gate import _load_targets
+
+    body = TWO_GATES.replace("  n_categories: 2\n  per_category: {candle: 78.1, pcb1: 78.1}\n", "")
+    with pytest.raises(ValueError, match="no legacy top-level count"):
+        _load_targets(_targets_file(tmp_path, body), "gate_b")
