@@ -487,13 +487,19 @@ The three-seed run is owed and is not one of the options — §6 forbids reporti
 one seed, including the number behind "PatchCore is flagged as not reproduced". What follows is
 everything that *is* a choice, in the order it arrives.
 
-### Decision 1 — before running: where seed 0 comes from
+### Decision 1 — CLOSED 2026-09-18: `SEEDS = (0, 1, 2)`
 
-Detailed in cell 3b.3's markdown. `SEEDS = (0, 1, 2)` re-runs all three (~2 h, identical
-provenance); `SEEDS = (1, 2)` reuses the 2026-09-16 shards from `MyDrive/reproduction/` (~80 min,
-seed 0's provenance asymmetric to its siblings). The reused shards are numerically valid: the
-`anomalib` path is untouched by the pre-processing work, because `preprocess_spec("anomalib")`
-returns `center_crop: None` and never modifies the model.
+**All three seeds are re-run in the session; the 2026-09-16 seed-0 shards are not reused.** ~2 h
+instead of ~80 min, bought for identical provenance across the three — same commit, same runtime,
+same `preprocess` key on all three shards. The number that closes M2 gets it. Recorded in cell
+3b.3's markdown as well, so the live session does not re-open a settled question.
+
+The alternative, as it stood: `SEEDS = (1, 2)` reusing `MyDrive/reproduction/` (~80 min, seed 0's
+provenance asymmetric to its siblings). It was numerically valid — the `anomalib` path is
+untouched by the pre-processing work, because `preprocess_spec("anomalib")` returns
+`center_crop: None` and never modifies the model, and the gate's `_check_single_preprocess`
+ignores NaN so the older shards' missing `preprocess` column would not have tripped it. It was
+declined on provenance, not on correctness.
 
 ### Decision 2 — after the three seeds: the gate verdict
 
