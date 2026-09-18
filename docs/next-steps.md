@@ -916,6 +916,59 @@ These cannot be pre-written without the data/repo in front of you, and each play
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 
+## Where to pick up (session handoff, 2026-09-18, after the seeds session)
+
+**PatchCore's reproduction gate PASSED** (see "THE GATE PASSED" above): 98.02 ± 0.07 against a
+published 99.0, inside ±1.0 by 0.02 points, three seeds, report committed. Nothing about the
+MVTec AD gate needs re-running.
+
+**The one thing left from that session is VisA, and it did not fit.** The seeds took the session;
+VisA is ~2 h on its own and was not started. It is a *reported secondary check* that cannot fail
+the method (§2 v0.2.12) — now a second independent reading of an implementation that has already
+passed its real gate, rather than evidence for a pending decision.
+
+**Session state: the three-seed shards were copied to `MyDrive/reproduction_3seed/`** — a new
+folder, deliberately not `MyDrive/reproduction/`, which holds the 2026-09-16 seed-0 shards under
+byte-identical filenames and would have been overwritten. The maps were not copied and are not
+needed: the gate is image-level, and threshold calibration runs on MVTec AD 2, not on classic.
+
+### Tomorrow's session is short, and shorter than the last two
+
+VisA needs **no Drive upload and no cell 3.1**. `scripts/run_visa_secondary.py` fetches the 1.8 GB
+archive itself from AWS Open Data (no registration, CC BY 4.0) and checks its byte-exact size
+before starting, precisely so a two-hour run cannot begin on a truncated download.
+
+1. **Phase 0** entire, fresh runtime.
+2. **Cell 1.1** — hard sync.
+3. **One line:** `!python scripts/run_visa_secondary.py` (~2 h, resumable per object, so a drop
+   costs one of twelve). It scores itself and writes `results/reproduction/patchcore_visa.md`.
+
+**Reload the notebook from `master` first.** The 2026-09-18 session ran on a copy that predated
+`b86e209` (2026-09-17) and therefore had no cell 3.4 at all — which cost nothing, because the
+check is one typed line, but it is the second time a stale notebook copy has shown up. Cell 1.1
+syncs the *repository*; it cannot sync the notebook the session is executing.
+
+### After VisA, in order
+
+- **Commit `results/reproduction/patchcore_visa.md`.** A result in a closed session's scrollback
+  is the same as no result.
+- **Phase 4 is then finished** — the config pin landed 2026-09-17, the notebook is committed, and
+  what remains is confirming both CI jobs stay green.
+- **Settle what M2 means.** The README scopes it to every method's GPU backend; item 1 of this
+  file says PatchCore's gate closes it. The checkbox is deliberately unticked until that is
+  decided; the two documents should then say the same thing.
+- **M3 is unblocked for PatchCore** — the full MVTec AD 2 grid, one category at a time, the
+  download/resume/shard unit. Mechanical, and the largest category is Fabric at 10 GB.
+- **WinCLIP is next on methods**, and its targets are already read and pre-registered (two gates,
+  91.8 and 78.1). So is AnomalyCLIP's (two gates, two checkpoints). **AdaCLIP and SAA+ are the
+  two papers still unread**; reading them is CPU work that needs no GPU session.
+- **VisA's own §6 debt:** seed 0 alone is a first reading, not a table entry. Seeds 1 and 2 are
+  `--seed 1` / `--seed 2` on the same script, ~4 h more, owed before the number appears anywhere.
+
+Both repos clean and in sync with `origin/master`; bench: 452 tests green.
+
+Older handoff (2026-09-17, after the phase 3b session) follows.
+
 ## Where to pick up (session handoff, 2026-09-17, after the phase 3b session)
 
 **Phase 3b is done and its question is answered: the CenterCrop hypothesis is refuted** (section
