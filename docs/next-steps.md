@@ -714,12 +714,24 @@ the restart-recovery cell if Colab asks), **1.1** (hard sync), **3.1** (extract 
 Budget ~2 h for `SEEDS = (0, 1, 2)`; the runner is resumable, so a dropped session costs one
 category.
 
+**That skip list broke cell 3b.3, and it is fixed on `master` (2026-09-18, CPU).** 3b.3 had no
+imports of its own — it inherited `run_evaluation`, `ResultStore`, `run_meta`, `PatchCoreRef`,
+`PatchCoreBackend` and `dataset` from 3b.1, the cell the handoff tells you to skip. Following the
+handoff exactly would have raised `NameError` on the first line of the loop, *after* the fifteen
+minutes of install, Drive mount and extraction had been paid for. It now repeats the six imports
+and builds its own `MVTecAD`, like every other run cell. `tests/test_notebook_run_cells.py` holds
+the invariant: a cell that calls `run_evaluation` may inherit only `MVTEC_AD_CATEGORIES` (cell 3.1
+defines it beside the extraction that no such session can skip) and must import everything else.
+It parses the cells rather than matching strings, and it was checked against the pre-fix cell —
+six orphan names — not only against the fixed one.
+
+
 Then the gate decision comes back, informed rather than open. **The full decision tree — both
 choices, all three outcomes, and the two post-hoc causes pre-registered on 2026-09-17 so that
 testing them later stays legitimate — is written out in "The options for the next session" below.
 Read that section before deciding anything.**
 
-Both repos clean and in sync with `origin/master`; bench: 429 tests green on Python 3.11 and
+Both repos clean and in sync with `origin/master`; bench: 436 tests green on Python 3.11 and
 3.13.
 
 Older handoff (2026-08-26, after the second Colab session) follows.
