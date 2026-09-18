@@ -916,6 +916,45 @@ These cannot be pre-written without the data/repo in front of you, and each play
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 
+## Session log — 2026-09-18
+
+One index of a long day, because the detail lives in five separate sections below and a reader
+resuming cold should not have to find them. Commits are on `master` in both repos.
+
+**GPU (the author's Colab session), in order:**
+
+1. **Cell 3b.3 — three seeds on the `anomalib` pre-processing.** 45 runs (3 seeds × 15
+   categories), none dropped. Coreset sizes confirmed the `anomalib` transform reached every
+   category (bottle 21400 → 21401 rows → 209 × 102.4, the 32×32 grid).
+2. **The reproduction gate PASSED**: 98.02 ± 0.07 against a published 99.0, inside ±1.0 by
+   **0.02 points**. Report committed (`results/reproduction/patchcore_mvtec_ad_3seed.md`, commit
+   `cf00207`). Full detail, caveats and what it does *not* close: **"THE GATE PASSED"** below.
+3. **VisA was not started.** The seeds took the session; VisA is ~2 h on its own.
+
+**CPU (this side), in order:**
+
+1. **Fixed cell 3b.3 before it ran** (`5e43da8`). It had no imports of its own and would have
+   raised `NameError` on the first line of the loop, after the ~15 minutes of setup were already
+   paid for. `tests/test_notebook_run_cells.py` now parses the notebook and holds the invariant.
+2. **Closed Decision 1** (`45462ea`): `SEEDS = (0, 1, 2)`, all three re-run for identical
+   provenance rather than restoring seed 0 from Drive.
+3. **Read WinCLIP's paper and pre-registered its gate** (`96c0446`, paper repo `bdf492b`).
+   **Two gates**, 91.8 and 78.1, per-category for both. Protocol → **v0.2.14**.
+4. **Read AnomalyCLIP's paper and pre-registered its gate** (`e820700`, paper repo `08355af`).
+   **Two gates, two checkpoints.** Protocol → **v0.2.15**. The overlap audit gained the *test
+   split* it was missing.
+5. **The targets schema learned to hold more than one gate** — `--which` names a block, a block
+   declares `gates:` itself. PatchCore's file is untouched and its legacy keys still load, pinned
+   by a test, because its three-seed run was in flight at the time.
+
+**State at close:** both repos clean and in sync with `origin/master`; bench 452 tests green on
+3.11 and 3.13; protocol v0.2.15; three-seed shards saved to `MyDrive/reproduction_3seed/`.
+
+**The one thing that must not be lost in the retelling:** the gate passed *by 0.02 points*, on a
+reproduction that is **not even** — six of fifteen categories sit outside ±1.0 and `toothbrush`
+(-8.22) contributes -0.548 of the -0.98 by itself. Every table that cites PatchCore as the anchor
+owes both facts.
+
 ## Where to pick up (session handoff, 2026-09-18, after the seeds session)
 
 **PatchCore's reproduction gate PASSED** (see "THE GATE PASSED" above): 98.02 ± 0.07 against a
@@ -960,8 +999,27 @@ syncs the *repository*; it cannot sync the notebook the session is executing.
 - **M3 is unblocked for PatchCore** — the full MVTec AD 2 grid, one category at a time, the
   download/resume/shard unit. Mechanical, and the largest category is Fabric at 10 GB.
 - **WinCLIP is next on methods**, and its targets are already read and pre-registered (two gates,
-  91.8 and 78.1). So is AnomalyCLIP's (two gates, two checkpoints). **AdaCLIP and SAA+ are the
-  two papers still unread**; reading them is CPU work that needs no GPU session.
+  91.8 and 78.1). So is AnomalyCLIP's (two gates, two checkpoints).
+
+### The CPU track, which needs no GPU session and can run in parallel with anything
+
+**AdaCLIP and SAA+ are the last two papers unread**, and §2 requires each gate settled from the
+method's own paper *before* its Colab run. The other three took roughly an hour each, and two of
+the three turned up something that would otherwise have surfaced mid-session: PatchCore's gate was
+the wrong dataset entirely, and AnomalyCLIP needs a different checkpoint per gate.
+
+What to expect from each, written before reading them so it can be checked afterwards:
+
+- **AdaCLIP** — auxiliary-trained like AnomalyCLIP, so expect a checkpoint question and an overlap
+  audit to refine (`docs/adaclip-overlap-audit.md`). Its plan already pre-registers a contingency
+  for the repo publishing only one checkpoint; the paper may settle that before Colab does.
+- **SAA+** — training-free, so no aux-training concern, but protocol v0.2.9 and the paper repo's
+  third pass both say its own paper reports on **VisA, MVTec-AD, MTD and KSDD2 — none of them
+  MVTec AD 2**. The realistic outcome is that no AD 2 category has a published prompt, which is
+  the `prompt_coverage: unresolved_until_first_colab_run` contingency in `configs/methods/saa.yaml`
+  and may end with a decision about whether SAA+ stays in the study.
+
+Order it after VisA only because VisA needs the live session and this does not.
 - **VisA's own §6 debt:** seed 0 alone is a first reading, not a table entry. Seeds 1 and 2 are
   `--seed 1` / `--seed 2` on the same script, ~4 h more, owed before the number appears anywhere.
 
