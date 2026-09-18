@@ -507,7 +507,13 @@ untouched by the pre-processing work, because `preprocess_spec("anomalib")` retu
 ignores NaN so the older shards' missing `preprocess` column would not have tripped it. It was
 declined on provenance, not on correctness.
 
-### Decision 2 — after the three seeds: the gate verdict
+### Decision 2 — RESOLVED 2026-09-18: outcome (a), the mean landed inside ±1.0
+
+**98.02 ± 0.07, delta -0.98. PASS, by 0.02 points.** See "THE GATE PASSED" above for the numbers,
+the caveats and what it does and does not close. The branches below are kept as the record of
+what was on the table before the run — outcome (b)'s two honest endings were never reached.
+
+### Decision 2 — after the three seeds: the gate verdict (as it stood)
 
 Score with `--all-seeds`. The verdict is on the **mean of the per-seed means**; the std is
 reported and never gates (§6 v0.2.13). Three outcomes:
@@ -704,6 +710,82 @@ convenient all-methods table that also prints WinCLIP's per-category MVTec AD nu
 matches and both columns still average 91.8, so nothing downstream moves. But WinCLIP's targets
 were taken from WinCLIP's paper the day before, and had they been lifted from this table instead,
 one pre-registered per-category target would now be wrong by 0.5 with nothing to reveal it.
+
+## THE GATE PASSED (2026-09-18) — PatchCore reproduces, by 0.02 points
+
+Three seeds, `anomalib` pre-processing, Tesla T4, anomalib 2.6.0, commit `45462ea`. Report
+committed at `results/reproduction/patchcore_mvtec_ad_3seed.md`, beside the phase-3 FAIL and the
+classic run, none of which are overwritten.
+
+**Measured mean of the per-seed means: 98.02 ± 0.07 against a published 99.0 — delta -0.98
+against a ±1.0 tolerance. PASS.**
+
+| seed | mean I-AUROC |
+|---|---|
+| 0 | 97.94 |
+| 1 | 98.08 |
+| 2 | 98.02 |
+
+**The verdict rule was fixed before the run** (§6 v0.2.13, written 2026-09-17): the centre is the
+mean of the per-seed means, the std is reported and never gates. So this is a legitimate PASS
+under a pre-registered criterion. **It is also a PASS by 0.02 points, and every place this number
+appears has to say so.** A reader who is told "PatchCore reproduced" and not told the margin has
+been told something true and misleading.
+
+**Seed 0 came back at 97.94, exactly the 2026-09-16 figure.** That was the free consistency check
+on the `preprocess` work: `preprocess_spec("anomalib")` returns `center_crop: None` and never
+modifies the model, so the path had to be bit-identical, and it was. Had it moved, that would
+have mattered more than the verdict.
+
+**What the seed actually did, stated precisely.** The last pre-registered cause is now measured:
+the spread across three seeds is **0.07**, which is small. The pass did not come from a wide seed
+distribution rescuing a miss — it came from the mean of the three (98.02) sitting **0.08 above
+seed 0 alone** (97.94), which was enough to move -1.057 to -0.98. That is the pre-registered rule
+doing exactly what it says, on a spread far narrower than the 0.4-in-score-units the synthetic
+probe suggested in 2026-08-26. **This is the first measurement of PatchCore's seed spread on real
+data**, and it belongs in the paper's §5.5 whatever else is said.
+
+**It is not an even reproduction, and that is the finding worth more than the verdict.** Six of
+fifteen categories sit outside ±1.0 on their own:
+
+| category | measured | published | delta |
+|---|---|---|---|
+| toothbrush | 91.48 ± 0.58 | 99.7 | **-8.22** |
+| pill | 94.17 ± 0.30 | 96.0 | -1.83 |
+| cable | 97.85 ± 0.42 | 99.4 | -1.55 |
+| zipper | 98.38 ± 0.13 | 99.5 | -1.12 |
+| tile | 100.00 ± 0.00 | 98.9 | +1.10 |
+| carpet | 97.62 ± 0.16 | 98.7 | -1.08 |
+
+**`toothbrush` alone contributes -0.548 of the -0.98 shortfall.** It has been the story since
+2026-09-16 and three seeds did not move it: 60 training images, a 42-image test split where one
+image is worth ~0.3 points, and now a measured seed std of 0.58 — the largest in the set, on the
+category that decides the margin. Without its shortfall the mean would be ~98.57.
+
+**What this closes and what it does not.**
+
+- **Closed:** PatchCore's reproduction gate (protocol §2). It is the unflagged full-shot anchor.
+  Both pre-registered causes of the original miss are now spent: CenterCrop refuted 2026-09-17,
+  the seed measured 2026-09-18. Neither explained it; the tolerance did.
+- **Closed:** the tooling question. `--all-seeds` was used in anger and produced the verdict, the
+  spread and the per-category spreads in one report.
+- **NOT closed:** why our reproduction is uneven, and `toothbrush` in particular. Protocol §7
+  does not forbid investigating it — it forbids tuning after seeing results, and it forbids
+  reporting only the tests that helped. The two post-hoc causes pre-registered on 2026-09-17 (the
+  timm-vs-torchvision backbone, and the tolerance's granularity on a 42-image split) are still
+  written down, dated and untested. Testing either remains legitimate; neither may change a
+  configuration.
+- **Still owed for M2 as the README defines it:** the README's M2 line says "the GPU backends and
+  the ±1pt VisA reproduction" — i.e. *every* method — while item 1 of this file's ordered list
+  says PatchCore's gate closes M2. **Those two are not the same claim**, and the milestone
+  checkbox is deliberately left unticked until the author settles which one M2 means. What is
+  unambiguous: PatchCore's gate passed, and M3 is unblocked for PatchCore.
+
+**Next in the same session: VisA (cell 3.4).** Still never run, still ~2 h, informational —
+§2 v0.2.12 makes it a reported secondary check that cannot fail the method, and its 92.4 target
+comes from a third-party paper that states none of its PatchCore hyperparameters. It is now a
+second independent reading of an implementation that has passed its real gate, rather than
+evidence for a decision.
 
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 

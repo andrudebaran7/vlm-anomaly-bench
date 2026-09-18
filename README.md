@@ -97,7 +97,11 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt
 - [ ] M2 — **core + adapter CPU-halves done**: pixel metrics, loader, resumable runner,
   lighting-grouped aggregation, and the CPU-testable half of seven adapters (intensity_baseline,
   mllm_qwen, patchcore_ref, winclip, anomalyclip, adaclip, saa), all tested. Remaining: the GPU
-  backends and the ±1pt VisA reproduction, on Colab. **Operational state and ordering: [`docs/next-steps.md`](docs/next-steps.md).**
+  backends and the ±1pt VisA reproduction, on Colab. **PatchCore's reproduction gate PASSED on
+  2026-09-18** — MVTec AD classic, three seeds, 98.02 ± 0.07 against a published 99.0, inside the
+  ±1.0 tolerance by 0.02 points (`results/reproduction/patchcore_mvtec_ad_3seed.md`). The box stays
+  unticked because this line scopes M2 to *every* method's backend, not only the anchor's.
+  **Operational state and ordering: [`docs/next-steps.md`](docs/next-steps.md).**
 - [ ] M3 — full grid on the MVTec AD 2 public test split
 - [ ] M4 — one evaluation-server submission per method; leaderboard numbers recorded *(registration
   requested 2026-07-23; see [`docs/datasets-access.md`](docs/datasets-access.md))*
