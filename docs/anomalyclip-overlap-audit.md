@@ -11,15 +11,33 @@ trained on VisA." So there are two relevant checkpoints:
 
 | Checkpoint | Auxiliary training data |
 |---|---|
-| MVTec-AD-trained (main) | MVTec AD (classic) |
-| VisA-trained | VisA |
+| MVTec-AD-trained (main) | MVTec AD (classic), **test split** |
+| VisA-trained | VisA, **test split** |
+
+**The split is not a detail, and it was added on 2026-09-18 after reading the paper.** The paper
+fine-tunes on the auxiliary dataset's *test* data, stated twice, in two places: "we fine-tune AnomalyCLIP using the test data on
+MVTec AD and evaluate the ZSAD performance on other datasets. As for MVTec AD, we fine-tune
+AomalyCLIP on the test data of VisA" (§4.1, repeated in Appendix A.1), and Appendix B's "Since we
+just use the test data of Datasets". It has to be the test split, because object-agnostic prompts
+are learned against **labelled anomalies**, which only the test split has.
+
+This does not change a single conclusion below — a *test* split of MVTec AD classic overlaps VisA
+exactly as little as its train split does — but an audit of auxiliary-training overlap that does
+not say which split was trained on is not an audit. A reader who checks this claim will find the
+sentence "we fine-tune ... using the test data" in the source, and they should find it here first.
 
 ## Which checkpoint we use for which test set, and why it is clean
 
 | Our test set | Checkpoint used | Auxiliary data | Overlap with the test set? |
 |---|---|---|---|
-| MVTec AD 2 (primary) | VisA-trained | VisA | None — VisA is a different dataset and provider; and MVTec AD 2, though MVTec-family, is never touched by a VisA-trained model. |
-| VisA (reproduction §2) | MVTec-AD-trained | MVTec AD (classic) | None — MVTec AD classic and VisA are different datasets. |
+| MVTec AD 2 (primary) | VisA-trained | VisA test split | None — VisA is a different dataset and provider; and MVTec AD 2, though MVTec-family, is never touched by a VisA-trained model. |
+| VisA (reproduction §2) | MVTec-AD-trained | MVTec AD classic test split | None — MVTec AD classic and VisA are different datasets. |
+| MVTec AD classic (reproduction §2) | VisA-trained | VisA test split | None. **This is the same checkpoint as the primary row**, so this gate exercises the exact configuration the MVTec AD 2 evaluation will run — which is a reason to value it beyond the ±1.0 verdict. |
+
+**Each reproduction gate names its checkpoint** in `configs/reproduction/anomalyclip.yaml`,
+because the paper's two published numbers come from the two different checkpoints (VisA 82.1 from
+the MVTec-AD-trained model, MVTec AD 91.5 from the VisA-trained one). Scoring a run against the
+other checkpoint's number would fail a correct implementation.
 
 ## The subtlety we deliberately avoid
 
@@ -35,3 +53,11 @@ conservative choice; it removes the domain-proximity question rather than arguin
 - Pinned repo commit: ____
 - VisA-trained checkpoint file + sha256: ____
 - MVTec-AD-trained checkpoint file + sha256: ____
+- Which checkpoint each reproduction run actually loaded: ____
+
+**Nothing mechanical checks that last line yet**, and it is the same shape of defect as the seed
+that was recorded but never applied (2026-08-26) and the `preprocess` a shard could not name
+(2026-09-17). A shard records dataset, method, category, seed and `preprocess`; it has no field
+for a checkpoint. When the AnomalyCLIP backend is built, it should declare the checkpoint it
+loaded the way `PatchCoreBackend` declares its seed and pre-processing, and the adapter should
+refuse a declared value its backend does not apply.

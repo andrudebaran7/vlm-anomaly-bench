@@ -1,0 +1,110 @@
+# Pre-registered reproduction targets for the AnomalyCLIP zero-shot adapter (protocol §2 v0.2.15).
+#
+# Committed before any AnomalyCLIP reproduction run, so the gate cannot be moved after seeing a
+# result.
+#
+# SOURCE — PDF downloaded from arXiv and read directly, 2026-09-18:
+#   Qihang Zhou, Guansong Pang, Yu Tian, Shibo He, Jiming Chen. "AnomalyCLIP: Object-agnostic
+#   Prompt Learning for Zero-shot Anomaly Detection". ICLR 2024.
+#   **arXiv:2310.18961v12, 1 Jan 2026** — the version actually read, recorded because this is the
+#   twelfth revision and the PDF carries no ICLR banner. If a gate misses narrowly, "does the
+#   camera-ready print the same numbers?" is a question that can only be asked of a pinned version.
+#   Means: **Table 1**, industrial domain, Image-level (AUROC, AP), column `AnomalyCLIP`.
+#   Per-category: **Table 12** (MVTec AD) and **Table 16** (VisA), column `AnomalyCLIP`.
+#
+# TWO GATES, EACH AGAINST A DIFFERENT CHECKPOINT — this is what makes AnomalyCLIP unlike WinCLIP.
+# The paper fine-tunes on the auxiliary dataset's TEST split and swaps which one per target:
+# "we fine-tune AnomalyCLIP using the test data on MVTec AD and evaluate the ZSAD performance on
+# other datasets. As for MVTec AD, we fine-tune AomalyCLIP on the test data of VisA" (§4.1, A.1).
+# So 82.1 is the MVTec-AD-trained model and 91.5 is the VisA-trained one. Scoring one checkpoint
+# against the other's number would fail a correct implementation, which is why every block below
+# names its `checkpoint` and why nothing here may be scored until the run records which was used.
+#
+# Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md, sixth pass.
+# Overlap audit (unchanged in conclusion, refined on the split): docs/anomalyclip-overlap-audit.md
+
+method: anomalyclip
+
+gate_visa:
+  dataset: visa
+  metric: i_auroc
+  tolerance: 1.0
+  gates: true
+  published_mean: 82.1
+  source: "arXiv:2310.18961v12 Table 1, industrial, image-level AUROC, AnomalyCLIP column"
+  # The auxiliary training data is MVTec AD classic's TEST split; the test set here is VisA.
+  # No overlap. This is the clean pairing the overlap audit already designated.
+  checkpoint: mvtec_ad_trained
+  n_categories: 12
+  # Table 16. The paper prints "Macaroni1", "Pcb1", "Pipe fryum"; the keys are the object
+  # directory names verified against the real archive (docs/datasets-access.md).
+  per_category:
+    candle: 79.3
+    capsules: 81.5
+    cashew: 76.3
+    chewinggum: 97.4
+    fryum: 93.0
+    macaroni1: 87.2
+    macaroni2: 73.4
+    pcb1: 85.4
+    pcb2: 62.2
+    pcb3: 62.7
+    pcb4: 93.9
+    pipe_fryum: 92.4
+
+gate_mvtec_ad:
+  dataset: mvtec_ad
+  metric: i_auroc
+  tolerance: 1.0
+  gates: true
+  published_mean: 91.5
+  source: "arXiv:2310.18961v12 Table 1, industrial, image-level AUROC, AnomalyCLIP column"
+  # The auxiliary training data is VisA's TEST split; the test set here is MVTec AD classic.
+  # No overlap. Same checkpoint the audit designates for MVTec AD 2, so this gate exercises
+  # exactly the configuration the primary evaluation will run.
+  checkpoint: visa_trained
+  n_categories: 15
+  # Table 12. The paper prints "Metal nut"; the key is the loader's directory name.
+  per_category:
+    bottle: 89.3
+    cable: 69.8
+    capsule: 89.9
+    carpet: 100.0
+    grid: 97.0
+    hazelnut: 97.2
+    leather: 99.8
+    metal_nut: 93.6
+    pill: 81.8
+    screw: 81.1
+    tile: 100.0
+    toothbrush: 84.7
+    transistor: 92.8
+    wood: 96.8
+    zipper: 98.5
+
+# Configuration the targets are attached to, read from §4.1 / Appendix A.1 / Appendix B. A target
+# is only a criterion at the configuration it was measured at, and two of these are not yet in
+# configs/methods/anomalyclip.yaml as anything a run could apply.
+published_configuration:
+  backbone: "CLIP ViT-L/14@336px, all CLIP parameters frozen"
+  input_resolution: 518          # 518x518, with OpenCLIP's default normalization (Appendix B)
+  prompt_length: 12
+  text_encoder_layers_with_learnable_tokens: 9
+  dpam_from_visual_layer: 6
+  lambda: 4
+  optimizer: "Adam, lr 0.001, batch 8, 15 epochs"
+  test_time_map_smoothing: "Gaussian filter, sigma = 4 (A.1)"
+  note: >-
+    The 518x518 input into a 336px-trained backbone is deliberate and stated twice. The Gaussian
+    sigma=4 smoothing is part of the published method, not something we would be adding, and a
+    backend derived from the repo's test.py inherits it; it moves pixel-level numbers and leaves
+    the image-level gate alone.
+
+# Protocol §6, same conditional as WinCLIP's: three seeds "where any stochasticity exists".
+# AnomalyCLIP's scoring path is a frozen CLIP forward with learned prompts loaded from a
+# checkpoint, so it may well be deterministic — but that is a measurement, not an inference, and
+# the prompts themselves came from a training run whose seed we do not control. Same pre-registered
+# procedure: run one category twice at two seeds before reporting anything. If the image scores are
+# bit-identical, one run is the reportable number with that measurement recorded beside it;
+# otherwise three seeds and `--all-seeds`.
+n_seeds: 3

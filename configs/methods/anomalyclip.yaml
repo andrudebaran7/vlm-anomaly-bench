@@ -5,7 +5,18 @@ aux_trained: true                # learns object-agnostic prompts on auxiliary A
 # repo (protocol §3 priority 1). Pin the commit on the first Colab run.
 source: https://github.com/zqhang/AnomalyCLIP
 commit: unpinned_until_first_colab_run     # record the exact SHA here
-backbone: ViT-L-14-336                     # AnomalyCLIP's CLIP backbone (verify at integration)
+backbone: ViT-L-14-336                     # CLIP ViT-L/14@336px, all CLIP params frozen (paper §4.1)
+# Read from arXiv:2310.18961v12 on 2026-09-18, and NOT previously recorded here: the paper feeds
+# that 336px-trained backbone 518x518 inputs, stated in both A.1 and Appendix B. It is deliberate
+# ("to obtain an appropriate visual feature map resolution"), not a typo. A backend that resizes
+# to 336 would be a different method from the one the ±1.0 targets were measured on.
+input_resolution: 518
+# Part of the published method, inherited by any backend derived from the repo's test.py: the
+# anomaly score map is smoothed with a Gaussian, sigma = 4, at test time (A.1). It moves
+# pixel-level numbers and leaves the image-level reproduction gate alone. Do not remove it as a
+# "post-processing" step -- protocol §4 forbids normalisation we add, not the method's own output.
+test_time_map_smoothing_sigma: 4
+paper_version: "arXiv:2310.18961v12 (1 Jan 2026)"   # the version the targets were read from
 # Two official checkpoints, each used only where its auxiliary training data does NOT overlap the
 # test set (docs/anomalyclip-overlap-audit.md):
 checkpoint_for_mvtec_ad2: visa_trained     # conservative: AD2 is MVTec-family; train on VisA

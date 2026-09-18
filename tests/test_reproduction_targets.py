@@ -132,3 +132,73 @@ def test_winclip_pre_registers_how_the_seed_question_gets_settled():
     assert cfg["n_seeds"] == 3
     text = WINCLIP.read_text()
     assert "bit-identical" in text and "--all-seeds" in text
+
+
+# --- AnomalyCLIP -------------------------------------------------------------------------
+# Two gates again, but each against a DIFFERENT checkpoint: the paper fine-tunes on the
+# auxiliary dataset's test split and swaps which one per target (arXiv:2310.18961v12 §4.1).
+
+ANOMALYCLIP = TARGETS.parent / "anomalyclip.yaml"
+
+
+def _anomalyclip():
+    with open(ANOMALYCLIP) as fh:
+        return yaml.safe_load(fh)
+
+
+def test_anomalyclip_per_category_numbers_average_to_their_published_means():
+    cfg = _anomalyclip()
+    for block, n, published in (("gate_mvtec_ad", 15, 91.5), ("gate_visa", 12, 82.1)):
+        per_cat = cfg[block]["per_category"]
+        assert len(per_cat) == n, f"{block} should hold {n} categories"
+        mean = sum(per_cat.values()) / len(per_cat)
+        assert abs(mean - published) < 0.1, (
+            f"{block}: per-category mean {mean:.3f} does not reproduce the published {published}"
+        )
+        assert cfg[block]["published_mean"] == published
+
+
+def test_each_anomalyclip_gate_names_the_checkpoint_it_is_the_target_for():
+    """The paper's two numbers come from two different checkpoints -- VisA 82.1 from the
+    MVTec-AD-trained model, MVTec AD 91.5 from the VisA-trained one -- because it fine-tunes on
+    the OTHER dataset's test split. A gate that did not name its checkpoint would fail a correct
+    implementation that happened to load the other one."""
+    cfg = _anomalyclip()
+    assert cfg["gate_visa"]["checkpoint"] == "mvtec_ad_trained"
+    assert cfg["gate_mvtec_ad"]["checkpoint"] == "visa_trained"
+    assert cfg["gate_visa"]["checkpoint"] != cfg["gate_mvtec_ad"]["checkpoint"]
+
+
+def test_the_anomalyclip_gate_checkpoints_agree_with_the_overlap_audit():
+    """The audit designates which checkpoint is clean for which test set (protocol §3.1). If the
+    targets file and the audit drifted apart, one of them would be authorising leakage."""
+    cfg = _anomalyclip()
+    with open(ANOMALYCLIP.parent.parent / "methods" / "anomalyclip.yaml") as fh:
+        method = yaml.safe_load(fh)
+    assert method["aux_trained"] is True
+    assert method["checkpoint_for_visa_reproduction"] == cfg["gate_visa"]["checkpoint"]
+    # MVTec AD classic's gate runs the same checkpoint as the MVTec AD 2 primary evaluation,
+    # which is what makes that gate worth more than its verdict.
+    assert method["checkpoint_for_mvtec_ad2"] == cfg["gate_mvtec_ad"]["checkpoint"]
+
+
+def test_the_published_configuration_is_recorded_with_the_targets():
+    """A target is only a criterion at the configuration it was measured at. The 518x518 input
+    into a 336px backbone is the one most likely to be silently 'fixed' by an implementer."""
+    cfg = _anomalyclip()["published_configuration"]
+    assert cfg["input_resolution"] == 518
+    assert cfg["test_time_map_smoothing"].startswith("Gaussian")
+    with open(ANOMALYCLIP.parent.parent / "methods" / "anomalyclip.yaml") as fh:
+        method = yaml.safe_load(fh)
+    assert method["input_resolution"] == 518, "the method config must run what the target assumes"
+    assert method["test_time_map_smoothing_sigma"] == 4
+
+
+def test_the_arxiv_version_the_targets_were_read_from_is_pinned():
+    """Twelve revisions exist and the PDF carries no ICLR banner. "ICLR 2024" alone cannot
+    answer "does the version we read print these numbers?"."""
+    cfg = _anomalyclip()
+    for block in ("gate_mvtec_ad", "gate_visa"):
+        assert "arXiv:2310.18961v12" in cfg[block]["source"]
+    with open(ANOMALYCLIP.parent.parent / "methods" / "anomalyclip.yaml") as fh:
+        assert "v12" in yaml.safe_load(fh)["paper_version"]

@@ -66,8 +66,24 @@ overlap table required in the paper).
     a miss. **Not the target:** Table 7's VisA 78.9 is the `+ specific states` ablation, which
     adds per-object defect words; taking it would import exactly the prompt content §3 forbids
     us to write.
+  - **AnomalyCLIP → both are gates, but each against a different checkpoint.** Its paper
+    (arXiv:2310.18961v12, ICLR 2024) reports both benchmarks zero-shot at the backbone this repo
+    runs. Table 1, image-level: **MVTec AD 91.5 ± 1.0** and **VisA 82.1 ± 1.0** image-AUROC, with
+    per-category values from Tables 12 and 16. What is new is that the two numbers come from two
+    different models: the paper fine-tunes on the *other* dataset's **test split** ("we fine-tune
+    AnomalyCLIP using the test data on MVTec AD and evaluate the ZSAD performance on other
+    datasets. As for MVTec AD, we fine-tune AomalyCLIP on the test data of VisA"), so 82.1 is the
+    MVTec-AD-trained checkpoint and 91.5 is the VisA-trained one. **Each gate therefore names its
+    checkpoint**, and a run scored against the other one's number would fail a correct
+    implementation. The pairing is the one `docs/anomalyclip-overlap-audit.md` already designated
+    as clean, and the MVTec AD classic gate runs the same checkpoint as the MVTec AD 2 primary
+    evaluation.
   - Every other method's gate is settled the same way when its own paper is read, and recorded
-    here before its Colab run. **Still owed: AnomalyCLIP, AdaCLIP, SAA+.**
+    here before its Colab run. **Still owed: AdaCLIP, SAA+.**
+  - **A target is a criterion only at the configuration it was measured at, so that
+    configuration is recorded with it** — AnomalyCLIP's targets carry the paper's 518×518 input
+    into a 336px-trained backbone and its σ=4 test-time map smoothing, because an implementer who
+    "fixed" either would be measuring a different method against these numbers.
 
   Provenance for all of the above: `../vlm-anomaly-paper/docs/verified-literature-facts.md`,
   fourth pass, both PDFs read directly.
@@ -469,3 +485,14 @@ pre-processing that produced them.
   legacy top-level keys still load exactly as before. No metric definition changed and no
   existing number moves.
   Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (fifth pass)
+- 2026-09-18 — v0.2.15. §2 records AnomalyCLIP's reproduction gate, read from its own paper
+  (arXiv:2310.18961v12) before its Colab run. Two gates again — MVTec AD 91.5, VisA 82.1,
+  zero-shot image-AUROC, ±1.0, per-category targets for all 15 and all 12 — but with a
+  constraint no previous method had: **the two published numbers come from two different
+  checkpoints**, because the method fine-tunes on the other dataset's test split. A gate that
+  does not name its checkpoint would fail a correct implementation that loaded the other one, so
+  §2 now requires the checkpoint to be named per gate, and more generally requires the
+  configuration a target was measured at to be recorded beside it. `docs/anomalyclip-overlap-audit.md`
+  gains the split it was missing; its conclusions are unchanged. No metric definition changed and
+  no existing number moves.
+  Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (sixth pass)

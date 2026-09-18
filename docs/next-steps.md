@@ -13,7 +13,7 @@ that cost and what it means for the four methods behind it.
 
 - **Evaluation core:** image/pixel metrics (P-AUROC, AU-PRO, SegF1), provenance, a crash-safe
   result store, a resumable runner with per-sample latency, per-category `fit` for full-shot
-  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.14**.
+  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.15**.
 - **MVTec AD 2 data path:** loader (verified against the real Vial archive), layout verification
   (`scripts/prepare_data.py`), and the run_eval CLI. Native-resolution, raw-scale maps (v0.2.6).
 - **Method adapters — CPU halves done and registered** (each wraps an injectable backend; without
@@ -88,7 +88,9 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    `docs/superpowers/plans/2026-07-25-anomalyclip-zeroshot-adapter.md`. Uses the **official repo**
    (anomalib does not ship it), so its backend is derived from the repo's `test.py` at a pinned
    commit. Use the **VisA-trained** checkpoint for MVTec AD 2 and the **MVTec-AD-trained** checkpoint
-   for the VisA reproduction (overlap audit, §3.1).
+   for the VisA reproduction (overlap audit, §3.1). **Its targets are read and pre-registered
+   (2026-09-18) — see the section below.** Two gates, one per checkpoint, and the paper's 518×518
+   input into a 336px backbone is now in the method config as something a backend must apply.
 4. **AdaCLIP Colab phases (A–D)** —
    `docs/superpowers/plans/2026-07-29-adaclip-zeroshot-adapter.md`. Zero-shot and, like AnomalyCLIP,
    **auxiliary-trained**, so it carries the same kind of overlap audit. Its CPU half is done and
@@ -647,6 +649,62 @@ second dataset `secondary` would have been the cheap fix, and would have recorde
 **Cost, for the session that runs it:** two full grids, not one — 15 MVTec AD categories plus 12
 VisA objects, and VisA's one-class split is the larger of the two (8,659 train normals).
 
+
+## AnomalyCLIP's gate is read too — two gates, two checkpoints (2026-09-18, protocol v0.2.15)
+
+Same CPU session as WinCLIP's, same order: **arXiv:2310.18961v12 read directly, recorded in
+`../vlm-anomaly-paper/docs/verified-literature-facts.md` (sixth pass) before anything reached a
+config.**
+
+| | published (Table 1, industrial, image-level AUROC) | per-category | checkpoint |
+|---|---|---|---|
+| MVTec AD classic (15) | **91.5** ± 1.0 | Table 12 | VisA-trained |
+| VisA (12) | **82.1** ± 1.0 | Table 16 | MVTec-AD-trained |
+
+Both lists sum to their printed means (91.49, 82.06). The 82.1 that sat on the paper repo's
+unverified-leads list is confirmed — **both leads on that list turned out correct, which is not
+evidence the shortcut works**, and the next paragraph is the counter-example.
+
+**The checkpoint column is the new constraint, and it is not cosmetic.** AnomalyCLIP fine-tunes on
+the *other* dataset's **test split** — "we fine-tune AnomalyCLIP using the test data on MVTec AD
+and evaluate the ZSAD performance on other datasets. As for MVTec AD, we fine-tune AomalyCLIP on
+the test data of VisA" (§4.1, repeated in A.1). So the two published numbers come from two
+different models, and a run scored against the other one's number would fail a correct
+implementation. Every block in `configs/reproduction/anomalyclip.yaml` names its checkpoint, a
+test pins those against the overlap audit, and §2 v0.2.15 now requires it.
+
+**The overlap audit gained the split it was missing.** It said "MVTec AD (classic)"; it now says
+*test split*, in both rows. **No conclusion changed** — a test split of MVTec AD classic overlaps
+VisA exactly as little as its train split does — but an auxiliary-training overlap audit that does
+not say which split was trained on is not an audit, and a reader who checks the source will find
+"we fine-tune ... using the test data" there. They should find it in our audit first.
+
+**One bonus the pairing gives us:** the MVTec AD classic gate runs the **same checkpoint** as the
+MVTec AD 2 primary evaluation (VisA-trained). That gate therefore exercises the exact configuration
+the real results will come from, which is worth more than its ±1.0 verdict.
+
+**Two configuration facts that were not in the method config and now are.** The paper feeds its
+**336px-trained backbone 518×518 inputs** — deliberate, stated twice, "to obtain an appropriate
+visual feature map resolution" — and applies a **Gaussian σ=4 smoothing to the anomaly map at test
+time**. A backend that resized to 336, or that stripped the smoothing as "post-processing", would
+be a different method from the one these targets were measured on. §4 forbids normalisation *we*
+add, not the method's own published output.
+
+**A gap recorded, not closed.** A shard can name its dataset, method, category, seed and
+`preprocess`; it has **no field for a checkpoint**. Nothing mechanical would catch a run that
+declared `visa_trained` and loaded the other one — the same shape as the seed that was recorded but
+never applied, and the `preprocess` a shard could not name. The fix belongs with the AnomalyCLIP
+backend when it is built: declare the checkpoint the way `PatchCoreBackend` declares its seed, and
+have the adapter refuse a declared value its backend does not apply. Written into the audit's
+first-run checklist.
+
+**A worked example of why the primary-source rule is not pedantry.** AnomalyCLIP's Table 12 is a
+convenient all-methods table that also prints WinCLIP's per-category MVTec AD numbers. Its
+`toothbrush` cell says **88.0**; WinCLIP's own paper says **87.5**. Every other cell checked
+matches and both columns still average 91.8, so nothing downstream moves. But WinCLIP's targets
+were taken from WinCLIP's paper the day before, and had they been lifted from this table instead,
+one pre-registered per-category target would now be wrong by 0.5 with nothing to reveal it.
+
 ## Phase 2 ran green (2026-09-16) — plumbing only, nothing here is reportable
 
 Vial end to end through `run_evaluation` on a Colab T4, anomalib 2.6.0 under **Python 3.13**
@@ -767,10 +825,12 @@ These cannot be pre-written without the data/repo in front of you, and each play
   so `run_eval.py --dataset` reaches them.
 - **The published-numbers table**, from each method's own paper — record the exact source next to
   it. **Done for PatchCore** (`configs/reproduction/patchcore_ref.yaml`) **and for WinCLIP**
-  (`configs/reproduction/winclip.yaml`). For the remaining three — AnomalyCLIP, AdaCLIP, SAA+ —
-  read the paper first: PatchCore's case showed the table cannot be assumed to exist, WinCLIP's
-  showed it can also be richer than expected, and which dataset may gate a method is a §2 v0.2.12
-  decision recorded before its Colab run.
+  (`configs/reproduction/winclip.yaml`) **and for AnomalyCLIP**
+  (`configs/reproduction/anomalyclip.yaml`). For the remaining two — AdaCLIP and SAA+ — read the
+  paper first: PatchCore's case showed the table cannot be assumed to exist, WinCLIP's showed it
+  can be richer than expected, AnomalyCLIP's showed a method can need **a different checkpoint per
+  gate**, and which dataset may gate a method is a §2 v0.2.12 decision recorded before its Colab
+  run.
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 
