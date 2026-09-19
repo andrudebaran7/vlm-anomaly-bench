@@ -5,6 +5,11 @@
 # position). Those prompts ARE the method, which is why protocol §3's verbatim-sourcing principle
 # applies them here from the repo rather than a paper.
 #
+# **The paper confirms there was never another option** (2026-09-19, eighth pass of the paper
+# repo's verified-literature-facts.md): arXiv:2305.10724v1 §5.1 says "Details about the prompts
+# derived from domain expert knowledge are explained in the supplementary material", and no
+# supplementary exists — v1 is the only version, 13 pages, ending at the references.
+#
 # THE CONDITION THAT MAKES THIS DEFENSIBLE — read before editing this file:
 #   1. Every value below is copied VERBATIM from the official repo at the pinned commit recorded in
 #      configs/methods/saa.yaml. Cite the exact file and line range you copied it from.
@@ -20,74 +25,144 @@
 # fallback is reported on every table as "SAA+ without its per-object prompts", never as SAA+ proper
 # (protocol §3, v0.2.9).
 #
-# KEEP THIS BLOCK-SCALAR FORM. Do not collapse a category back into a flow mapping
-# (`{prompt: ..., property_constraints: ...}`): pasted repo text routinely contains commas and
-# colons (e.g. "black hole, defect" or "area: 0.01-0.2"), and PyYAML's flow-mapping parser either
-# silently truncates at the comma (producing a junk key with no error) or raises on the colon. The
-# `|` block scalars below survive both intact. `configs/methods/mllm_qwen.yaml` uses the same form
-# for the same reason.
+# ⚠️ THE PROPERTY CONSTRAINT IS A POSITIONAL FORMAT, NOT PROSE. Found 2026-09-19 in
+# `SAA/model.py`: `set_property_text_prompts` indexes whitespace-separated tokens by position —
+# [5] object count, [6] similar/dissimilar, [7] object, [12] k_mask, [19] area threshold. Re-wrapping
+# one of these strings, collapsing a double space or dropping the trailing space silently changes a
+# threshold to whatever token lands at index 19, with no error and a complete, plausible run at
+# parameters nobody chose. **They are stored as double-quoted scalars so every byte, including the
+# trailing space, is visible and unambiguous**, and `tests/test_saa_prompts.py` re-parses each one at
+# those five indices. That is also why `prompt_pairs` is a list of explicit two-item lists rather
+# than one block of pasted text: the repo's structure is `[prompt, filtered phrase]` and flattening
+# it would lose which half is which.
+#
+# Do NOT collapse a category into a flow mapping (`{prompt: ..., property_constraints: ...}`):
+# the pasted text routinely contains commas and colons, and PyYAML's flow-mapping parser either
+# silently truncates at the comma (producing a junk key with no error) or raises on the colon.
+# `configs/methods/mllm_qwen.yaml` carries the same warning for the same reason.
 
-source_commit: unpinned_until_first_colab_run
-source_files: unrecorded            # e.g. "SAA/prompts.py L12-L88" — the exact provenance
-recorded_on: unrecorded             # date the values below were copied
+# RECORDED 2026-09-19, on CPU, from the official repo read directly — NOT deferred to Colab.
+# Reading it early is what turned up the branch below, and the branch is the difference between
+# SAA+ and SAA (published VisA Fp 27.07 vs 12.76).
+source_branch: SAA-plus             # ⚠️ NOT `master`, which holds only the vanilla SAA demo
+source_commit: ff564ed09bef91d86452f62aa1564e778580513e     # SAA-plus HEAD, 2025-02-22
+source_files: "SAA/prompts/visa_parameters.py, SAA/prompts/general_prompts.py, SAA/hybrid_prompts.py"
+recorded_on: 2026-09-19
+# `SAA/hybrid_prompts.py` keys its tables by DATASET — visa_public, visa_challenge, mvtec, ksdd2,
+# mtd — and uses `manual_prompts` + `property_prompts`. Two consequences recorded here:
+#   - MVTec AD 2 is an ABSENT DATASET, not a category that falls back. See `categories:` below.
+#   - `visa_parameters.py` also defines `official_prompts` (VisA's own defect-type labels). It is
+#     imported NOWHERE. It is the larger and more official-looking of the two tables in that file,
+#     and it is the dead one. Do not take prompts from it.
+unused_table_in_source: official_prompts
 
+# --- MVTec AD 2 (the primary evaluation) -------------------------------------------------------
+# COVERAGE: 0 of 8. The repo publishes parameters for MVTec AD classic (15), VisA (12), KSDD2 and
+# MTD, and nothing else — exactly the realistic outcome protocol v0.2.9 pre-registered. Every
+# category below therefore runs on the repo's own generic fallback, `build_general_prompts`, which
+# in full is:
+#
+#     general_anomaly_description = ['defect on {}', 'damage on {}', 'flaw on {}']
+#     def build_general_prompts(category):
+#         return [[f.format(category), category] for f in general_anomaly_description]
+#
+# There is no property constraint in the fallback at all: `property_prompts` has no MVTec AD 2
+# entry, so the §4.1.2 rules (object count, k_mask, area threshold) have no published values here.
+# That is a larger gap than the language prompts, because those rules are what P^P contributes.
 categories:
-  can:
-    prompt: |
-      unrecorded
-    property_constraints: |
-      unrecorded
-    copied_from: unrecorded
-  fabric:
-    prompt: |
-      unrecorded
-    property_constraints: |
-      unrecorded
-    copied_from: unrecorded
-  fruit_jelly:
-    prompt: |
-      unrecorded
-    property_constraints: |
-      unrecorded
-    copied_from: unrecorded
-  rice:
-    prompt: |
-      unrecorded
-    property_constraints: |
-      unrecorded
-    copied_from: unrecorded
-  sheet_metal:
-    prompt: |
-      unrecorded
-    property_constraints: |
-      unrecorded
-    copied_from: unrecorded
-  vial:
-    prompt: |
-      unrecorded
-    property_constraints: |
-      unrecorded
-    copied_from: unrecorded
-  wallplugs:
-    prompt: |
-      unrecorded
-    property_constraints: |
-      unrecorded
-    copied_from: unrecorded
-  walnuts:
-    prompt: |
-      unrecorded
-    property_constraints: |
-      unrecorded
-    copied_from: unrecorded
+  can: &not_published
+    prompt: NOT_PUBLISHED_IN_REPO
+    fallback_prompt_pairs: |
+      build_general_prompts(<category>) -> [["defect on <category>", "<category>"],
+                                            ["damage on <category>", "<category>"],
+                                            ["flaw on <category>", "<category>"]]
+    property_constraints: NOT_PUBLISHED_IN_REPO
+    copied_from: "SAA/prompts/general_prompts.py L1-L9; absent from SAA/hybrid_prompts.py's tables"
+  fabric: *not_published
+  fruit_jelly: *not_published
+  rice: *not_published
+  sheet_metal: *not_published
+  vial: *not_published
+  wallplugs: *not_published
+  walnuts: *not_published
 
-# VisA objects, for the §2 reproduction gate. Same keyed shape as `categories:` above, same reason
-# (block scalars survive commas/colons in pasted text). The VisA object list itself — which objects
-# exist and what to name each key — is filled in Colab phase A.3, from the repo, verbatim.
+# --- VisA (the §2 reproduction run) ------------------------------------------------------------
+# All 12 objects DO have published prompts. Generated mechanically from the repo source and
+# round-tripped against it byte-for-byte rather than retyped — given the positional format above,
+# hand-transcription is the way this goes wrong.
 visa_categories:
-  __fill_from_repo_in_colab_phase_a3__:
-    prompt: |
-      unrecorded
-    property_constraints: |
-      unrecorded
-    copied_from: unrecorded
+  candle:
+    prompt_pairs:
+      - ["color defect. hole. black defect. wick hole. spot. ", "candle"]
+    property_constraints: "the image of candle have 4 similar candle, with a maximum of 1 anomaly. The anomaly would not exceed 0.3 object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L2-L4 (manual_prompts), L70 (property_prompts)"
+  capsules:
+    prompt_pairs:
+      - ["black melt. dark liquid.", "capsules"]
+      - ["bubble", "capsules"]
+    property_constraints: "the image of capsule have 20 dissimilar capsule, with a maximum of 15 anomaly. The anomaly would not exceed 1. object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L6-L9 (manual_prompts), L71 (property_prompts)"
+  cashew:
+    prompt_pairs:
+      - ["yellow defect. black defect. small holes. scratch. breakage. crack.", "cashew"]
+      - ["small spot.", "cashew"]
+    property_constraints: "the image of cashew have 1 dissimilar cashew, with a maximum of 17 anomaly. The anomaly would not exceed 0.05 object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L11-L15 (manual_prompts), L72 (property_prompts)"
+  chewinggum:
+    prompt_pairs:
+      - ["crack. yellow defect. color defect. black defect. thread.", "chewinggum"]
+    property_constraints: "the image of chewinggum have 1 dissimilar chewinggum with a maximum of 50 anomaly. The anomaly would not exceed 0.2 object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L17-L19 (manual_prompts), L73 (property_prompts)"
+  fryum:
+    prompt_pairs:
+      - ["broken part. purple defect. black defect. red defect. color defect. color crack. break", "fryum"]
+    property_constraints: "the image of fryum have 1 dissimilar fryum, with a maximum of 5 anomaly. The anomaly would not exceed 1. object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L21-L24 (manual_prompts), L74 (property_prompts)"
+  macaroni1:
+    prompt_pairs:
+      - ["broken part. red defect. black defect. crack. hole. scratch. color crack.", "macaroni"]
+    property_constraints: "the image of macaroni1 have 4 similar macaroni, with a maximum of 5 anomaly. The anomaly would not exceed 0.3 object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L26-L28 (manual_prompts), L75 (property_prompts)"
+  macaroni2:
+    prompt_pairs:
+      - ["broken part. red defect. black defect. crack. hole. scratch.", "macaroni"]
+      - ["edge. spot. chip.", "macaroni"]
+    property_constraints: "the image of macaroni2 have 4 dissimilar macaroni, with a maximum of 50 anomaly. The anomaly would not exceed 0.3 object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L30-L33 (manual_prompts), L76 (property_prompts)"
+  pcb1:
+    prompt_pairs:
+      - ["bent wire on pcb", "pcb"]
+      - ["white scratch on pcb", "pcb"]
+      - ["white defect on pcb", "pcb"]
+      - ["white circle.", "pcb"]
+    property_constraints: "the image of pcb1 have 1 dissimilar printed_circuit_board, with a maximum of 1 anomaly. The anomaly would not exceed 0.3 object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L36-L41 (manual_prompts), L77 (property_prompts)"
+  pcb2:
+    prompt_pairs:
+      - ["bent wire", "pcb"]
+      - ["pointed", "pcb"]
+      - ["wire", "pcb"]
+    property_constraints: "the image of pcb2 have 1 dissimilar pcb, with a maximum of 9 anomaly. The anomaly would not exceed 0.3 object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L43-L47 (manual_prompts), L78 (property_prompts)"
+  pcb3:
+    prompt_pairs:
+      - ["bent wire on pcb", "pcb"]
+      - ["scratch on pcb", "pcb"]
+      - ["defect on pcb", "pcb"]
+    property_constraints: "the image of pcb3 have 1 dissimilar printed_circuit_board, with a maximum of 5 anomaly. The anomaly would not exceed 0.3 object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L49-L53 (manual_prompts), L79 (property_prompts)"
+  pcb4:
+    prompt_pairs:
+      - ["yellow paper on pcb", "pcb"]
+      - ["yellow defect on pcb", "pcb"]
+      - ["black defect on pcb", "pcb"]
+      - ["color defect on pcb", "pcb"]
+      - ["scratch on pcb", "pcb"]
+      - ["defect on pcb", "pcb"]
+    property_constraints: "the image of pcb4 have 1 dissimilar pcb, with a maximum of 7 anomaly. The anomaly would not exceed 0.3 object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L55-L62 (manual_prompts), L80 (property_prompts)"
+  pipe_fryum:
+    prompt_pairs:
+      - ["broken part. red defect. black defect. crack. hole. scratch.", "fryum"]
+    property_constraints: "the image of pipe_fryum have 1 dissimilar pipe_fryum, with a maximum of 19 anomaly. The anomaly would not exceed 0.3 object area. "
+    copied_from: "SAA/prompts/visa_parameters.py L64-L66 (manual_prompts), L81 (property_prompts)"

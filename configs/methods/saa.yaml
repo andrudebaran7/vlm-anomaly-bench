@@ -4,24 +4,51 @@ aux_trained: false               # training-free cascade; no method-trained weig
 # SAA+ (Cao et al., "Segment Any Anomaly without Training"). anomalib does not ship it, so provenance
 # is the official repo (protocol §3 priority 1). Pin the commit on the first Colab run.
 source: https://github.com/caoyunkang/Segment-Any-Anomaly
+# ⚠️ THE BRANCH IS NOT THE DEFAULT-LOOKING ONE. `master` holds only the vanilla SAA demo — a gradio
+# app and vendored GroundingDINO/SAM. All of SAA+ (hybrid prompts, per-dataset parameters, run
+# scripts) is on `SAA-plus`, which IS the repo's default branch but is not what a reader expects.
+# A clone without the branch gets SAA, whose published VisA Fp is 12.76 against SAA+'s 27.07.
+branch: SAA-plus
 commit: unpinned_until_first_colab_run     # record the exact SHA here
+# SAA-plus HEAD when the prompts and metrics were read on CPU, 2026-09-19. If the pinned commit
+# above differs, re-read SAA/prompts/ and SAA/model.py before trusting saa_prompts.yaml.
+branch_head_read_for_provenance: ff564ed09bef91d86452f62aa1564e778580513e
+paper_version: "arXiv:2305.10724v1 (18 May 2023) — the only version; its cited supplementary does not exist"
+
 # TWO independent frozen artefacts, each pinned separately: swapping either moves every pixel metric
 # without touching a line of code.
 grounding_dino_checkpoint: unpinned_until_first_colab_run
 grounding_dino_sha256: unpinned_until_first_colab_run
 sam_checkpoint: unpinned_until_first_colab_run
 sam_sha256: unpinned_until_first_colab_run
+
+# Read from §5.1 of the paper, 2026-09-19. The published numbers were measured here.
+input_resolution: 400                  # 400x400 for evaluation
+saliency_backbone: wide_resnet50_2     # ImageNet-pretrained, for the P^S saliency prompt
+saliency_n: 400                        # N, §5.1
+confidence_k: 5                        # K for the P^C confidence prompt; Fig. 5 is its sweep
+
 # Per-category prompts, taken VERBATIM from the repo at the pinned commit — never tuned by us, never
 # adjusted after seeing a result. Protocol §3 amendment v0.2.9. Table: configs/methods/saa_prompts.yaml
 prompts: per_category_verbatim_from_official_repo
 prompts_file: configs/methods/saa_prompts.yaml
-# How many of MVTec AD 2's eight categories actually got a published prompt from the repo, vs. fell
-# back to the repo's own generic unknown-object prompt (protocol §3 v0.2.9). SAA+'s published prompts
-# cover MVTec AD (classic) and VisA objects, none of which are our eight categories, so the realistic
-# outcome is 0/8 — must be set in Colab phase A.3 after reading the repo, so that decision cannot be
-# skipped or discovered only when a table looks odd. Any category left on the fallback is reported on
-# every table as "SAA+ without its per-object prompts", never as SAA+ proper.
-prompt_coverage: unresolved_until_first_colab_run
+# ⚠️ A property constraint is a POSITIONAL format, not prose: SAA/model.py indexes whitespace tokens
+# at [5] count, [6] similar/dissimilar, [7] object, [12] k_mask, [19] area threshold. Re-wrapping one
+# changes a threshold silently. See the warning block in saa_prompts.yaml.
+property_prompt_is_positional: true
+# RESOLVED 2026-09-19 on CPU, from the repo — not deferred to Colab phase A.3. The repo publishes
+# parameters for MVTec AD classic, VisA, KSDD2 and MTD only, so NO MVTec AD 2 category has a
+# published prompt: the realistic outcome protocol v0.2.9 pre-registered. Every AD 2 category runs
+# on the repo's three-line generic fallback, and `property_prompts` has no AD 2 entry at all, so the
+# §4.1.2 rules that P^P contributes have no published values here either. Any category on the
+# fallback is reported on every table as "SAA+ without its per-object prompts", never as SAA+ proper.
+prompt_coverage: 0_of_8
+prompt_coverage_resolved_on: 2026-09-19
 # The anomaly map is the repo's OWN final map, taken verbatim. Not recomposed, not smoothed
 # (protocol §3: any composition of ours would be a re-implementation, priority 3).
 anomaly_map_source: official_repo_final_map
+# How an image-level score exists at all for a segmentation method: the repo's own metric_cal takes
+# the maximum of the anomaly map (utils/metrics.py). Recorded because the PAPER publishes no
+# image-level number of any kind, so this is our construction following their code — never a
+# reproduction of a published figure. See configs/reproduction/saa.yaml.
+image_score_from_map: max
