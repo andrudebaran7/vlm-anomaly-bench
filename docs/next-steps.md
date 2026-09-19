@@ -1183,6 +1183,33 @@ reported. At ~4 h per seed that is **~12 h of T4 time for one secondary check th
 method** (§2 v0.2.12). That is now a budget decision worth making deliberately rather than
 inheriting from a line that says "~4 h more". It is flagged, not decided.
 
+**The per-object train counts are recovered, and the transform is verified per object.** Same
+arithmetic as the MVTec runs — the sampler's bar totals `rows - 1`, and `floor(N x 102.4)` gives
+the coreset size, so `N` is recoverable. All eight so far land on integers, which is the
+per-category proof that the `anomalib` 32x32 grid reached each one rather than only the first:
+
+| object | coreset rows | train images | fit |
+|---|---|---|---|
+| candle | 92160 | 900 | 23m39 |
+| capsules | 55500 | 542 | 8m21 |
+| cashew | 46080 | 450 | 5m39 |
+| chewinggum | 46387 | 453 | 5m51 |
+| fryum | 46080 | 450 | 5m39 |
+| macaroni1 | 92160 | 900 | 23m41 |
+| macaroni2 | 92160 | 900 | 23m39 |
+| pcb1 | 92569 | 904 | 23m51 |
+
+**5499 over eight objects**, against VisA 1-cls's documented 8659, so **3160** remain across
+pcb2, pcb3, pcb4 and pipe_fryum — the record closes exactly when they land. Fit time through
+pcb1: **2h00m**.
+
+**The quadratic cost is now measured rather than inferred.** cashew and candle differ by exactly
+2x in training images (450 vs 900) and by **4.19x** in fit time, where quadratic predicts 4.0.
+It is also visible directly in the sampler's own rate: **135.6 it/s at 450 images against 64.9 at
+900** — each greedy step scans a bank twice as large, so doubling the images quarters nothing and
+quadruples the wall clock. That is the whole explanation for why VisA costs ~4 h and MVTec AD
+classic's fifteen categories cost ~40 minutes.
+
 **Operational, learned the same hour:** during a multi-hour run the finished objects live only on
 the VM's disk, and Colab serializes cells, so cell 3.5 cannot protect them until the run ends.
 `scripts/save_visa_to_drive.py` exists for that — interrupt after a `[N/12] done` line, cell 1.1,
