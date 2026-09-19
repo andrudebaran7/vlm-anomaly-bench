@@ -325,3 +325,89 @@ def test_adaclip_pre_registers_how_the_seed_question_gets_settled():
     assert cfg["n_seeds"] == 3
     text = ADACLIP.read_text()
     assert "bit-identical" in text and "--all-seeds" in text
+
+
+# --- SAA+ --------------------------------------------------------------------------------
+# The one method with NO gate. Its paper publishes no image-level number, and protocol §2
+# v0.2.17 forbids manufacturing one from what is available. These tests hold the absence in
+# place: the easiest way to lose this decision is for someone to later "fix" the missing gate.
+
+SAA = TARGETS.parent / "saa.yaml"
+
+
+def _saa():
+    with open(SAA) as fh:
+        return yaml.safe_load(fh)
+
+
+def test_no_saa_block_gates_and_the_absence_is_declared():
+    """Not an oversight, a pre-registered decision. `no_image_level_target` makes it a fact in
+    the file rather than something inferred from a missing key."""
+    cfg = _saa()
+    assert cfg["no_image_level_target"] is True
+    assert cfg["no_image_level_target_reason"].strip()
+    gating = [k for k, v in cfg.items() if isinstance(v, dict) and v.get("gates") is True]
+    assert not gating, f"SAA+ must have no gate; these claim to gate: {gating}"
+    assert cfg["check_visa"]["gates"] is False
+    assert cfg["check_mvtec_ad"]["gates"] is False
+
+
+def test_no_tolerance_is_pre_registered_for_fp():
+    """§7. We have never measured this metric's scale on this pipeline, so any number in this
+    field would have been invented rather than inherited -- and a gate would follow from it."""
+    for block in ("check_visa", "check_mvtec_ad"):
+        assert "tolerance" not in _saa()[block], (
+            f"{block} carries a tolerance. Adding one turns a non-gating check into a gate "
+            "through the back door."
+        )
+
+
+def test_the_fp_checks_carry_the_published_numbers_and_their_confounds():
+    cfg = _saa()
+    assert cfg["check_visa"]["published_mean"] == 27.07
+    assert cfg["check_mvtec_ad"]["published_mean"] == 39.40
+    for block in ("check_visa", "check_mvtec_ad"):
+        assert "arXiv:2305.10724v1" in cfg[block]["source"]
+        assert cfg[block]["metric"] == "seg_f1max"
+    # The resolution confound is the one that makes a miss uninterpretable, so it must be stated.
+    assert "400x400" in cfg["check_mvtec_ad"]["caveat"]
+
+
+def test_the_two_numbers_that_must_not_become_targets_are_named():
+    """Fr is the paper's own contribution and its released code does not compute it; the image
+    AUROC that code DOES compute is published nowhere. Both are within reach of someone looking
+    for a gate to fill the empty slot."""
+    cfg = _saa()["not_the_target"]
+    assert cfg["max_f1_region_visa"] == 14.46
+    assert cfg["max_f1_region_mvtec_ad"] == 49.67
+    assert "commented out" in cfg["max_f1_region_why_not"]
+    assert "published nowhere" in cfg["image_auroc_from_their_code_why_not"]
+
+
+def test_the_faithfulness_check_names_both_halves_and_has_a_runner():
+    """The static half is a script; the runtime half is owed by the backend. Recording only the
+    half that exists would let a green run imply the other was checked too."""
+    cfg = _saa()["integration_faithfulness"]
+    assert cfg["static"] and cfg["runtime"]
+    assert (SAA.parents[2] / "scripts" / "saa_faithfulness.py").is_file()
+    runtime = " ".join(cfg["runtime"])
+    assert "400x400" in runtime and "unmodified" in runtime
+
+
+def test_the_disclosures_saa_owes_every_table_are_pre_registered():
+    """Whatever the checks return. The 0/8 prompt coverage means the primary evaluation does not
+    run SAA+ as published, and that is true before any number exists."""
+    disclosures = " ".join(_saa()["disclosures"])
+    assert "0/8" in disclosures
+    assert "neither" in disclosures and "reproduced" in disclosures
+
+
+def test_the_saa_checks_agree_with_the_method_config_on_coverage():
+    cfg = _saa()
+    with open(SAA.parent.parent / "methods" / "saa.yaml") as fh:
+        method = yaml.safe_load(fh)
+    assert method["prompt_coverage"] == "0_of_8"
+    # MVTec AD classic is the only run where SAA+ has its published prompts -- which is the whole
+    # argument for paying for a non-gating check at all.
+    assert cfg["check_mvtec_ad"]["why_it_runs"].startswith("only_configuration")
+    assert method["aux_trained"] is False

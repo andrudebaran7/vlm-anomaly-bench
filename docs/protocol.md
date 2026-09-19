@@ -96,6 +96,30 @@ overlap table required in the paper).
     VisA and **must never be loaded**, and the maintainers state that the released weights do
     not reproduce the published table by an unquantified amount — which every AdaCLIP verdict
     must be reported with, PASS or FAIL.
+  - **SAA+ → NO gate exists, and one is not invented.** Its paper (arXiv:2305.10724v1) reports
+    **max-F1-pixel and max-F1-region only** — it addresses zero-shot anomaly *segmentation* and
+    publishes no image AUROC, AP or F1 on any of its four datasets. This is not PatchCore's case,
+    where the paper had one dataset and lacked the other; here the metric §2 gates on is absent
+    entirely. Nothing available is a substitute: Fr is **not computed by the released code**
+    (`max_f1_region` is assigned 0 and the call is commented out), and the image AUROC their code
+    *does* compute is published nowhere, so scoring against it would manufacture a criterion the
+    literature does not contain. Two things replace the gate, and the split follows the gate's
+    own job: **(a) an integration-faithfulness check** (`scripts/saa_faithfulness.py`,
+    pre-registered in `configs/reproduction/saa.yaml`), which is the stronger instrument here
+    because this repo does not reimplement SAA+ — it stores the repo's final map verbatim, so
+    the only failure mode left is driving their code with the wrong configuration, and that is
+    checked directly rather than inferred from a statistic; and **(b) two NON-GATING checks**
+    against the Fp the paper does publish (MVTec AD 39.40, VisA 27.07), reported with their
+    discrepancy and their confounds and unable to fail the method. **No tolerance is
+    pre-registered for Fp**: this repo has never measured that metric's scale on this pipeline,
+    and a number invented to fill the field is what §7 forbids. SAA+ is therefore neither
+    "reproduced" nor "not reproduced", and every table says so.
+  - **The general rule this adds:** where a method's own paper provides no target in the metric
+    §2 gates on, the method is **not dropped and not given a manufactured gate**. It carries a
+    faithfulness check appropriate to how it is integrated, a non-gating check against whatever
+    its paper does publish, and a disclosure on every table. A gate's purpose is to detect a
+    broken integration; where the literature cannot serve that purpose, the integration is
+    checked directly instead.
   - Every other method's gate is settled the same way when its own paper is read, and recorded
     here before its Colab run. **Still owed: AdaCLIP, SAA+.**
   - **A target is a criterion only at the configuration it was measured at, so that
@@ -534,3 +558,18 @@ pre-processing that produced them.
   than something we can choose our way out of. No conclusion of that audit changed, no metric
   definition changed, and no existing number moves.
   Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (seventh pass)
+- 2026-09-20 — v0.2.17. §2 records SAA+'s acceptance criterion, read from its own paper
+  (arXiv:2305.10724v1) and its official repo before its Colab run — the fifth and last method, so
+  §2's per-method rule is now exercised on every one. **The outcome is that SAA+ has no gate and
+  is not given one.** Its paper publishes no image-level number at all, and §2's own disqualifying
+  test forbids manufacturing a criterion from what is available: Fr is not computed by the
+  released code, and the image AUROC that code does compute is published nowhere. §2 therefore
+  gains a general rule for a case it had not met — where a method's paper provides no target in
+  the gating metric, the method is neither dropped nor given a manufactured gate, but carries an
+  integration-faithfulness check, a non-gating check against whatever its paper does publish, and
+  a disclosure on every table. For SAA+ the faithfulness check is the stronger instrument anyway,
+  because this repo stores its final map verbatim rather than reimplementing it, so the only
+  failure mode left is configuration and it is checked directly. **No tolerance is pre-registered
+  for Fp**, deliberately: the scale has never been measured on this pipeline. No metric definition
+  changed and no existing number moves.
+  Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (eighth pass + addendum)

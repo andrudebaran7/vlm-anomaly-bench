@@ -1,0 +1,134 @@
+# Pre-registered acceptance criterion for the SAA+ training-free adapter (protocol §2 v0.2.17).
+#
+# Committed before any SAA+ run. **This file does not contain a gate, and that is its point.**
+#
+# SOURCE — PDF downloaded from arXiv and read directly, 2026-09-19:
+#   Yunkang Cao, Xiaohao Xu, Chen Sun, Yuqi Cheng, Zongwei Du, Liang Gao, Weiming Shen.
+#   "Segment Any Anomaly without Training via Hybrid Prompt Regularization".
+#   **arXiv:2305.10724v1, 18 May 2023** — the only version on arXiv.
+#   Table 1 is its only performance table.
+#
+# WHY THERE IS NO GATE. §2 requires a reproduction target from the method's own paper, at the
+# configuration this repo runs, in image-AUROC. **SAA+'s paper publishes no image-level number of
+# any kind** — it reports max-F1-pixel (Fp) and max-F1-region (Fr) only, because it addresses
+# zero-shot anomaly *segmentation*. There is nothing to gate against, and §2's own disqualifying
+# test ("a criterion that cannot distinguish a wrong implementation from a different setup is not
+# a criterion") rules out manufacturing one from what is available — see `not_the_target` below.
+#
+# WHAT REPLACES IT. Two things, because the gate's job splits cleanly in two for this method:
+#   1. `integration_faithfulness` — the safeguard. SAA+ is the one method this repo does NOT
+#      reimplement: `anomaly_map_source: official_repo_final_map` takes the repo's final map
+#      verbatim, so no arithmetic of ours can be wrong. The only failure mode left is driving
+#      their code with the wrong configuration, and that is checked directly rather than through
+#      a summary statistic. For this method that is STRONGER evidence than a ±1.0 gate, not a
+#      weaker substitute for one.
+#   2. `check_visa` / `check_mvtec_ad` — the tie to the literature, NON-GATING, using the same
+#      `gates: false` machinery §2 v0.2.12 built for PatchCore's VisA.
+#
+# Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md, eighth pass + its addendum.
+
+method: saa
+
+# §2's metric has no source for this method. Recorded as a first-class fact rather than an
+# absence, so nothing downstream can quietly assume a gate was simply forgotten.
+no_image_level_target: true
+no_image_level_target_reason: >-
+  arXiv:2305.10724v1 reports max-F1-pixel and max-F1-region only. It contains no image AUROC, no
+  image AP and no image F1, on any of its four datasets. This is not PatchCore's situation, where
+  the paper had MVTec AD and lacked only VisA; here the metric §2 gates on is absent entirely.
+
+# --- The safeguard (E) -------------------------------------------------------------------------
+# Pre-registered here, before any run, so that "our SAA+ was configured correctly" is a claim with
+# evidence behind it rather than an assumption. `scripts/saa_faithfulness.py` runs the static half
+# against a live clone; the runtime half is owed by the backend when it is built.
+integration_faithfulness:
+  static:                        # checkable against the cloned repo alone, no GPU
+    - branch is SAA-plus, not master        # master is the vanilla SAA demo, VisA Fp 12.76
+    - clone HEAD equals the commit pinned in configs/methods/saa.yaml
+    - every VisA prompt pair in configs/methods/saa_prompts.yaml is byte-identical to
+      SAA/prompts/visa_parameters.py at that commit
+    - every property constraint still parses at token indices 5, 6, 7, 12, 19
+    - SAA/hybrid_prompts.py still reads manual_prompts and property_prompts, not official_prompts
+    - SAA/prompts/general_prompts.py still holds the three-line fallback we recorded for AD 2
+  runtime:                       # owed by the backend; each must be asserted from the live object
+    - input resolution is 400x400
+    - confidence prompt K is 5
+    - saliency N is 400 on an ImageNet wide_resnet50_2
+    - the stored anomaly map is the repo's final map, unmodified by us
+    - for MVTec AD 2, the prompts actually used are the repo's generic fallback, and the run
+      records that it used the fallback rather than a per-object prompt
+
+# --- The literature check (C), NON-GATING ------------------------------------------------------
+# Run, reported beside the published figure with its discrepancy and its confounds, and unable to
+# fail the method. Deliberately NO `tolerance` key: we have never measured this metric's scale on
+# this pipeline, and inventing a number to fill the field would be exactly the pre-registration
+# §7 forbids. A verdict here is read, not computed.
+check_mvtec_ad:
+  dataset: mvtec_ad
+  metric: seg_f1max
+  gates: false
+  published_mean: 39.40
+  source: "arXiv:2305.10724v1 Table 1, Fp row, SAA+ column, MVTec-AD"
+  n_categories: 15
+  # THE REASON THIS CHECK IS WORTH ITS COST, and it is not the number: MVTec AD classic is the
+  # ONLY place SAA+ runs with its real per-object prompts (15/15 published). The primary MVTec
+  # AD 2 evaluation runs at 0/8 on the generic fallback. So this is the single piece of evidence
+  # we will ever have that the cascade behaves as its authors describe.
+  why_it_runs: only_configuration_where_saa_plus_has_its_published_prompts
+  caveat: >-
+    Three confounds, all recorded before the run. (1) The paper measures at 400x400; this repo
+    stores raw maps at native resolution (protocol v0.2.6), and a pixel metric at a different
+    resolution is not the same number. (2) Both sides are oracle-thresholded, which makes the
+    COMPARISON apples-to-apples but means neither figure may be reported as achievable (§4).
+    (3) Whether the paper's per-dataset figure is a mean over categories or a pooled-pixel
+    number over the whole dataset is NOT yet established — settle it from the repo's eval loop
+    before reading any discrepancy. Together these are why a miss here could not distinguish a
+    wrong implementation from a different setup, which is §2's own test for what cannot gate.
+  comparability_note: >-
+    One thing does line up exactly: this repo's `seg_f1max` and the repo's `calculate_max_f1` are
+    the same construction — pooled pixels, sklearn `precision_recall_curve`, maximum F1.
+
+check_visa:
+  dataset: visa
+  metric: seg_f1max
+  gates: false
+  published_mean: 27.07
+  source: "arXiv:2305.10724v1 Table 1, Fp row, SAA+ column, VisA"
+  n_categories: 12
+  why_it_runs: second_configuration_with_published_per_object_prompts   # 12/12, from the repo
+  caveat: same_as_check_mvtec_ad
+
+# Numbers from this paper that must NOT become targets.
+not_the_target:
+  max_f1_region_mvtec_ad: 49.67
+  max_f1_region_visa: 14.46
+  max_f1_region_why_not: >-
+    Fr is the metric the paper proposes as its own contribution, and **the released code does not
+    compute it**: in utils/metrics.py `max_f1_region` is assigned 0 in the else branch, the call
+    that would compute it is commented out, and it is absent from the returned dict. It cannot be
+    reproduced with the authors' own code as published.
+  image_auroc_from_their_code_why_not: >-
+    The repo's `metric_cal` DOES compute an image-level AUROC (`i_roc`), from the maximum of the
+    anomaly map. It is published nowhere. Running their code therefore produces an image AUROC
+    with no counterpart in the literature, and treating it as a target would manufacture a
+    criterion that does not exist. `configs/methods/saa.yaml` records `image_score_from_map: max`
+    as OUR construction following their code — never as a reproduction of a published figure.
+
+# Required on every table where SAA+ appears, whatever the checks above return.
+disclosures:
+  - >-
+    No published image-level target exists for this method; it carries an integration-faithfulness
+    check in place of a reproduction gate, and is neither "reproduced" nor "not reproduced".
+  - >-
+    On MVTec AD 2 it runs at 0/8 prompt coverage, on the repo's three-line generic fallback and
+    with no property constraints at all, so it is "SAA+ without its per-object prompts", never
+    SAA+ proper (protocol §3 v0.2.9).
+
+# Protocol §6, same conditional as the other zero-shot methods. The paper states its own answer —
+# §5.2: "as all methods require no training process, their performance is stable with a variance
+# of ±0.00" — which is evidence about their pipeline, not ours, exactly as WinCLIP's ±0.0 rows
+# were. Same pre-registered procedure: run one category twice at two seeds before reporting
+# anything; bit-identical image scores mean one run is reportable with that measurement recorded
+# beside it, anything else means three seeds and `--all-seeds`. SAM and GroundingDINO inference is
+# expected to be deterministic, but expected is not measured.
+n_seeds: 3

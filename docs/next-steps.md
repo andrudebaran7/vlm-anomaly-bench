@@ -784,7 +784,7 @@ live at 2 a.m. on a T4.
 plus 12 VisA objects — and **two checkpoint downloads**, one per gate, with the third weight in
 the same Drive folder that must not be the one loaded.
 
-## SAA+ is read, and its gate DOES NOT EXIST (2026-09-19) — one decision is open
+## SAA+ is read, and its gate DOES NOT EXIST (2026-09-19; decided 2026-09-20, v0.2.17)
 
 The fifth and last paper. **arXiv:2305.10724v1 read directly, recorded in
 `../vlm-anomaly-paper/docs/verified-literature-facts.md` (eighth pass, plus a same-day addendum)
@@ -846,14 +846,51 @@ literature does not contain. `configs/methods/saa.yaml` records `image_score_fro
 - **`visa_parameters.py`'s `official_prompts` is imported nowhere.** It is the larger and more
   official-looking of the two prompt tables in that file, and it is the dead one.
 
-### The open decision: what SAA+'s acceptance criterion is, or whether it has one
+### DECIDED 2026-09-20 (protocol v0.2.17): no gate, and one is not invented
 
-**This is not something to settle in a Colab session, and it is not something to settle by
-picking whichever number is available.** §2 says a gate must come from the method's own paper at
-the configuration this repo runs. For SAA+ that yields nothing at image level. The options, with
-what each costs, are written out for the author rather than chosen here. Until it is settled,
-**SAA+ has no pre-registered gate and `configs/reproduction/saa.yaml` is deliberately not
-written** — an empty slot is honest; a gate invented to fill it is not.
+`configs/reproduction/saa.yaml` is written, and it contains **no gating block**. Two things take
+the gate's place, because the gate's job splits in two for this method:
+
+**(a) An integration-faithfulness check — the safeguard, and for SAA+ the stronger instrument.**
+This repo does not reimplement SAA+: `anomaly_map_source: official_repo_final_map` stores the
+repo's final map verbatim, so no arithmetic of ours can be wrong. The only failure mode left is
+driving their code with the wrong configuration, and a published-number gate is an indirect,
+noisy proxy for that. `scripts/saa_faithfulness.py` checks it directly — branch, pinned commit,
+every VisA prompt byte-identical to the repo, the positional format still read at tokens
+5/6/7/12/19, `hybrid_prompts.py` still using the live tables and not the dead `official_prompts`,
+and the three-line fallback that all eight AD 2 categories depend on. Ten tests, most of them
+breaking something on purpose. **It covers the static half only and says so on every run**; the
+runtime half (400×400, K=5, N=400, the map stored unmodified, the fallback recorded when used) is
+listed under `integration_faithfulness.runtime` and is owed by the backend.
+
+**(b) Two NON-GATING checks against the Fp the paper does publish** — MVTec AD 39.40, VisA 27.07
+— reported with their discrepancy and their confounds, unable to fail the method, on the
+`gates: false` machinery §2 v0.2.12 built for PatchCore's VisA.
+
+**The argument that earned (b) its cost is not the number.** MVTec AD classic is the **only**
+configuration where SAA+ runs with its real per-object prompts (15/15); the primary MVTec AD 2
+evaluation runs at 0/8 on the generic fallback. It is the single piece of evidence this study
+will ever have that the cascade behaves as its authors describe.
+
+**No tolerance is pre-registered for Fp**, deliberately. This repo has never measured that
+metric's scale on this pipeline, and a number invented to fill the field is what §7 forbids. A
+verdict there is read, not computed. Three confounds are written down before the run: the paper
+measures at 400×400 against our native-resolution raw maps (v0.2.6); both sides are
+oracle-thresholded, which makes the comparison apples-to-apples but means neither figure may be
+reported as achievable (§4); and whether the paper's per-dataset figure is a mean over categories
+or a pooled-pixel number is **not yet established** — settle it from the repo's eval loop before
+reading any discrepancy. One thing does line up exactly: our `seg_f1max` and their
+`calculate_max_f1` are the same construction — pooled pixels, sklearn `precision_recall_curve`,
+maximum F1.
+
+**§2 gained a general rule from this**, rather than a special case: where a method's own paper
+provides no target in the gating metric, the method is neither dropped nor given a manufactured
+gate. A gate's purpose is to detect a broken integration; where the literature cannot serve that
+purpose, the integration is checked directly instead.
+
+**Cost warning, with yesterday's VisA lesson fresh:** (b) is 27 categories through a
+GroundingDINO+SAM cascade. The plan already pre-registers a measured cost probe (phase C.2) —
+run it before committing a session, not after.
 
 Whatever is decided, one thing is already true and belongs on every SAA+ table: on MVTec AD 2 it
 runs **without its per-object prompts and without its property rules**, which is not SAA+ as
