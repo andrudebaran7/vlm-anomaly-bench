@@ -1115,7 +1115,7 @@ published 99.0, inside ±1.0 by 0.02 points, three seeds, report committed. Noth
 MVTec AD gate needs re-running.
 
 **The one thing left from that session is VisA, and it did not fit.** The seeds took the session;
-VisA is ~2 h on its own and was not started. It is a *reported secondary check* that cannot fail
+VisA is **~4 h** on its own (measured 2026-09-19; this line said ~2 h) and was not started. It is a *reported secondary check* that cannot fail
 the method (§2 v0.2.12) — now a second independent reading of an implementation that has already
 passed its real gate, rather than evidence for a pending decision.
 
@@ -1123,6 +1123,34 @@ passed its real gate, rather than evidence for a pending decision.
 folder, deliberately not `MyDrive/reproduction/`, which holds the 2026-09-16 seed-0 shards under
 byte-identical filenames and would have been overwritten. The maps were not copied and are not
 needed: the gate is image-level, and threshold calibration runs on MVTec AD 2, not on classic.
+
+### MEASURED 2026-09-19: VisA costs ~4 h, not ~2 h — every "~2 h" below is wrong
+
+From the live run, not from an estimate. **7 of 12 objects in 2 hours**, with the four pcb
+objects (the other large ones) and pipe_fryum still to go.
+
+**macaroni2's fit alone took 23m39s.** Its coreset printed 92159 on the sampler's bar, i.e. 92160
+rows, i.e. `92160 / 102.4 = 900` training images — which also confirms the `anomalib` transform's
+32x32 grid reached this object, the same per-category check every MVTec run got.
+
+**The mechanism, so the number generalises instead of being a surprise twice.** Greedy coreset
+selection is roughly *quadratic* in the number of training patches, and VisA's large objects have
+**900** training images against MVTec AD classic's largest, hazelnut, at **391**. Hazelnut's fit
+took 2m29s. So a single large VisA object costs about **ten times** the worst MVTec category, and
+VisA has five or six of them. The earlier note that corrected "cheap relative to a 15-category
+fit" to "roughly two hours" did not go far enough: it scaled by image count, and the cost does not
+scale by image count.
+
+**What this changes downstream, and it is not small.** §6 owes VisA three seeds like anything else
+reported. At ~4 h per seed that is **~12 h of T4 time for one secondary check that cannot fail the
+method** (§2 v0.2.12). That is now a budget decision worth making deliberately rather than
+inheriting from a line that says "~4 h more". It is flagged, not decided.
+
+**Operational, learned the same hour:** during a multi-hour run the finished objects live only on
+the VM's disk, and Colab serializes cells, so cell 3.5 cannot protect them until the run ends.
+`scripts/save_visa_to_drive.py` exists for that — interrupt after a `[N/12] done` line, cell 1.1,
+one typed line, re-run 3.4. Cell 1.1 is safe to run mid-session: `git reset --hard` does not touch
+untracked files and the `git clean` is scoped to `src`, so `data/visa` and the shards survive.
 
 ### Tomorrow's session is short, and shorter than the last two
 
@@ -1135,8 +1163,9 @@ before starting, precisely so a two-hour run cannot begin on a truncated downloa
    interpreter that does not inherit it. What makes the script importable is cell 0.1's
    `%cd` + `pip install -e .`. Skipping straight to 1.1 ends in `No module named 'vlmab'`.
 2. **Cell 1.1** — hard sync.
-3. **Cell 3.4, one line:** `!python scripts/run_visa_secondary.py` (~2 h, resumable per object,
-   so a drop costs one of twelve). It scores itself and writes
+3. **Cell 3.4, one line:** `!python scripts/run_visa_secondary.py` (**~4 h — measured
+   2026-09-19, see the section above; the ~2 h this line used to say was wrong**, resumable per
+   object, so a drop costs one of twelve). It scores itself and writes
    `results/reproduction/patchcore_visa.md`.
 4. **Cell 3.5, immediately after** — copies the report *and the shards* to
    `MyDrive/reproduction_visa/` and reprints the report under a banner to copy out. **New on
@@ -1204,7 +1233,9 @@ What to expect from each, written before reading them so it can be checked after
 
 Order it after VisA only because VisA needs the live session and this does not.
 - **VisA's own §6 debt:** seed 0 alone is a first reading, not a table entry. Seeds 1 and 2 are
-  `--seed 1` / `--seed 2` on the same script, ~4 h more, owed before the number appears anywhere.
+  `--seed 1` / `--seed 2` on the same script, **~8 h more at the measured cost**, owed before
+  the number appears anywhere — and worth weighing against what a non-gating secondary check is
+  for. See the measured-cost section above.
 
 Both repos clean and in sync with `origin/master`; bench: 452 tests green.
 
