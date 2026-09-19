@@ -70,3 +70,48 @@ def test_a_run_cell_imports_everything_it_uses(index, source):
         "defining them. A session told to skip the cells above this one would NameError here, "
         "after paying for the setup. Repeat the imports in the cell."
     )
+
+
+# --- The VisA session path -----------------------------------------------------------------
+# Its handoff is phase 0 -> 1.1 -> 3.4 -> 3.5, and it skips cell 3.1 entirely because VisA needs
+# no Drive upload. So these cells may not inherit even MVTEC_AD_CATEGORIES -- the one name the
+# rule above allows. They are checked separately and more strictly for that reason.
+
+VISA_CELLS = [(i, src) for i, src in _code_cells()
+              if "run_visa_secondary" in src or "reproduction_visa" in src]
+
+
+def test_the_visa_session_path_still_has_its_cells():
+    """A guard on the guard, as above: a renamed script or folder would empty this list and the
+    check below would pass by vacuity."""
+    assert len(VISA_CELLS) == 2, (
+        f"expected cells 3.4 and 3.5, found {[i for i, _ in VISA_CELLS]}"
+    )
+
+
+@pytest.mark.parametrize("index, source", VISA_CELLS, ids=lambda v: v if isinstance(v, int) else "")
+def test_a_visa_cell_imports_everything_it_uses(index, source):
+    orphans = _free_names(source)
+    assert not orphans, (
+        f"notebook cell {index} is on the VisA session path and reads {sorted(orphans)} without "
+        "defining them. That path skips cell 3.1, so it cannot inherit even "
+        "MVTEC_AD_CATEGORIES. Repeat the imports in the cell."
+    )
+
+
+def test_the_visa_result_is_copied_off_the_runtime_before_anything_can_delete_it():
+    """Cell 1.1 does `git reset --hard`, and the Colab filesystem dies with the runtime. The
+    handoff calls a result left in a closed session's scrollback the same as no result, so the
+    notebook has to carry the step that gets it out -- not just the step that produces it."""
+    copy_cells = [src for _, src in VISA_CELLS if "reproduction_visa" in src]
+    assert len(copy_cells) == 1
+    src = copy_cells[0]
+    assert "drive.mount" in src, "the copy step has to mount Drive itself"
+    assert "patchcore_visa.md" in src and "shards" in src, (
+        "both the report and the shards go to Drive: the shards are what let the gate be "
+        "re-scored without repeating the two-hour fit"
+    )
+    assert "os.path.isfile(REPORT)" in src, (
+        "an absent report means the gate refused, which is a different problem from a FAIL and "
+        "must not be copied over in silence"
+    )

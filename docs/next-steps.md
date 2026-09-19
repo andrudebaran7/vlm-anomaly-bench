@@ -1052,15 +1052,40 @@ VisA needs **no Drive upload and no cell 3.1**. `scripts/run_visa_secondary.py` 
 archive itself from AWS Open Data (no registration, CC BY 4.0) and checks its byte-exact size
 before starting, precisely so a two-hour run cannot begin on a truncated download.
 
-1. **Phase 0** entire, fresh runtime.
+1. **Phase 0** entire, fresh runtime. **It is not optional, and the reason is not obvious:**
+   cell 1.1 adds `src` to the *kernel's* `sys.path`, and `!python scripts/...` starts a new
+   interpreter that does not inherit it. What makes the script importable is cell 0.1's
+   `%cd` + `pip install -e .`. Skipping straight to 1.1 ends in `No module named 'vlmab'`.
 2. **Cell 1.1** — hard sync.
-3. **One line:** `!python scripts/run_visa_secondary.py` (~2 h, resumable per object, so a drop
-   costs one of twelve). It scores itself and writes `results/reproduction/patchcore_visa.md`.
+3. **Cell 3.4, one line:** `!python scripts/run_visa_secondary.py` (~2 h, resumable per object,
+   so a drop costs one of twelve). It scores itself and writes
+   `results/reproduction/patchcore_visa.md`.
+4. **Cell 3.5, immediately after** — copies the report *and the shards* to
+   `MyDrive/reproduction_visa/` and reprints the report under a banner to copy out. **New on
+   2026-09-19**, because nothing in the notebook did this: the only git cell is 20, which
+   commits the backend and belongs to a phase this session skips, and cell 1.1's
+   `git reset --hard` deletes an uncommitted report. The shards go too, so the gate can be
+   re-scored, or one object re-run, without repeating the two-hour fit.
 
 **Reload the notebook from `master` first.** The 2026-09-18 session ran on a copy that predated
 `b86e209` (2026-09-17) and therefore had no cell 3.4 at all — which cost nothing, because the
 check is one typed line, but it is the second time a stale notebook copy has shown up. Cell 1.1
-syncs the *repository*; it cannot sync the notebook the session is executing.
+syncs the *repository*; it cannot sync the notebook the session is executing. **This matters more
+than last time: cell 3.5 is new, and an old copy will not have it.**
+
+**Pre-session verification, done 2026-09-19 on CPU.** Every signature `run_visa_secondary.py`
+calls was checked against the installed code — `run_evaluation`'s kwargs, `VisA.SPLITS ==
+("train", "test")` against the `split`/`fit_split` it passes, `PatchCoreRef.seed`/`.preprocess`,
+the gate's flags, and `secondary_n_categories: 12` in the targets file. Seven tests now exercise
+the script's `run()` and `main()` with injected fakes; before that, **no line of either had ever
+executed** — only the module import and one constant were covered, which is the shape of the
+cell 3b.3 defect at a much higher price. One more thing confirmed: cell 1.1's `git clean -qfd src`
+touches `src` only, so `data/visa` and the shards survive a re-sync mid-session.
+
+**One flag to remember for later, not for this session:** seeds 1 and 2 go into the *same*
+results root, and the gate refuses a root that pools seeds. They need
+`--no-score` (`python scripts/run_visa_secondary.py --seed 1 --no-score`), or a correct two-hour
+run ends in exit code 2.
 
 ### After VisA, in order
 
