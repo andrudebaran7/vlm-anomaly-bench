@@ -202,3 +202,126 @@ def test_the_arxiv_version_the_targets_were_read_from_is_pinned():
         assert "arXiv:2310.18961v12" in cfg[block]["source"]
     with open(ANOMALYCLIP.parent.parent / "methods" / "anomalyclip.yaml") as fh:
         assert "v12" in yaml.safe_load(fh)["paper_version"]
+
+
+# --- AdaCLIP -----------------------------------------------------------------------------
+# Two gates and two checkpoints again (arXiv:2407.15795v1 §5.1), but with three wrinkles none of
+# the earlier methods had: each checkpoint carries a medical auxiliary dataset as well as an
+# industrial one, the paper reports the same two datasets a SECOND time under a different setup,
+# and the repo ships a third checkpoint that must never be loaded.
+
+ADACLIP = TARGETS.parent / "adaclip.yaml"
+
+
+def _adaclip():
+    with open(ADACLIP) as fh:
+        return yaml.safe_load(fh)
+
+
+def _adaclip_method():
+    with open(ADACLIP.parent.parent / "methods" / "adaclip.yaml") as fh:
+        return yaml.safe_load(fh)
+
+
+def test_adaclip_per_category_numbers_average_to_their_published_means():
+    cfg = _adaclip()
+    for block, n, published in (("gate_mvtec_ad", 15, 89.2), ("gate_visa", 12, 85.8)):
+        per_cat = cfg[block]["per_category"]
+        assert len(per_cat) == n, f"{block} should hold {n} categories"
+        mean = sum(per_cat.values()) / len(per_cat)
+        assert abs(mean - published) < 0.1, (
+            f"{block}: per-category mean {mean:.3f} does not reproduce the published {published}"
+        )
+        assert cfg[block]["published_mean"] == published
+
+
+def test_both_adaclip_blocks_gate():
+    cfg = _adaclip()
+    assert cfg["gate_mvtec_ad"]["gates"] is True
+    assert cfg["gate_visa"]["gates"] is True
+    assert cfg["gate_mvtec_ad"]["dataset"] == "mvtec_ad"
+    assert cfg["gate_visa"]["dataset"] == "visa"
+    assert cfg["gate_mvtec_ad"]["metric"] == cfg["gate_visa"]["metric"] == "i_auroc"
+    assert cfg["gate_mvtec_ad"]["tolerance"] == cfg["gate_visa"]["tolerance"] == 1.0
+
+
+def test_each_adaclip_gate_names_the_full_checkpoint_it_is_the_target_for():
+    """Every published checkpoint is trained on an industrial AND a medical dataset. A block
+    naming only the industrial half would name a checkpoint that does not exist, and the repo
+    publishes its weights under the two-dataset labels asserted here."""
+    cfg = _adaclip()
+    assert cfg["gate_mvtec_ad"]["checkpoint"] == "visa_colondb_trained"
+    assert cfg["gate_visa"]["checkpoint"] == "mvtec_ad_clinicdb_trained"
+    assert cfg["gate_mvtec_ad"]["checkpoint"] != cfg["gate_visa"]["checkpoint"]
+
+
+def test_the_adaclip_gate_checkpoints_agree_with_the_overlap_audit():
+    """Protocol §3.1, same invariant as AnomalyCLIP's: if the targets file and the method config
+    drifted apart, one of them would be authorising leakage."""
+    cfg = _adaclip()
+    method = _adaclip_method()
+    assert method["aux_trained"] is True
+    assert method["checkpoint_for_visa_reproduction"] == cfg["gate_visa"]["checkpoint"]
+    # The MVTec AD gate runs the same checkpoint as the MVTec AD 2 primary evaluation.
+    assert method["checkpoint_for_mvtec_ad2"] == cfg["gate_mvtec_ad"]["checkpoint"]
+
+
+def test_the_all_datasets_checkpoint_is_forbidden_in_both_files():
+    """The repo's third weight trains on 14 datasets including both mvtec and visa. Loading it
+    would void the zero-shot claim, and nothing in a filename would reveal it -- which is exactly
+    why the refusal has to live in the config rather than in someone's memory."""
+    cfg = _adaclip()
+    assert cfg["forbidden_checkpoint"] == "all_datasets"
+    assert _adaclip_method()["forbidden_checkpoint"] == "all_datasets"
+    for block in ("gate_mvtec_ad", "gate_visa"):
+        assert cfg[block]["checkpoint"] != cfg["forbidden_checkpoint"]
+
+
+def test_the_anomalyclip_setting_numbers_are_recorded_as_not_the_target():
+    """Appendix §4 reports the same two datasets under AnomalyCLIP's single-auxiliary-dataset
+    setup. Its MVTec figure is HIGHER than the gate, so it is the number a narrow miss would
+    tempt someone toward -- and the repo publishes no weights for it."""
+    cfg = _adaclip()
+    assert cfg["not_the_target"]["anomalyclip_setting_mvtec_ad"] == 89.6
+    assert cfg["not_the_target"]["anomalyclip_setting_visa"] == 83.9
+    assert cfg["gate_mvtec_ad"]["published_mean"] < cfg["not_the_target"][
+        "anomalyclip_setting_mvtec_ad"
+    ]
+
+
+def test_the_maintainers_warning_about_the_released_weights_is_pre_registered():
+    """The repo states its released weights do not reproduce its published table, by an
+    unquantified amount. Written down before the run so it cannot be produced afterwards as an
+    excuse for a miss -- and flagged to be reported with a PASS too."""
+    cfg = _adaclip()["released_weights_caveat"]
+    assert cfg["quantified"] is False
+    assert cfg["report_with_verdict"] is True
+    assert "caoyunkang/AdaCLIP" in cfg["source"]
+
+
+def test_the_adaclip_published_configuration_matches_what_the_method_config_runs():
+    """A target is only a criterion at the configuration it was measured at. As with AnomalyCLIP,
+    the 518x518 input into a 336px backbone is the one an implementer would silently 'fix'."""
+    cfg = _adaclip()["published_configuration"]
+    method = _adaclip_method()
+    assert cfg["input_resolution"] == method["input_resolution"] == 518
+    assert cfg["feature_layers"] == method["feature_layers"] == [6, 12, 18, 24]
+    assert cfg["prompting_depth"] == method["prompting_depth"] == 4
+    assert cfg["prompting_length"] == method["prompting_length"] == 5
+    assert method["backbone"] == "ViT-L-14-336"
+
+
+def test_the_adaclip_arxiv_version_the_targets_were_read_from_is_pinned():
+    cfg = _adaclip()
+    for block in ("gate_mvtec_ad", "gate_visa"):
+        assert "arXiv:2407.15795v1" in cfg[block]["source"]
+    assert "2407.15795v1" in _adaclip_method()["paper_version"]
+
+
+def test_adaclip_pre_registers_how_the_seed_question_gets_settled():
+    """Same conditional as WinCLIP's and AnomalyCLIP's, and AdaCLIP has a clustering step (HSF,
+    K=20) where a seed can hide."""
+    cfg = _adaclip()
+    assert cfg["n_seeds"] == 3
+    text = ADACLIP.read_text()
+    assert "bit-identical" in text and "--all-seeds" in text

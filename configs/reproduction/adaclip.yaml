@@ -1,0 +1,152 @@
+# Pre-registered reproduction targets for the AdaCLIP zero-shot adapter (protocol §2 v0.2.16).
+#
+# Committed before any AdaCLIP reproduction run, so the gate cannot be moved after seeing a
+# result.
+#
+# SOURCE — PDF downloaded from arXiv and read directly, 2026-09-19:
+#   Yunkang Cao, Jiangning Zhang, Luca Frittoli, Yuqi Cheng, Weiming Shen, Giacomo Boracchi.
+#   "AdaCLIP: Adapting CLIP with Hybrid Learnable Prompts for Zero-Shot Anomaly Detection".
+#   ECCV 2024. **arXiv:2407.15795v1, 22 Jul 2024** — the only version on arXiv, so unlike
+#   AnomalyCLIP's twelfth revision there is no later-version question to ask of these numbers.
+#   Means: **Table 1**, industrial domain, Image-level (AUROC, max-F1), column `AdaCLIP`.
+#   Per-category: **Table 9** (MVTec AD) and **Table 10** (VisA), same column.
+#
+# TWO GATES, TWO CHECKPOINTS — as with AnomalyCLIP, and for the same reason: the auxiliary data
+# may not contain a category of the test set, so the paper swaps which dataset it trains on.
+# What is different here is that **each checkpoint carries a medical auxiliary dataset as well**
+# (§5.1: "we default to using the industrial dataset, MVTec AD, and the medical dataset,
+# ClinicDB, as auxiliary data. For evaluations on MVTec AD and ClinicDB, VisA and ColonDB are
+# utilized for training"). A block that named only the industrial half would be naming half of
+# what produced its number, so `checkpoint` below carries both and matches the official repo's
+# own weight-table label.
+#
+# The auxiliary data is the TEST split of those datasets (Appendix §1: "We solely utilize the
+# test data from these datasets"), corroborated by its Table 1's counts — MVTec AD (467, 1258)
+# = 1725 and VisA (962, 1200) = 2162, which are the test splits exactly.
+#
+# Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md, seventh pass.
+# Overlap audit: docs/adaclip-overlap-audit.md
+
+method: adaclip
+
+gate_mvtec_ad:
+  dataset: mvtec_ad
+  metric: i_auroc
+  tolerance: 1.0
+  gates: true
+  published_mean: 89.2
+  source: "arXiv:2407.15795v1 Table 1, industrial domain, image-level AUROC, AdaCLIP column"
+  # Auxiliary training data: VisA's + ColonDB's test splits. The test set here is MVTec AD
+  # classic. No category overlap. This is also the checkpoint the audit designates for the
+  # MVTec AD 2 primary evaluation, so this gate exercises that exact configuration.
+  checkpoint: visa_colondb_trained
+  n_categories: 15
+  # Table 9. The paper prints `metal_nut` and `toothbrush` with the loader's own directory
+  # names, so no re-keying was needed for this one.
+  per_category:
+    bottle: 94.4
+    cable: 90.6
+    capsule: 91.5
+    carpet: 82.1
+    grid: 90.0
+    hazelnut: 80.2
+    leather: 99.8
+    metal_nut: 83.5
+    pill: 82.9
+    screw: 87.0
+    tile: 90.5
+    toothbrush: 93.6
+    transistor: 82.1
+    wood: 98.3
+    zipper: 91.5
+
+gate_visa:
+  dataset: visa
+  metric: i_auroc
+  tolerance: 1.0
+  gates: true
+  published_mean: 85.8
+  source: "arXiv:2407.15795v1 Table 1, industrial domain, image-level AUROC, AdaCLIP column"
+  # Auxiliary training data: MVTec AD's + ClinicDB's test splits. The test set here is VisA.
+  # No category overlap.
+  checkpoint: mvtec_ad_clinicdb_trained
+  n_categories: 12
+  # Table 10, which prints the object directory names verified against the real archive
+  # (docs/datasets-access.md), `pipe_fryum` included.
+  per_category:
+    candle: 96.0
+    capsules: 85.1
+    cashew: 91.8
+    chewinggum: 96.4
+    fryum: 93.0
+    macaroni1: 91.6
+    macaroni2: 64.1
+    pcb1: 81.1
+    pcb2: 75.3
+    pcb3: 64.7
+    pcb4: 93.4
+    pipe_fryum: 96.6
+
+# The paper reports the SAME two datasets a second time, under a different setup, and those are
+# not the targets. Appendix §4, Tables 6 and 7: AdaCLIP re-evaluated "within the experimental
+# setting of AnomalyCLIP" — MVTec AD alone as auxiliary data, VisA alone when evaluating MVTec AD,
+# with no medical dataset. §2's rule is that the target comes from the method's own paper **at
+# the configuration this repo runs**, and the tie is broken by what the official repo publishes:
+# weights for the main setting above, and none for this one (README "Weight Preparation", read
+# 2026-09-19). Recorded because the MVTec figure here is the HIGHER of the pair and would be the
+# tempting one to reach for after a narrow miss.
+not_the_target:
+  anomalyclip_setting_mvtec_ad: 89.6
+  anomalyclip_setting_visa: 83.9
+  source: "arXiv:2407.15795v1 Appendix §4, Tables 6 and 7"
+  why_not: >-
+    Different checkpoints (single industrial auxiliary dataset, no medical one) for which the
+    official repo publishes no weights. Scoring our run against them would compare our loaded
+    checkpoint to a model nobody can download.
+
+# Configuration the targets are attached to, read from §5.1. A target is only a criterion at the
+# configuration it was measured at.
+published_configuration:
+  backbone: "CLIP ViT-L/14@336px, from open_clip (github.com/mlfoundations/open_clip)"
+  feature_layers: [6, 12, 18, 24]   # patch embeddings extracted from these transformer layers
+  input_resolution: 518             # 518x518 for BOTH training and testing
+  prompting_depth: 4                # J
+  prompting_length: 5               # M
+  training: "5 epochs, lr 0.01, FP16, PyTorch 1.9.2, one NVIDIA A6000"
+  note: >-
+    The 518x518 input into a 336px-trained backbone is the same choice AnomalyCLIP makes, arrived
+    at independently. We do not train — the gate loads the authors' released weights — so the
+    training row is recorded for attribution, not for us to reproduce.
+
+# WRITTEN DOWN BEFORE THE RUN, so that it cannot become a post-hoc excuse for a miss. The
+# official repo's README says, verbatim, under "Main Results": "Due to differences in versions
+# utilized, the reported performance may vary slightly compared to the detection performance with
+# the provided pre-trained weights. Some categories may show higher performance while others may
+# show lower." And under "Train": training is FP16, "can occasionally be unstable", and the
+# released model is a best-of-N selected on the validation set.
+#
+# So this gate scores the authors' released weights against the authors' published table, and the
+# authors state those two disagree by an unquantified amount. No other method in this study
+# carries such a warning from its own maintainers. It does NOT move the target — §2 takes the
+# number from the paper — but every verdict this file produces, PASS or FAIL, is owed it.
+released_weights_caveat:
+  source: "github.com/caoyunkang/AdaCLIP README, read 2026-09-19 at b762ac40c3f33c77e7e513e48cb436f059d456da"
+  quantified: false
+  report_with_verdict: true
+
+# The checkpoint that must never be loaded. The repo's third published weight, "All Datasets
+# Mentioned Above", is trained on a list containing BOTH mvtec and visa (README "Train"). It is
+# the demo weight behind the repo's HuggingFace Space. Loading it would put the test set's own
+# family into the auxiliary data and void the zero-shot claim, and nothing in a filename would
+# reveal it.
+forbidden_checkpoint: all_datasets
+
+# Protocol §6, same conditional as WinCLIP's and AnomalyCLIP's: three seeds "where any
+# stochasticity exists". AdaCLIP's scoring path is a frozen CLIP forward with prompts loaded from
+# a checkpoint, plus the HSF module's clustering (K = 20 by default, Appendix §2.2) — and a
+# clustering step is exactly where a seed can hide. Same pre-registered procedure: run one
+# category twice at two seeds before reporting anything. If the image scores are bit-identical,
+# one run is the reportable number with that measurement recorded beside it; otherwise three
+# seeds and `--all-seeds`. PatchCore is the standing reminder that a seed can be recorded
+# without being applied.
+n_seeds: 3

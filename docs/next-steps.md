@@ -95,8 +95,12 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    `docs/superpowers/plans/2026-07-29-adaclip-zeroshot-adapter.md`. Zero-shot and, like AnomalyCLIP,
    **auxiliary-trained**, so it carries the same kind of overlap audit. Its CPU half is done and
    registered (`src/vlmab/methods/adaclip.py`, `docs/adaclip-overlap-audit.md`); what remains is the
-   GPU backend. Watch: the plan pre-registers a contingency for the case where the repo publishes
-   only one checkpoint — resolve it in Colab phase A.2 before scoring anything.
+   GPU backend. **Its targets are read and pre-registered (2026-09-19) — see the section below.**
+   Two gates, 89.2 and 85.8, two checkpoints. ~~Watch: the plan pre-registers a contingency for
+   the case where the repo publishes only one checkpoint — resolve it in Colab phase A.2~~
+   **That contingency is RESOLVED, on CPU, from the repo's own README: both checkpoints exist.**
+   What phase A.2 still owes is the sha256 of each file actually downloaded, and a refusal of the
+   third checkpoint the repo ships, which trains on both MVTec AD and VisA.
 5. **SAA+ Colab phases (A–D)** —
    `docs/superpowers/plans/2026-07-29-saa-trainingfree-adapter.md`. Training-free (GroundingDINO + SAM
    cascade), so **no aux-training concern** — simpler than AdaCLIP/AnomalyCLIP on the audit side, but it
@@ -711,6 +715,75 @@ matches and both columns still average 91.8, so nothing downstream moves. But Wi
 were taken from WinCLIP's paper the day before, and had they been lifted from this table instead,
 one pre-registered per-category target would now be wrong by 0.5 with nothing to reveal it.
 
+## AdaCLIP's gate is read too — and the repo had to be read with the paper (2026-09-19, protocol v0.2.16)
+
+Same CPU track as WinCLIP's and AnomalyCLIP's, same ordering: **arXiv:2407.15795v1 read directly,
+recorded in `../vlm-anomaly-paper/docs/verified-literature-facts.md` (seventh pass) before
+anything reached a config.** AdaCLIP is the fourth of five; only SAA+ is unread.
+
+| | published (Table 1, industrial, image-level AUROC) | per-category | checkpoint |
+|---|---|---|---|
+| MVTec AD classic (15) | **89.2** ± 1.0 | Table 9 | `VisA & ColonDB` |
+| VisA (12) | **85.8** ± 1.0 | Table 10 | `MVTec AD & ClinicDB` |
+
+Both lists sum to their printed means (89.20 exactly, 85.76 → 85.8). Committed at
+`configs/reproduction/adaclip.yaml` with ten tests holding the transcription and the invariants.
+
+**This is the first method where the paper alone could not settle the gate.** AdaCLIP reports the
+same two datasets *twice*: Table 1 under its own setup (89.2 / 85.8), and Appendix §4's Tables 6
+and 7 "within the experimental setting of AnomalyCLIP" (89.6 / 83.9), which drops the medical
+auxiliary dataset. §2's rule — the target comes from the method's own paper **at the configuration
+this repo runs** — had to break a tie *inside one paper*, and the thing that breaks it is not in
+the paper at all: **the official repo publishes weights for the main setting and none for the
+ablation.** So the repo was read alongside the PDF, and the losing pair is recorded as
+`not_the_target` (the MVTec one being the higher of the two, and therefore the tempting one).
+
+**Three facts that come from the repo, not the paper, and all three matter.**
+
+1. **The published-checkpoint contingency fired and resolved favourably.** The plan and the audit
+   pre-registered "what if only one checkpoint is published?"; the README's weight table publishes
+   three. Both of the checkpoints the audit assumed exist — but in its *third* branch, because
+   neither is trained on exactly VisA or exactly MVTec AD classic: **each carries a medical
+   auxiliary dataset too** (ColonDB, ClinicDB). The audit's rule for that branch says to record
+   the complete training-set list rather than its nearest label and to set the caveat from the
+   list alone; applied as written, `domain_proximity_caveat: false`. A config saying `visa_trained`
+   was naming half of a checkpoint.
+2. **The third published checkpoint must never be loaded.** `All Datasets Mentioned Above` trains
+   on 14 datasets including **both** mvtec and visa — the demo weight behind the repo's
+   HuggingFace Space. Loading it would put the test set's own family in the auxiliary data and
+   void the zero-shot claim, and **nothing in a filename would reveal it**. It is now
+   `forbidden_checkpoint: all_datasets` in both configs, with a test, and the backend must refuse
+   it by name.
+3. **The released checkpoints were selected by their score on the evaluation dataset.** Read from
+   `train.py`, not from the prose: the val loader is built from `--testing_data` and `_best.pth`
+   is saved on best pixel max-F1 there. So the checkpoint we run on MVTec AD 2 was *selected* on
+   MVTec AD classic. No category is in the auxiliary **training** data — the audit's claim is
+   untouched — but this is a second channel from the test set into the weights, it cannot be
+   chosen around (both published checkpoints were made this way), and it now has its own row in
+   the audit and its own line owed in the paper's §3.1 table.
+
+**The one that has to be said before any number exists:** the repo states, verbatim, that its
+released weights do **not** reproduce its published table — "the reported performance may vary
+slightly compared to the detection performance with the provided pre-trained weights. Some
+categories may show higher performance while others may show lower" — and that training was FP16,
+unstable, and best-of-N on a validation set. Our gate scores *their weights* against *their table*.
+**No other method here carries such a warning from its own maintainers.** It does not move the
+target (§2 takes the number from the paper) and it is not an excuse; it is pre-registered as
+`released_weights_caveat` with `report_with_verdict: true` precisely so that it is stated with a
+PASS as readily as with a FAIL, rather than produced afterwards if the gate misses.
+
+**One judgement recorded rather than made in a GPU session.** The audit's contingency says to set
+the caveat true if any component of the training data "shares a provider or industrial-inspection
+domain with the test set in use". Read literally that is satisfied by VisA, since VisA *is*
+industrial inspection — which would flag the very pairing the audit's own table declares clean. A
+rule cannot do both, so the operative reading is provider-and-family proximity. Written down in
+the audit, with the ambiguity, because resolving a pre-registered sentence is not a thing to do
+live at 2 a.m. on a T4.
+
+**Cost, for the session that runs it:** two full grids like WinCLIP's — 15 MVTec AD categories
+plus 12 VisA objects — and **two checkpoint downloads**, one per gate, with the third weight in
+the same Drive folder that must not be the one loaded.
+
 ## THE GATE PASSED (2026-09-18) — PatchCore reproduces, by 0.02 points
 
 Three seeds, `anomalib` pre-processing, Tesla T4, anomalib 2.6.0, commit `45462ea`. Report
@@ -908,11 +981,13 @@ These cannot be pre-written without the data/repo in front of you, and each play
 - **The published-numbers table**, from each method's own paper — record the exact source next to
   it. **Done for PatchCore** (`configs/reproduction/patchcore_ref.yaml`) **and for WinCLIP**
   (`configs/reproduction/winclip.yaml`) **and for AnomalyCLIP**
-  (`configs/reproduction/anomalyclip.yaml`). For the remaining two — AdaCLIP and SAA+ — read the
-  paper first: PatchCore's case showed the table cannot be assumed to exist, WinCLIP's showed it
-  can be richer than expected, AnomalyCLIP's showed a method can need **a different checkpoint per
-  gate**, and which dataset may gate a method is a §2 v0.2.12 decision recorded before its Colab
-  run.
+  (`configs/reproduction/anomalyclip.yaml`) **and for AdaCLIP**
+  (`configs/reproduction/adaclip.yaml`). For the remaining one — SAA+ — read the paper first:
+  PatchCore's case showed the table cannot be assumed to exist, WinCLIP's showed it can be richer
+  than expected, AnomalyCLIP's showed a method can need **a different checkpoint per gate**,
+  AdaCLIP's showed a paper can print the same number twice under two setups and need its own repo
+  read to break the tie, and which dataset may gate a method is a §2 v0.2.12 decision recorded
+  before its Colab run.
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 
@@ -1003,16 +1078,20 @@ syncs the *repository*; it cannot sync the notebook the session is executing.
 
 ### The CPU track, which needs no GPU session and can run in parallel with anything
 
-**AdaCLIP and SAA+ are the last two papers unread**, and §2 requires each gate settled from the
-method's own paper *before* its Colab run. The other three took roughly an hour each, and two of
-the three turned up something that would otherwise have surfaced mid-session: PatchCore's gate was
-the wrong dataset entirely, and AnomalyCLIP needs a different checkpoint per gate.
+~~**AdaCLIP and SAA+ are the last two papers unread**~~ — **AdaCLIP was read 2026-09-19; SAA+
+is the last one.** §2 requires each gate settled from the method's own paper *before* its Colab
+run. The four read so far took roughly an hour each, and three of the four turned up something
+that would otherwise have surfaced mid-session: PatchCore's gate was the wrong dataset entirely,
+AnomalyCLIP needs a different checkpoint per gate, and AdaCLIP reports its numbers twice and
+needed its own repo read to settle which pair is the target.
 
 What to expect from each, written before reading them so it can be checked afterwards:
 
-- **AdaCLIP** — auxiliary-trained like AnomalyCLIP, so expect a checkpoint question and an overlap
-  audit to refine (`docs/adaclip-overlap-audit.md`). Its plan already pre-registers a contingency
-  for the repo publishing only one checkpoint; the paper may settle that before Colab does.
+- ~~**AdaCLIP**~~ — **DONE 2026-09-19, and the written-beforehand expectation was right on both
+  counts and short on a third.** "Expect a checkpoint question and an overlap audit to refine":
+  both happened. "The paper may settle the contingency before Colab does": it did not — the
+  *repo* did, and the paper by itself could not even settle which of its two reported settings is
+  the target. Worth keeping as the record of what reading a paper alone is and is not good for.
 - **SAA+** — training-free, so no aux-training concern, but protocol v0.2.9 and the paper repo's
   third pass both say its own paper reports on **VisA, MVTec-AD, MTD and KSDD2 — none of them
   MVTec AD 2**. The realistic outcome is that no AD 2 category has a published prompt, which is

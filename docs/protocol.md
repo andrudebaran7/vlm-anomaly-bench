@@ -78,6 +78,24 @@ overlap table required in the paper).
     implementation. The pairing is the one `docs/anomalyclip-overlap-audit.md` already designated
     as clean, and the MVTec AD classic gate runs the same checkpoint as the MVTec AD 2 primary
     evaluation.
+  - **AdaCLIP → both are gates, two checkpoints again, and the paper reports each number
+    twice.** Its paper (arXiv:2407.15795v1, ECCV 2024) reports both benchmarks at the backbone
+    this repo runs (CLIP ViT-L/14@336px at 518²). Table 1, industrial, image-level:
+    **MVTec AD 89.2 ± 1.0** and **VisA 85.8 ± 1.0** image-AUROC, with per-category values from
+    Tables 9 and 10. Like AnomalyCLIP it trains on the *other* dataset's **test split** and so
+    has a checkpoint per gate — but **each checkpoint carries a medical auxiliary dataset as
+    well** (`VisA & ColonDB` for the MVTec AD gate, `MVTec AD & ClinicDB` for the VisA gate), and
+    a gate naming only the industrial half would name a checkpoint that does not exist. **Not
+    the target:** Appendix §4's Tables 6 and 7 report the same two datasets a second time
+    "within the experimental setting of AnomalyCLIP" — one industrial auxiliary dataset, no
+    medical one — giving MVTec AD 89.6 and VisA 83.9. Two numbers for one dataset in one paper
+    is what "at the configuration this repo runs" is for, and the tie is broken by the official
+    repo: it publishes weights for the main setting and none for that ablation. Two further
+    facts are pre-registered with the targets because they are read from the repo rather than
+    the paper: a third published checkpoint (`All Datasets`) is trained on both MVTec AD and
+    VisA and **must never be loaded**, and the maintainers state that the released weights do
+    not reproduce the published table by an unquantified amount — which every AdaCLIP verdict
+    must be reported with, PASS or FAIL.
   - Every other method's gate is settled the same way when its own paper is read, and recorded
     here before its Colab run. **Still owed: AdaCLIP, SAA+.**
   - **A target is a criterion only at the configuration it was measured at, so that
@@ -496,3 +514,23 @@ pre-processing that produced them.
   gains the split it was missing; its conclusions are unchanged. No metric definition changed and
   no existing number moves.
   Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (sixth pass)
+- 2026-09-19 — v0.2.16. §2 records AdaCLIP's reproduction gate, read from its own paper
+  (arXiv:2407.15795v1) **and from the official repo**, before its Colab run. Two gates again —
+  MVTec AD 89.2, VisA 85.8, image-AUROC, ±1.0, per-category targets for all 15 and all 12 — and
+  two checkpoints again, but with three things no previous method had. **(a)** Each checkpoint is
+  trained on a medical auxiliary dataset as well as an industrial one, so §2's "name the
+  checkpoint" requirement is now "name the complete auxiliary training set", not its nearest
+  label. **(b)** The paper reports the same two datasets a second time under a different setup
+  (Appendix §4: 89.6 / 83.9), so for the first time the "at the configuration this repo runs"
+  clause had to break a tie *within one paper*; it is broken by which weights the official repo
+  publishes, and the losing pair is recorded as `not_the_target`. **(c)** §2 now also requires
+  that a target's known threats to reproduction be pre-registered with it where the method's own
+  maintainers state them: AdaCLIP's repo says its released weights do not reproduce its published
+  table by an unquantified amount, and that is recorded now so it cannot be produced later as an
+  excuse for a miss — and so it is reported with a PASS too. `docs/adaclip-overlap-audit.md`
+  resolves its published-checkpoint contingency (third branch: both exist, both mixed), records
+  the forbidden `All Datasets` checkpoint, and gains a channel it had no slot for — the released
+  checkpoints are selected by their score on the evaluation dataset, which is a disclosure rather
+  than something we can choose our way out of. No conclusion of that audit changed, no metric
+  definition changed, and no existing number moves.
+  Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (seventh pass)

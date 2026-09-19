@@ -5,14 +5,39 @@ aux_trained: true                # learns hybrid (static + dynamic) prompts on a
 # (protocol §3 priority 1). Pin the commit on the first Colab run.
 source: https://github.com/caoyunkang/AdaCLIP
 commit: unpinned_until_first_colab_run     # record the exact SHA here
-backbone: verify_at_integration            # read from the repo's config at the pinned commit
+# The README's weight table and train.py were read at b762ac40c3f33c77e7e513e48cb436f059d456da
+# (2025-07-07) for the overlap audit and the reproduction targets. If the commit pinned above
+# differs, re-read that table before trusting the checkpoint names below.
+repo_commit_read_for_provenance: b762ac40c3f33c77e7e513e48cb436f059d456da
+paper_version: "arXiv:2407.15795v1 (22 Jul 2024) — the only version on arXiv"
+
+# Read from §5.1 of the paper, 2026-09-19. These are not free choices: the reproduction targets in
+# configs/reproduction/adaclip.yaml were measured at exactly this configuration.
+backbone: ViT-L-14-336                     # CLIP ViT-L/14@336px, from open_clip
+feature_layers: [6, 12, 18, 24]            # patch embeddings taken from these transformer layers
+input_resolution: 518                      # 518x518 for both training and testing, as published
+prompting_depth: 4                         # J
+prompting_length: 5                        # M
+
 # Checkpoint per test set, so the auxiliary data never overlaps the test set
-# (docs/adaclip-overlap-audit.md):
-checkpoint_for_mvtec_ad2: visa_trained     # conservative: AD2 is MVTec-family; train on VisA
-checkpoint_for_visa_reproduction: mvtec_ad_trained   # clean: train on MVTec AD, test on VisA
-# Must be resolved to true or false during Colab phase A.2, once the published checkpoints are
-# known — never leave this defaulting to a clean answer before that. If the repo publishes only
-# the MVTec-AD-trained checkpoint, use it for MVTec AD 2 and set domain_proximity_caveat: true —
-# never report it as clean (see the audit).
-domain_proximity_caveat: unresolved_until_first_colab_run
+# (docs/adaclip-overlap-audit.md). **Names match the official repo's own weight-table labels**,
+# because each published checkpoint carries a medical auxiliary dataset alongside the industrial
+# one and a name like `visa_trained` would be naming half of it.
+checkpoint_for_mvtec_ad2: visa_colondb_trained            # conservative: AD2 is MVTec-family
+checkpoint_for_visa_reproduction: mvtec_ad_clinicdb_trained   # clean: MVTec AD aux, VisA test
+# The repo's third published weight trains on 14 datasets including BOTH mvtec and visa. It is the
+# demo weight behind its HuggingFace Space. Loading it would void the zero-shot claim and nothing
+# in a filename would reveal it. The backend must refuse it by name.
+forbidden_checkpoint: all_datasets
+# RESOLVED 2026-09-19 (audit contingency, third branch: both checkpoints exist, and both mix in a
+# medical dataset). Neither ColonDB nor ClinicDB shares a provider or industrial-inspection domain
+# with anything we test on, and the industrial component of each is a pairing the audit already
+# declares clean.
+domain_proximity_caveat: false
+# A SEPARATE disclosure the audit had no slot for, and not the same thing as the line above:
+# train.py selects the released checkpoint by its score on the evaluation dataset (its val loader
+# is built from --testing_data; it saves on best pixel max-F1). So the checkpoint we run on
+# MVTec AD 2 was selected on MVTec AD classic. It is not fixable by choosing differently — both
+# published checkpoints were selected this way — so it is reported, per table, not worked around.
+model_selection_on_evaluation_dataset: true
 prompts: learned_hybrid_static_plus_dynamic   # protocol §3: from the official checkpoint, not tuned

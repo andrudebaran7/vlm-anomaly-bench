@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Score a finished reproduction run against its pre-registered targets (protocol §2 v0.2.15).
+"""Score a finished reproduction run against its pre-registered targets (protocol §2 v0.2.16).
 
 This never runs a method. Running is GPU work; this is the CPU half — read the shards, compute
 I-AUROC per category, compare against `configs/reproduction/<method>.yaml`, write the verdict.
