@@ -784,6 +784,82 @@ live at 2 a.m. on a T4.
 plus 12 VisA objects — and **two checkpoint downloads**, one per gate, with the third weight in
 the same Drive folder that must not be the one loaded.
 
+## SAA+ is read, and its gate DOES NOT EXIST (2026-09-19) — one decision is open
+
+The fifth and last paper. **arXiv:2305.10724v1 read directly, recorded in
+`../vlm-anomaly-paper/docs/verified-literature-facts.md` (eighth pass, plus a same-day addendum)
+before anything reached a config.** Every method's paper is now read.
+
+**The finding is that SAA+'s own paper publishes no image-level number, on any dataset.** §5.1,
+verbatim: ZSAS performance is evaluated on "(I) max-F1-pixel (Fp) ... (II) max-F1-region (Fr)".
+No image AUROC, no image AP, no image F1. The task it addresses is zero-shot anomaly
+*segmentation* and it is measured as such throughout.
+
+What it does publish, Table 1 — the only performance table:
+
+| metric | VisA | MVTec-AD | KSDD2 | MTD | Total |
+|---|---|---|---|---|---|
+| Fp (SAA+) | 27.07 | 39.40 | 59.19 | 35.40 | 34.85 |
+| Fr (SAA+) | 14.46 | 49.67 | 39.34 | 30.27 | 34.07 |
+
+Three properties of those numbers matter as much as their values:
+
+1. **Both are computed "at the optimal threshold" — they are oracle metrics**, the class this
+   repo marks `seg_f1max` with and which §4 already refuses to report as if achievable.
+2. **There is no per-category breakdown anywhere.** Table 1 is per dataset and per defect type
+   (texture/object); Table 2, the ablation, is texture/object/total. The per-category
+   pre-registration WinCLIP, AnomalyCLIP and AdaCLIP all carry cannot be done here at any
+   tolerance — there is nothing to transcribe.
+3. **Fr is not computed by the released code.** In `utils/metrics.py`, `max_f1_region` is assigned
+   `0` in the `else` branch, the call is commented out, and it is absent from the returned dict.
+   The metric the paper proposes as its own contribution cannot be reproduced with the authors'
+   own code as published.
+
+**And the trap, named before anyone runs it:** the repo's `metric_cal` *does* compute image-level
+AUROC (`i_roc`), from the max of the anomaly map. So executing their code produces an image AUROC
+with no published counterpart. Treating it as a target would manufacture a criterion the
+literature does not contain. `configs/methods/saa.yaml` records `image_score_from_map: max` as
+*our construction following their code*, never as a reproduction.
+
+### What this settles on its own, and is already committed
+
+- **The paper's cited supplementary does not exist.** §5.1 points to it for the per-category
+  prompts; v1 is the only version, 13 pages, ending at the references. That confirms **from the
+  paper itself** the decision protocol §3 v0.2.9 already made — the repo is the only possible
+  source for those prompts. It was the right call for a reason nobody had checked.
+- **The branch is `SAA-plus`, not `master`.** `master` holds only the vanilla SAA demo, whose
+  published VisA Fp is 12.76 against SAA+'s 27.07. A clone that does not name the branch runs a
+  different method and says nothing about it. Now in both configs, with a test.
+- **`prompt_coverage` is RESOLVED as `0_of_8`, on CPU** — the Colab phase A.3 question, answered
+  without a session. The repo publishes parameters for MVTec AD classic, VisA, KSDD2 and MTD, and
+  nothing else. For MVTec AD 2 this is an **absent dataset**, not a category that falls back, and
+  `property_prompts` has no entry either — so §4.1.2's rules (object count, k_mask, area
+  threshold) have no published values for our eight at all. That is the larger half of the gap:
+  the language prompts fall back to three generic lines, the property rules fall back to nothing.
+- **The property constraint is a POSITIONAL format, not prose.** `SAA/model.py` indexes
+  whitespace tokens at [5] count, [6] similar/dissimilar, [7] object, [12] k_mask, [19] area
+  threshold. Re-wrapping one, collapsing a double space or dropping its trailing space silently
+  changes a threshold to whatever token lands at index 19 — no error, a complete and plausible run
+  at parameters nobody chose. The 12 VisA entries were **generated from the repo source and
+  round-tripped byte-for-byte rather than retyped**, and a test re-parses each at those five
+  indices.
+- **`visa_parameters.py`'s `official_prompts` is imported nowhere.** It is the larger and more
+  official-looking of the two prompt tables in that file, and it is the dead one.
+
+### The open decision: what SAA+'s acceptance criterion is, or whether it has one
+
+**This is not something to settle in a Colab session, and it is not something to settle by
+picking whichever number is available.** §2 says a gate must come from the method's own paper at
+the configuration this repo runs. For SAA+ that yields nothing at image level. The options, with
+what each costs, are written out for the author rather than chosen here. Until it is settled,
+**SAA+ has no pre-registered gate and `configs/reproduction/saa.yaml` is deliberately not
+written** — an empty slot is honest; a gate invented to fill it is not.
+
+Whatever is decided, one thing is already true and belongs on every SAA+ table: on MVTec AD 2 it
+runs **without its per-object prompts and without its property rules**, which is not SAA+ as
+published. Protocol §3 v0.2.9 already requires that disclosure; the 0/8 makes it universal rather
+than partial.
+
 ## THE GATE PASSED (2026-09-18) — PatchCore reproduces, by 0.02 points
 
 Three seeds, `anomalib` pre-processing, Tesla T4, anomalib 2.6.0, commit `45462ea`. Report
@@ -987,7 +1063,9 @@ These cannot be pre-written without the data/repo in front of you, and each play
   than expected, AnomalyCLIP's showed a method can need **a different checkpoint per gate**,
   AdaCLIP's showed a paper can print the same number twice under two setups and need its own repo
   read to break the tie, and which dataset may gate a method is a §2 v0.2.12 decision recorded
-  before its Colab run.
+  before its Colab run. **SAA+ closes the list and closes it oddly: its paper has no image-level
+  table to take a target from at all** (2026-09-19), so what is recorded for it is the absence
+  plus the two oracle segmentation metrics it does publish.
 - **The pinned versions/commits and checkpoint shas**, recorded back into the method's config and,
   for AnomalyCLIP, into the overlap audit's blank record-fields.
 
@@ -1117,11 +1195,12 @@ What to expect from each, written before reading them so it can be checked after
   both happened. "The paper may settle the contingency before Colab does": it did not — the
   *repo* did, and the paper by itself could not even settle which of its two reported settings is
   the target. Worth keeping as the record of what reading a paper alone is and is not good for.
-- **SAA+** — training-free, so no aux-training concern, but protocol v0.2.9 and the paper repo's
-  third pass both say its own paper reports on **VisA, MVTec-AD, MTD and KSDD2 — none of them
-  MVTec AD 2**. The realistic outcome is that no AD 2 category has a published prompt, which is
-  the `prompt_coverage: unresolved_until_first_colab_run` contingency in `configs/methods/saa.yaml`
-  and may end with a decision about whether SAA+ stays in the study.
+- ~~**SAA+**~~ — **DONE 2026-09-19, and the written-beforehand expectation was right about the
+  prompts and silent about the bigger thing.** "The realistic outcome is that no AD 2 category has
+  a published prompt": correct, and now resolved to `0_of_8` on CPU rather than in Colab. What it
+  did not anticipate is that **SAA+'s paper publishes no image-level number at all**, so the ±1.0
+  gate §2 is written in has no primary source for this method. The decision that opens is written
+  out in its own section above.
 
 Order it after VisA only because VisA needs the live session and this does not.
 - **VisA's own §6 debt:** seed 0 alone is a first reading, not a table entry. Seeds 1 and 2 are
