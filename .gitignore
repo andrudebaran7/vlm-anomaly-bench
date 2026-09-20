@@ -9,6 +9,16 @@ data/
 # (results/reproduction/patchcore_visa.md, protocol §2).
 results/*
 !results/reproduction/
+# M3's per-category reports, same reason as the reproduction ones: they are the result, and a
+# result that is not in the repository is a result nobody has. The negation is narrow on
+# purpose -- `results/mvtec_ad2/<category>/` holds shards and native-resolution maps (24.9 GB
+# across the grid), which must stay out. Only the .md files directly under mvtec_ad2/ come in.
+# `tests/test_results_are_tracked.py` holds this: `git add -A` skips an ignored file silently,
+# so a commit can carry a message describing a result it does not contain. That happened once
+# (2026-09-21, vial.md).
+!results/mvtec_ad2/
+results/mvtec_ad2/*
+!results/mvtec_ad2/*.md
 .cache/
 checkpoints/
 .superpowers/
