@@ -115,3 +115,31 @@ def test_the_visa_result_is_copied_off_the_runtime_before_anything_can_delete_it
         "an absent report means the gate refused, which is a different problem from a FAIL and "
         "must not be copied over in silence"
     )
+
+
+# --- The M3 session path -------------------------------------------------------------------
+# Phase 0 -> 1.1 -> the grid cell, skipping everything else, so it inherits nothing at all.
+
+M3_CELLS = [(i, src) for i, src in _code_cells() if "run_mvtec_ad2" in src]
+
+
+def test_the_m3_grid_cell_exists():
+    assert len(M3_CELLS) == 1, f"expected one M3 cell, found {[i for i, _ in M3_CELLS]}"
+
+
+@pytest.mark.parametrize("index, source", M3_CELLS, ids=lambda v: v if isinstance(v, int) else "")
+def test_the_m3_cell_imports_everything_it_uses(index, source):
+    orphans = _free_names(source)
+    assert not orphans, (
+        f"notebook cell {index} runs the M3 grid and reads {sorted(orphans)} without defining "
+        "them. Its session path skips every cell between 1.1 and it."
+    )
+
+
+def test_the_m3_cell_names_the_category_rather_than_hardcoding_it_in_the_shell_line():
+    """Eight categories go through this one cell. A category spelled into the `!python` line
+    directly is one that has to be edited inside a shell string, which is where a typo stops
+    looking like a typo."""
+    source = M3_CELLS[0][1]
+    assert "CATEGORY =" in source
+    assert "--category {CATEGORY}" in source
