@@ -83,6 +83,38 @@ still "record on download", since Table 4 gives geometry but not bit depth.
 | Wallplugs | 2448x2048 | 1.20:1 | ____ | 293 | 33 | 150 |
 | Walnuts | 2448x2048 | 1.20:1 | ____ | 432 | 48 | 150 |
 
+### Lighting conditions per category — MEASURED, and they differ (2026-09-21)
+
+Table 4 gives `test_public` totals but not the split by lighting condition, and **the number of
+conditions is not constant across categories**. Read from `prepare_data.py` on the real archives:
+
+| category | conditions | names | images/condition |
+|---|---|---|---|
+| Vial | **7** | regular, overexposed, underexposed, shift_1–4 | 20 |
+| Sheet Metal | **6** | regular, overexposed, underexposed, shift_1–**3** | 19 |
+
+**Images per condition is the near-constant, not the condition count** — 20 and 19 on the two
+measured so far. Project per-condition cost with ~20 images, never with `test_public_total / 7`.
+Fill the rest of this table as each category is extracted; the count is printed before any fit
+runs, so it is known within seconds of starting a category.
+
+**Why it matters beyond bookkeeping:** `pixel_metrics` aggregates one lighting condition at a
+time and guards at 6 GB, at a measured 80 bytes/pixel. Sheet Metal's 4224×1056 at 19 images is
+**84,750,336 pooled pixels = 6.78 GB**, which trips it — predicted before the run and confirmed
+to the byte by the failure message. Projecting with ~20 images/condition:
+
+| category | resolution | peak | 6 GB guard |
+|---|---|---|---|
+| Can | 2232×1024 | 3.66 GB | ok |
+| Vial | 1400×1900 | 4.26 GB | ok (measured, passed) |
+| Fruit Jelly | 2100×1520 | 5.11 GB | ok |
+| Sheet Metal | 4224×1056 | 6.78 GB | **trips** (measured) |
+| Fabric / Rice / Wallplugs / Walnuts | 2448×2048 | 8.02 GB | **trips** |
+
+The way through is `--summarise-only --max-bytes <n>`: the seed loop builds a `PatchCoreBackend`
+per seed before the runner checks `is_done`, so even an all-done category otherwise holds ~3 GB
+of torch while aggregating. See `scripts/run_mvtec_ad2.py`.
+
 **The archive sizes above are driven by resolution, not image count.** Fabric is 13x Vial's
 download and has *fewer* training images. Any cost estimate extrapolated from GB is wrong by an
 order of magnitude — see the M3 cost model in `docs/next-steps.md`.
