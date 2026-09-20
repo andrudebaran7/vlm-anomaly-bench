@@ -53,7 +53,7 @@ def harness(monkeypatch, tmp_path):
 
 
 def _run(mod, root, tmp_path, *extra):
-    return mod.main(["--category", "vial", "--root", str(root), "--no-mount", "--no-save",
+    return mod.main(["--category", "vial", "--root", str(root), "--no-save",
                      "--results", str(tmp_path / "results"), *extra])
 
 
@@ -105,7 +105,7 @@ def test_a_missing_archive_exits_2_not_1(harness):
     """0 ran, 1 a run failed, 2 could not start. A category that was never uploaded to Drive must
     not look like one that ran and produced nothing."""
     mod, calls, root, tmp = harness
-    rc = mod.main(["--category", "fabric", "--root", str(root), "--no-mount", "--no-save",
+    rc = mod.main(["--category", "fabric", "--root", str(root), "--no-save",
                    "--archives", str(tmp / "empty"), "--results", str(tmp / "r")])
     assert rc == 2
     assert not calls
@@ -143,7 +143,51 @@ def test_shards_reach_drive_after_every_seed_not_only_at_the_end(monkeypatch, ha
     mod, calls, root, tmp = harness
     saved: list[int] = []
     monkeypatch.setattr(mod, "save_to_drive", lambda results, dest: saved.append(len(calls)))
-    rc = mod.main(["--category", "vial", "--root", str(root), "--no-mount",
+    rc = mod.main(["--category", "vial", "--root", str(root),
                    "--results", str(tmp / "results"), "--drive-results", str(tmp / "drive")])
     assert rc == 0
     assert saved == [1, 2, 3], "one copy per finished seed"
+
+
+# --- Mounting Drive is the notebook's job, and this is why ---------------------------------
+# Added 2026-09-21 after the first live M3 run died here. `google.colab.drive.mount` sends an
+# authentication request to the Colab frontend THROUGH the IPython kernel; a `!python`
+# subprocess has no kernel, so `get_ipython()` returns None and the call dies inside Colab's own
+# `_message.send_request` with an AttributeError naming nothing relevant.
+#
+# The tests above never caught it because every one of them passed --no-mount, which skipped the
+# only line that mattered. A flag that turns off the code under test is not a test of it.
+
+
+def test_the_script_never_tries_to_mount_drive():
+    """It cannot, from where it runs. Asserted against the parsed source rather than by running
+    it, because the failure only reproduces inside a real Colab subprocess."""
+    import ast
+
+    tree = ast.parse(SCRIPT.read_text())
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(a.name for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+    offenders = {m for m in imported if m.startswith("google")}
+    assert not offenders, (
+        f"{SCRIPT.name} imports {offenders}. Mounting is the notebook's job: this runs as a "
+        "subprocess with no IPython kernel, and drive.mount() needs one."
+    )
+
+
+def test_an_unmounted_drive_is_reported_as_such_and_not_as_a_missing_upload(harness, capsys):
+    """Two very different problems that would otherwise produce the same message: Drive not
+    mounted, versus mounted but the category never uploaded. The first is fixed in ten seconds
+    and the second needs a download behind a registration form."""
+    mod, calls, root, tmp = harness
+    rc = mod.main(["--category", "fabric", "--root", str(root), "--no-save",
+                   "--archives", "/content/drive/MyDrive/mvtec_ad2",
+                   "--results", str(tmp / "r")])
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "not mounted" in err
+    assert "drive.mount('/content/drive')" in err, "the message must carry the exact fix"
+    assert not calls

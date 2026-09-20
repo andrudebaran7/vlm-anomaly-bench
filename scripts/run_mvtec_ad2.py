@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Run one MVTec AD 2 category through PatchCore, at every seed protocol §6 requires (M3).
 
+    # In a notebook cell FIRST — this script cannot mount Drive, see fetch():
+    #     from google.colab import drive; drive.mount('/content/drive')
     python scripts/run_mvtec_ad2.py --category vial
     python scripts/run_mvtec_ad2.py --category vial --seeds 0   # a measurement, not a result
 
@@ -45,21 +47,36 @@ DRIVE_ARCHIVES = Path("/content/drive/MyDrive/mvtec_ad2")
 DRIVE_RESULTS = Path("/content/drive/MyDrive/mvtec_ad2_results")
 
 
-def fetch(category: str, root: Path, archives: Path, mount: bool) -> None:
-    """Extract <category>.tar.gz from Drive unless the category is already on disk."""
+class DriveNotMounted(RuntimeError):
+    """Raised instead of attempting a mount this process cannot perform."""
+
+
+def fetch(category: str, root: Path, archives: Path) -> None:
+    """Extract <category>.tar.gz from an ALREADY-MOUNTED Drive, unless it is already on disk.
+
+    **This deliberately does not mount Drive, because it cannot.** `google.colab.drive.mount`
+    sends an authentication request to the Colab frontend *through the IPython kernel*; in a
+    subprocess started by `!python` there is no kernel, `get_ipython()` returns None, and the
+    call dies inside Colab's own `_message.send_request` with an AttributeError that names
+    nothing relevant. Mounting is the notebook's job, in the kernel; reading a mounted Drive is
+    a plain filesystem operation and works fine from here.
+    """
     if (root / category / "train").is_dir():
         print(f"{category} already extracted at {root / category} — skipping")
         return
 
-    if mount:
-        try:
-            from google.colab import drive       # noqa: PLC0415 — Colab-only, imported on use
-            drive.mount("/content/drive")        # idempotent
-        except ImportError:
-            print("not on Colab; expecting --archives to be a local directory")
-
     tar = archives / f"{category}.tar.gz"
     if not tar.is_file():
+        # Two very different problems that would otherwise produce the same message.
+        drive_root = Path("/content/drive")
+        if str(archives).startswith(str(drive_root)) and not (drive_root / "MyDrive").is_dir():
+            raise DriveNotMounted(
+                "Google Drive is not mounted, so nothing under /content/drive exists yet.\n"
+                "This script cannot mount it: drive.mount() talks to the Colab frontend through\n"
+                "the IPython kernel, and a `!python` subprocess has no kernel.\n\n"
+                "Run this in a notebook cell, then re-run this script:\n\n"
+                "    from google.colab import drive; drive.mount('/content/drive')\n"
+            )
         raise FileNotFoundError(
             f"{tar} not found. Upload {category}.tar.gz to {archives}/ and re-run. The archive is "
             "the one from the MVTec download page, unmodified — it sits behind a registration "
@@ -156,7 +173,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--drive-results", type=Path, default=None,
                         help="default: <DRIVE_RESULTS>/<category>")
     parser.add_argument("--device", default="cuda")
-    parser.add_argument("--no-mount", action="store_true")
     parser.add_argument("--no-save", action="store_true",
                         help="skip the per-seed copy to Drive (not on Colab, say)")
     args = parser.parse_args(argv)
@@ -165,9 +181,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     drive_results = args.drive_results or DRIVE_RESULTS / args.category
 
     try:
-        fetch(args.category, args.root, args.archives, mount=not args.no_mount)
+        fetch(args.category, args.root, args.archives)
         verify_layout(args.category, args.root)
-    except (FileNotFoundError, RuntimeError, subprocess.CalledProcessError) as exc:
+    except (FileNotFoundError, DriveNotMounted, RuntimeError,
+            subprocess.CalledProcessError) as exc:
         print(f"\ncannot start: {exc}", file=sys.stderr)
         return 2
 
