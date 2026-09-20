@@ -897,6 +897,78 @@ runs **without its per-object prompts and without its property rules**, which is
 published. Protocol §3 v0.2.9 already requires that disclosure; the 0/8 makes it universal rather
 than partial.
 
+## VisA ran: 86.26 against a published 92.4 (2026-09-20) — reported, cannot fail the method
+
+Twelve objects, none dropped, seed 0, Tesla T4, anomalib 2.6.0, `preprocess=anomalib`, commit
+`8f043c7`. Report committed at `results/reproduction/patchcore_visa.md`. ~4 h, as measured the day
+before. **Delta -6.14.**
+
+**What this is not: a verdict.** PatchCore's gate is MVTec AD classic and it PASSED (98.02 ± 0.07,
+2026-09-18). §2 v0.2.12 makes VisA a reported secondary check that cannot fail the method, and the
+reason was pre-registered long before this number existed: the 92.4 comes from the VisA dataset
+paper's Table 6, a third-party source that states none of its PatchCore hyper-parameters, and
+whose MVTec-AD control in the same row is **99.8** — above every single-model number in
+PatchCore's own paper. A miss against it cannot distinguish a wrong implementation from a
+different setup. That is why it does not gate, and nothing about the decision changes now that the
+number is unflattering.
+
+**The train-count record closes EXACTLY.** The last four objects give pcb2 901, pcb3 905, pcb4 904,
+pipe_fryum 450, and the twelve sum to **8659** — VisA's documented 1-cls total, to the image. Every
+object's coreset landed on `floor(N x 102.4)`, so the `anomalib` 32x32 grid reached all twelve.
+Whatever -6.14 means, it is not "the transform failed to apply", and that was worth establishing
+before anything else.
+
+**Is it evidence our implementation is wrong? The check cannot say, but the surrounding evidence
+leans away from it.** The same code, the same pre-processing and the same seed path reproduced
+MVTec AD classic within 1 point across three seeds. A broken PatchCore that is 1 point off on one
+dataset and 6 points off on another would be an odd kind of broken. That is an argument, not a
+proof, and the next paragraph is the class of defect it would not cover.
+
+### A post-hoc hypothesis, recorded 2026-09-20 BEFORE any test, and NOT acted on
+
+Protocol §7 forbids tuning after seeing a result and forbids reporting only the tests that helped.
+It does not forbid writing down a candidate cause, dated, before testing it. This one is
+pre-registered here on the day the result arrived.
+
+**anomalib 2.6.0's pre-processor is `Resize([256, 256])` — a *fixed square* resize, with no
+aspect-ratio preservation and no CenterCrop.** That was read off the transform object itself on
+2026-09-17 and is in the verified record. MVTec AD classic's images are square, so a square resize
+is harmless there and no MVTec run could ever have surfaced this. **If VisA's released images are
+not square, the same transform distorts every VisA image**, and the distortion would sit in every
+VisA number while sitting in no MVTec number — which is the shape of the discrepancy.
+
+**It is NOT verified, and must not be repeated as though it were.** The VisA paper
+(arXiv:2207.14315) states only the acquisition sensor — "All images were acquired using a
+4,000 x 6,000 high-resolution RGB sensor" — and says nothing about the dimensions of the released
+images. This repo does not record them either; `docs/datasets-access.md` has VisA's archive size
+and layout but no image geometry, where it does record MVTec AD 2's.
+
+**Settling it is one line against the data**, and it belongs in the next session that has VisA on
+disk:
+
+```python
+from PIL import Image; import glob
+print({p.split('/')[-4]: Image.open(p).size
+       for p in sorted(glob.glob('data/visa/*/Data/Images/Normal/0000.JPG'))})
+```
+
+Record the answer in `docs/datasets-access.md` first, as every other geometry fact was. **Even if
+it confirms non-square images, nothing is reconfigured in response**: that would be tuning against
+a result, and this result does not gate. What it would license is a *dated, separately recorded*
+experiment whose outcome is reported either way — the same footing the CenterCrop hypothesis had,
+which was tested and REFUTED.
+
+**One benign coincidence, named so nobody chases it:** `fryum` scores 86.26 and the mean over the
+twelve is also 86.26. The other eleven average 86.2609 on their own, so this is arithmetic luck,
+not a mean leaking into a category cell.
+
+**Spread:** 29.4 points, from `macaroni2` 68.83 to `chewinggum` 98.24. Also unremarked-on by the
+target, which publishes no per-category breakdown at all.
+
+**Still owed if this number is ever reported anywhere:** §6 requires three seeds, and this is one.
+At the measured ~4 h per seed that is ~8 h more, for a check that cannot change a verdict — the
+budget question already flagged on 2026-09-19, now with a concrete number attached to it.
+
 ## THE GATE PASSED (2026-09-18) — PatchCore reproduces, by 0.02 points
 
 Three seeds, `anomalib` pre-processing, Tesla T4, anomalib 2.6.0, commit `45462ea`. Report
