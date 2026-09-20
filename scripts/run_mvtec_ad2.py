@@ -186,7 +186,7 @@ def save_to_drive(results: Path, dest: Path) -> None:
 SUMMARY_METRICS = ("i_auroc", "au_pro_030", "au_pro_005")
 
 
-def summarise(results: Path) -> None:
+def summarise(results: Path, max_bytes: int | None = None) -> None:
     """Per lighting condition, one aggregation PER SEED, combined as mean ± std (protocol §6).
 
     The first version of this pooled every seed into one `aggregate` call and died on the guard
@@ -221,9 +221,35 @@ def summarise(results: Path) -> None:
     tags = df["seed"].where(df["seed"].notna(), None) if "seed" in df.columns else None
     groups = list(df.groupby(tags, dropna=False)) if tags is not None else [(None, df)]
 
+    kw = {} if max_bytes is None else {"max_bytes": max_bytes}
     per_seed = []
     for seed, group in groups:
-        table = aggregate(group, by="meta_lighting")
+        try:
+            table = aggregate(group, by="meta_lighting", **kw)
+        except ValueError as exc:
+            if "max_bytes" not in str(exc):
+                raise
+            # The pixel-metric memory guard. It is a guard, not a tuning knob -- but its own
+            # docstring says to raise it deliberately against measured free RAM, so the way out
+            # is a measurement and an explicit flag, never a silent default. The shards are
+            # already written and on Drive; only this summary is blocked.
+            available = None
+            try:
+                for line in Path("/proc/meminfo").read_text().splitlines():
+                    if line.startswith("MemAvailable:"):
+                        available = int(line.split()[1]) * 1024
+            except OSError:
+                pass
+            print(f"\n{exc}\n", file=sys.stderr)
+            print("The shards are safe — this is the summary only, and nothing needs re-running.",
+                  file=sys.stderr)
+            if available:
+                print(f"This machine reports {available / 1e9:.1f} GB available right now.",
+                      file=sys.stderr)
+            print("Re-run with an explicit budget you have checked against that number, e.g.:\n"
+                  f"    python scripts/run_mvtec_ad2.py --category {results.name} "
+                  "--max-bytes 9000000000\n", file=sys.stderr)
+            raise SystemExit(1) from exc
         per_seed.append(table.assign(seed=seed))
     combined = pd.concat(per_seed, ignore_index=True)
 
@@ -300,6 +326,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--drive-results", type=Path, default=None,
                         help="default: <DRIVE_RESULTS>/<category>")
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--max-bytes", type=int, default=None,
+                        help="pixel-metric memory budget, in bytes. Only set this against a "
+                             "number you have actually measured on the machine (the failure "
+                             "message prints it); the default is a guard, not a knob.")
     parser.add_argument("--no-save", action="store_true",
                         help="skip the per-seed copy to Drive (not on Colab, say)")
     args = parser.parse_args(argv)
@@ -340,7 +370,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.no_save:
             save_to_drive(results, drive_results)
 
-    summarise(results)
+    summarise(results, args.max_bytes)
     print(f"\n{args.category} done at seeds {args.seeds}. Shards: {results / 'shards'}")
     return 0
 

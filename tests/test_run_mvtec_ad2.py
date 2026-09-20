@@ -376,3 +376,43 @@ def test_summarise_says_nothing_about_maps_when_they_are_all_present(monkeypatch
     mod.summarise(tmp_path / "results" / "vial")
 
     assert "not on this machine" not in capsys.readouterr().out
+
+
+def test_summarise_turns_the_memory_guard_into_a_recoverable_instruction(monkeypatch, tmp_path,
+                                                                         capsys):
+    """Four of eight categories are projected to exceed the 6 GB pixel-metric guard. The shards
+    are already written and on Drive when it fires, so the only thing blocked is the summary —
+    and the way out has to be an explicit budget checked against measured RAM, never a silent
+    default, because the guard's own docstring says exactly that."""
+    import vlmab.eval.aggregate as agg_mod
+    import vlmab.eval.store as store_mod
+
+    frame = _seeded_frame(seeds=(0,))
+    monkeypatch.setattr(store_mod.ResultStore, "load_all", lambda self: frame)
+
+    def exploding_aggregate(df, by=None, **kw):
+        raise ValueError("... exceeds max_bytes=6,000,000,000 (6.0 GB). Aggregate a smaller group")
+
+    monkeypatch.setattr(agg_mod, "aggregate", exploding_aggregate)
+
+    with pytest.raises(SystemExit) as excinfo:
+        _module().summarise(tmp_path / "results" / "rice")
+
+    assert excinfo.value.code == 1
+    err = capsys.readouterr().err
+    assert "shards are safe" in err
+    assert "--max-bytes" in err and "--category rice" in err
+
+
+def test_an_unrelated_value_error_is_not_swallowed_as_a_memory_problem(monkeypatch, tmp_path):
+    """The guard is matched on its own message. A different ValueError — a pooled-seed frame,
+    say — must keep its own traceback rather than being reported as a memory budget."""
+    import vlmab.eval.aggregate as agg_mod
+    import vlmab.eval.store as store_mod
+
+    monkeypatch.setattr(store_mod.ResultStore, "load_all", lambda self: _seeded_frame(seeds=(0,)))
+    monkeypatch.setattr(agg_mod, "aggregate",
+                        lambda df, by=None, **kw: (_ for _ in ()).throw(ValueError("pools 3 seeds")))
+
+    with pytest.raises(ValueError, match="pools 3 seeds"):
+        _module().summarise(tmp_path / "results" / "rice")
