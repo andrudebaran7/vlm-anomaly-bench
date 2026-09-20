@@ -936,9 +936,9 @@ with resolution — but the fit, which dominated everything so far, does not.
    mvtec.com's registration form, so no session can fetch them. This is the human bottleneck and
    the reason the runner takes one category and runs every seed before moving on: the alternative
    needs each category on Drive three separate times.
-2. **Anomaly maps at native resolution.** Stored as float16 `.npy`, so a Fabric map is 10.0 MB
-   and its 156 public-test images are 1.56 GB per seed. Across eight categories and three seeds
-   the grid writes **~26.7 GB of maps** — which does not fit Drive's free tier at all.
+2. **Anomaly maps at native resolution.** Stored as float16 `.npy`, so a Fabric map is 9.6 MB
+   and its 156 public-test images are 1.46 GB per seed. Across eight categories and three seeds
+   the grid writes **24.9 GB of maps** — which does not fit Drive's free tier at all.
    `scripts/run_mvtec_ad2.py` therefore copies **shards only** to Drive and leaves the maps on the
    VM. That is safe because the metrics are already in the shards and the maps are genuinely
    regenerable: same seed, same commit, same data, and the fit is now minutes rather than hours.
