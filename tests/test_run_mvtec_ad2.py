@@ -277,3 +277,24 @@ def test_summarise_handles_a_single_seed_and_says_it_is_not_reportable(monkeypat
     assert calls == [[0]]
     assert "nan" not in out.lower()
     assert "1 seed(s)" in out and "requires three" in out
+
+
+def test_summarise_writes_a_report_rather_than_only_printing(monkeypatch, tmp_path):
+    """A result that only ever printed is a result nobody has — the project's own rule, and the
+    first live M3 run's numbers existed solely in a console until they were transcribed by hand.
+    The report also has to carry the caveats, because a bare per-lighting table reads as a
+    zero-shot result when PatchCore is the full-shot ceiling."""
+    calls: list = []
+    _patch_summarise_deps(monkeypatch, _seeded_frame(), calls)
+    results = tmp_path / "mvtec_ad2" / "vial"
+
+    _module().summarise(results)
+
+    report = tmp_path / "mvtec_ad2" / "vial.md"
+    assert report.is_file(), "no report written"
+    text = report.read_text()
+    assert "patchcore_ref on vial" in text
+    assert "full-shot anchor" in text, "a bare table reads as a zero-shot result"
+    assert "One category is not a dataset result" in text
+    assert "Resize([256, 256])" in text, "the square-resize property must travel with the number"
+    assert "3 seed(s)" in text and "regular" in text and "overexposed" in text

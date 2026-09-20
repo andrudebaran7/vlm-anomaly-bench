@@ -32,6 +32,7 @@ Exit codes: **0 ran, 1 a run failed, 2 could not start** (archive missing, layou
 category that was never on Drive is never mistaken for one that produced no anomalies.
 """
 import argparse
+import datetime as dt
 import shutil
 import subprocess
 import sys
@@ -180,17 +181,61 @@ def summarise(results: Path) -> None:
     stats = combined.groupby("meta_lighting")[metrics].agg(["mean", "std"])
     n_seeds = combined["seed"].nunique(dropna=False)
 
+    def cell(metric, row):
+        std = row[(metric, "std")]
+        return f"{row[(metric, 'mean')]:.4f} ± {0.0 if pd.isna(std) else std:.4f}"
+
     print(f"\nPer lighting condition — mean ± std over {n_seeds} seed(s), "
           "each aggregated separately (protocol §6):")
     for lighting, row in stats.iterrows():
-        parts = " | ".join(
-            f"{m} {row[(m, 'mean')]:6.2f} ± {0.0 if pd.isna(row[(m, 'std')]) else row[(m, 'std')]:.2f}"
-            for m in metrics
-        )
-        print(f"  {lighting:<14} {parts}")
+        print(f"  {lighting:<14} " + " | ".join(f"{m} {cell(m, row)}" for m in metrics))
 
     if n_seeds < 3:
         print(f"\nNOTE: {n_seeds} seed(s). Protocol §6 requires three for any reported number.")
+
+    # A result that only ever printed is a result nobody has. `run_visa_secondary.py` writes its
+    # report through the gate; this had no equivalent, and the first live M3 run's numbers
+    # existed only in a console until they were transcribed by hand (2026-09-21).
+    report = results.parent / f"{results.name}.md"
+    seeds = sorted(str(s) for s in combined["seed"].dropna().unique()) or ["unseeded"]
+    head = subprocess.run(["git", "-C", str(Path(__file__).resolve().parent.parent),
+                           "rev-parse", "--short", "HEAD"],
+                          capture_output=True, text=True).stdout.strip() or "unknown"
+    lines = [
+        f"# MVTec AD 2 — patchcore_ref on {results.name}",
+        "",
+        f"Generated {dt.datetime.now(dt.UTC):%Y-%m-%d %H:%M} UTC by `scripts/run_mvtec_ad2.py`.",
+        "",
+        f"Mean ± std over **{n_seeds} seed(s)** ({', '.join(seeds)}), each aggregated separately "
+        "(protocol §6). The public test split; `test_private` has no ground truth here.",
+        "",
+        "| lighting | " + " | ".join(metrics) + " |",
+        "|---|" + "---|" * len(metrics),
+    ]
+    lines += [f"| {lighting} | " + " | ".join(cell(m, row) for m in metrics) + " |"
+              for lighting, row in stats.iterrows()]
+    lines += [
+        "",
+        "## Caveats recorded with the result",
+        "",
+        "- **PatchCore is the full-shot anchor, not a zero-shot method.** It is the ceiling the "
+        "zero-shot numbers are measured against, never a comparable entry.",
+        "- **One category is not a dataset result.** MVTec AD 2 has eight.",
+        "- **The pre-processor is a fixed square `Resize([256, 256])`** with no aspect-ratio "
+        "preservation, and no MVTec AD 2 category is square. This is the pinned configuration "
+        "the reproduction gate was passed at (protocol §7); it is a stated property of the "
+        "study, not an explanation produced afterwards.",
+        "",
+        "## Provenance",
+        "",
+        f"- shards: `{results / 'shards'}`",
+        f"- seeds: `{', '.join(seeds)}`",
+        f"- commit: `{head}`",
+        "",
+    ]
+    report.parent.mkdir(parents=True, exist_ok=True)
+    report.write_text("\n".join(lines))
+    print(f"\nwrote {report}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
