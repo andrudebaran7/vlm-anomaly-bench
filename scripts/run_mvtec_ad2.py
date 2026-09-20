@@ -135,6 +135,40 @@ def run_one_seed(category: str, root: Path, results: Path, seed: int, device: st
     print(f"  {category} seed {seed}: done (preprocess {method.preprocess})")
 
 
+def restore_from_drive(results: Path, source: Path) -> None:
+    """Copy back any shard Drive has and this VM does not, before deciding what to run.
+
+    The runner resumes on `ResultStore.is_done`, which is an existence check on a shard file —
+    and those live on the VM, which Colab reclaims. So a session that dropped after two of three
+    seeds redid all three, because `save_to_drive` only ever copied outward. Found on the first
+    live Vial run (2026-09-21), which re-fitted every seed on a fresh runtime while three
+    perfectly good shards sat on Drive.
+
+    **Only files missing locally are copied**, never overwriting a local shard with Drive's copy:
+    the Drive copy came from the local one, so they agree, and a restore that can clobber is a
+    restore nobody should run twice.
+
+    The anomaly maps are NOT restored — they are not copied to Drive at all, being 24.9 GB across
+    the grid against Drive's free 15 GB. A restored shard therefore supports image-level metrics
+    and not pixel-level ones; `summarise` detects that and says so rather than dying on a missing
+    file.
+    """
+    src = source / "shards"
+    if not src.is_dir():
+        return
+    dest = results / "shards"
+    dest.mkdir(parents=True, exist_ok=True)
+    restored = [f for f in sorted(src.glob("*.parquet")) if not (dest / f.name).is_file()]
+    for f in restored:
+        shutil.copy2(f, dest / f.name)
+    if restored:
+        print(f"restored {len(restored)} shard(s) from {src}:")
+        for f in restored:
+            print(f"  {f.name}")
+        print("  (their anomaly maps are not on Drive — see summarise's note if it skips "
+              "pixel metrics)")
+
+
 def save_to_drive(results: Path, dest: Path) -> None:
     """Copy the shards off the VM. The maps stay: they are large and regenerable."""
     shards = results / "shards"
@@ -167,6 +201,22 @@ def summarise(results: Path) -> None:
     from vlmab.eval.store import ResultStore
 
     df = ResultStore(results / "shards").load_all()
+
+    # A shard restored from Drive references maps that never left the VM it was computed on.
+    # `pixel_metrics` loads every `map_path` from disk, so a missing file would raise from
+    # inside np.load with no hint of why. Nulling the column instead makes `pixel_metrics`
+    # return {"n": 0} — it already has that branch — so the image-level table still comes out.
+    if "map_path" in df.columns:
+        present = df["map_path"].map(lambda q: bool(q) and Path(q).is_file())
+        missing = int((df["map_path"].notna() & ~present).sum())
+        if missing:
+            print(f"\n⚠️  {missing} of {int(df['map_path'].notna().sum())} anomaly maps are not "
+                  "on this machine — shards restored from Drive carry paths to maps that stayed "
+                  "on the VM that computed them.\n    Pixel metrics (AU-PRO, SegF1) are SKIPPED "
+                  "for the affected rows; image-level metrics are unaffected.\n    To get them "
+                  "back, delete the shard for that seed and re-run: the fit is minutes.")
+            df = df.assign(map_path=df["map_path"].where(present, None))
+
     # NaN is how parquet round-trips an unseeded run's None; fold it back so it groups as one.
     tags = df["seed"].where(df["seed"].notna(), None) if "seed" in df.columns else None
     groups = list(df.groupby(tags, dropna=False)) if tags is not None else [(None, df)]
@@ -280,6 +330,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if len(args.seeds) < 3:
         print(f"\n⚠️  {len(args.seeds)} seed(s). Protocol §6 requires three for any REPORTED "
               "number; anything less is a measurement. Continuing.\n")
+
+    if not args.no_save:
+        restore_from_drive(results, drive_results)
 
     for i, seed in enumerate(args.seeds, 1):
         print(f"[seed {i}/{len(args.seeds)}] {args.category} at seed {seed}")

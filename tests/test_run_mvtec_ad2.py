@@ -298,3 +298,81 @@ def test_summarise_writes_a_report_rather_than_only_printing(monkeypatch, tmp_pa
     assert "One category is not a dataset result" in text
     assert "Resize([256, 256])" in text, "the square-resize property must travel with the number"
     assert "3 seed(s)" in text and "regular" in text and "overexposed" in text
+
+
+# --- Restoring shards from Drive -----------------------------------------------------------
+# The runner resumes on an existence check of a shard file, and those live on the VM that Colab
+# reclaims. The first live Vial run re-fitted all three seeds on a fresh runtime while three
+# perfectly good shards sat on Drive, because save_to_drive only ever copied outward.
+
+
+def test_it_restores_shards_drive_has_and_this_machine_does_not(tmp_path, capsys):
+    mod = _module()
+    drive, results = tmp_path / "drive", tmp_path / "results"
+    (drive / "shards").mkdir(parents=True)
+    for name in ("a.parquet", "b.parquet"):
+        (drive / "shards" / name).write_bytes(b"shard")
+
+    mod.restore_from_drive(results, drive)
+
+    assert sorted(p.name for p in (results / "shards").glob("*.parquet")) == ["a.parquet",
+                                                                             "b.parquet"]
+    assert "restored 2 shard(s)" in capsys.readouterr().out
+
+
+def test_it_never_overwrites_a_local_shard_with_drives_copy(tmp_path):
+    """The Drive copy came from the local one, so they agree — but a restore that can clobber is
+    one nobody should run twice, and the local file is the one the current run just wrote."""
+    mod = _module()
+    drive, results = tmp_path / "drive", tmp_path / "results"
+    (drive / "shards").mkdir(parents=True)
+    (drive / "shards" / "a.parquet").write_bytes(b"from drive")
+    (results / "shards").mkdir(parents=True)
+    (results / "shards" / "a.parquet").write_bytes(b"local, newer")
+
+    mod.restore_from_drive(results, drive)
+
+    assert (results / "shards" / "a.parquet").read_bytes() == b"local, newer"
+
+
+def test_restoring_from_a_drive_with_nothing_on_it_is_a_no_op(tmp_path, capsys):
+    mod = _module()
+    mod.restore_from_drive(tmp_path / "results", tmp_path / "never-used")
+    assert "restored" not in capsys.readouterr().out
+
+
+def test_summarise_skips_pixel_metrics_rather_than_dying_on_absent_maps(monkeypatch, tmp_path,
+                                                                        capsys):
+    """A shard restored from Drive references maps that never left the VM that computed them.
+    pixel_metrics loads every map_path from disk, so a missing file would raise from inside
+    np.load with no hint of why. The image-level table has to survive that."""
+    import pandas as pd
+
+    frame = _seeded_frame(seeds=(0,))
+    frame = frame.assign(map_path=[str(tmp_path / "gone.npy")] * len(frame))
+    calls: list = []
+    _patch_summarise_deps(monkeypatch, frame, calls)
+
+    _module().summarise(tmp_path / "results" / "vial")
+
+    out = capsys.readouterr().out
+    assert "anomaly maps are not on this machine" in out
+    assert "Pixel metrics (AU-PRO, SegF1) are SKIPPED" in out
+    assert calls == [[0]], "the image-level aggregation must still have run"
+    seen = calls and True
+    assert seen
+
+
+def test_summarise_says_nothing_about_maps_when_they_are_all_present(monkeypatch, tmp_path,
+                                                                     capsys):
+    mod = _module()
+    real = tmp_path / "map.npy"
+    real.write_bytes(b"x")
+    frame = _seeded_frame(seeds=(0,))
+    frame = frame.assign(map_path=[str(real)] * len(frame))
+    calls: list = []
+    _patch_summarise_deps(monkeypatch, frame, calls)
+
+    mod.summarise(tmp_path / "results" / "vial")
+
+    assert "not on this machine" not in capsys.readouterr().out

@@ -940,10 +940,21 @@ with resolution — but the fit, which dominated everything so far, does not.
    and its 156 public-test images are 1.46 GB per seed. Across eight categories and three seeds
    the grid writes **24.9 GB of maps** — which does not fit Drive's free tier at all.
    `scripts/run_mvtec_ad2.py` therefore copies **shards only** to Drive and leaves the maps on the
-   VM. That is safe because the metrics are already in the shards and the maps are genuinely
-   regenerable: same seed, same commit, same data, and the fit is now minutes rather than hours.
-   Maps that a figure or the M4 submission actually needs get kept deliberately, per category,
-   rather than by default.
+   VM. That is safe because the image-level metrics are already in the shards and the maps are
+   genuinely regenerable: same seed, same commit, same data, and the fit is now minutes rather
+   than hours. Maps that a figure or the M4 submission actually needs get kept deliberately, per
+   category, rather than by default.
+
+   **The consequence, found on the first Vial run and now handled (2026-09-21):** the runner
+   resumes on `ResultStore.is_done`, an existence check on a shard *on the VM* — so a fresh
+   runtime re-fitted all three seeds while three good shards sat on Drive. `restore_from_drive`
+   now copies back any shard Drive has and the VM does not, before deciding what to run, and
+   never overwrites a local file with Drive's copy. A restored shard references maps that never
+   left the VM that computed them, so `summarise` checks each `map_path` and nulls the missing
+   ones — `pixel_metrics` already returns `{"n": 0}` for an empty column, so **the image-level
+   table still comes out and only AU-PRO and SegF1 are skipped**, with a message saying which
+   rows and how to get them back. Previously that case would have raised from inside `np.load`
+   with no hint of why.
 
 ### The tool, and what it deliberately does not do
 
