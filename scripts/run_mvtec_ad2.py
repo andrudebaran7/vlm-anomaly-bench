@@ -177,6 +177,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="skip the per-seed copy to Drive (not on Colab, say)")
     args = parser.parse_args(argv)
 
+    # Printed FIRST, before anything can fail. A stale clone is invisible in a traceback --
+    # the line numbers look plausible and the code is simply the old code. One live M3 run was
+    # lost to exactly that (2026-09-21): a fix was on origin/master, the session had not synced,
+    # and the traceback named a call signature that no longer existed anywhere in the repo.
+    here = Path(__file__).resolve().parent.parent
+    head = subprocess.run(["git", "-C", str(here), "rev-parse", "--short", "HEAD"],
+                          capture_output=True, text=True).stdout.strip() or "unknown"
+    print(f"{Path(__file__).name} running from commit {head}\n")
+
     results = args.results or Path("results/mvtec_ad2") / args.category
     drive_results = args.drive_results or DRIVE_RESULTS / args.category
 

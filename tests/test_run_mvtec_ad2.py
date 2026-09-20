@@ -191,3 +191,15 @@ def test_an_unmounted_drive_is_reported_as_such_and_not_as_a_missing_upload(harn
     assert "not mounted" in err
     assert "drive.mount('/content/drive')" in err, "the message must carry the exact fix"
     assert not calls
+
+
+def test_it_prints_the_commit_it_is_running_from(harness, capsys):
+    """A stale clone is invisible in a traceback: the line numbers look plausible and the code is
+    simply the old code. One live M3 run was lost to that — a fix sat on origin/master, the
+    session had not synced, and the traceback named a call signature that no longer existed
+    anywhere in the repo. Printed before anything can fail, so it is there even on a crash."""
+    mod, calls, root, tmp = harness
+    _run(mod, root, tmp, "--seeds", "0")
+    out = capsys.readouterr().out
+    assert "running from commit" in out
+    assert out.index("running from commit") < out.index("seed 1/1")
