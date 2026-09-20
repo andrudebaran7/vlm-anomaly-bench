@@ -416,3 +416,20 @@ def test_an_unrelated_value_error_is_not_swallowed_as_a_memory_problem(monkeypat
 
     with pytest.raises(ValueError, match="pools 3 seeds"):
         _module().summarise(tmp_path / "results" / "rice")
+
+
+def test_summarise_only_runs_no_seed_and_loads_no_backend(harness, monkeypatch, tmp_path):
+    """The seed loop constructs a PatchCoreBackend per seed BEFORE the runner checks is_done, so
+    even an all-done category pays for importing anomalib and building a model — roughly 3 GB
+    resident. On the four categories projected to exceed the pixel-metric guard, that 3 GB is
+    the difference between an aggregation that fits and one the kernel OOM-kills."""
+    mod, calls, root, tmp = harness
+    seen: list = []
+    monkeypatch.setattr(mod, "summarise", lambda results, mb=None: seen.append(mb))
+
+    rc = mod.main(["--category", "vial", "--root", str(root), "--no-save", "--summarise-only",
+                   "--max-bytes", "8000000000", "--results", str(tmp / "results")])
+
+    assert rc == 0
+    assert calls == [], "no seed may run"
+    assert seen == [8000000000], "the budget must reach summarise"

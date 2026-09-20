@@ -326,6 +326,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--drive-results", type=Path, default=None,
                         help="default: <DRIVE_RESULTS>/<category>")
     parser.add_argument("--device", default="cuda")
+    parser.add_argument("--summarise-only", action="store_true",
+                        help="skip the seed loop entirely and only re-read the shards. This "
+                             "never loads torch or anomalib, which is worth ~3 GB of resident "
+                             "memory — the difference between a pixel-metric aggregation that "
+                             "fits and one the kernel OOM-kills.")
     parser.add_argument("--max-bytes", type=int, default=None,
                         help="pixel-metric memory budget, in bytes. Only set this against a "
                              "number you have actually measured on the machine (the failure "
@@ -363,6 +368,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if not args.no_save:
         restore_from_drive(results, drive_results)
+
+    if args.summarise_only:
+        print("--summarise-only: not loading torch or anomalib, and running no seed.\n")
+        summarise(results, args.max_bytes)
+        return 0
 
     for i, seed in enumerate(args.seeds, 1):
         print(f"[seed {i}/{len(args.seeds)}] {args.category} at seed {seed}")
