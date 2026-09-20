@@ -1294,6 +1294,60 @@ reproduction that is **not even** — six of fifteen categories sit outside ±1.
 (-8.22) contributes -0.548 of the -0.98 by itself. Every table that cites PatchCore as the anchor
 owes both facts.
 
+## Where to pick up (session handoff, 2026-09-20) — M3 starts, with Vial
+
+**VisA is done and committed** (`results/reproduction/patchcore_visa.md`, 86.26 against a
+published 92.4, non-gating). Shards are on Drive at `MyDrive/reproduction_visa/`. Nothing from
+that session is outstanding.
+
+**Tomorrow is the first REPORTABLE MVTec AD 2 number of the study.** PatchCore's gate passed, so
+protocol §2 no longer blocks AD 2 results.
+
+### The session, in full
+
+1. **Phase 0** entire, fresh runtime. Still not optional: cell 0.1's `%cd` + `pip install -e .`
+   is what makes `!python scripts/...` work at all (a subprocess does not inherit cell 1.1's
+   `sys.path`).
+2. **Cell 1.1** — hard sync.
+3. **One typed line:** `!python scripts/run_mvtec_ad2.py --category vial`
+
+**You do not need cell 22.** The script mounts Drive, fetches `MyDrive/mvtec_ad2/vial.tar.gz`,
+extracts, verifies the layout with `prepare_data.py`, runs seeds 0/1/2, copies shards to
+`MyDrive/mvtec_ad2_results/vial/` **after every seed**, and prints a per-lighting aggregation.
+`vial.tar.gz` has been on Drive since 2026-09-16, so nothing needs uploading.
+
+**Budget: well under an hour.** Vial's fit is ~2m20s per seed (291 train images, measured), so
+~7 minutes of fitting plus scoring 140 public-test images three times.
+
+**Expect seed 0 to re-run, and that is correct.** Phase 2's Vial shard lives at
+`results/patchcore/vial/shards`, a different root, and it predates both the gate passing and the
+`preprocess` column. It was never reportable. The new run writes to `results/mvtec_ad2/vial/` and
+starts clean.
+
+### After Vial
+
+Order the remaining seven **smallest first**, so any cost surprise arrives early and cheap:
+`sheet_metal` (137 train), `fruit_jelly` (263), `wallplugs` (293), `rice` (313), `fabric` (387),
+`can` (412), `walnuts` (432). Each needs its archive uploaded to `MyDrive/mvtec_ad2/` once, by
+hand — that is the real bottleneck, not the GPU. Drive's free 15 GB holds one large category at a
+time, so delete an archive once its shards are safe.
+
+**Two things to watch on the first category that is not Vial:** the coreset size printed in the
+log gives the train count (`floor(N x 102.4)`), which cross-checks Table 4's figure for that
+category; and the float16 overflow guard has only ever been exercised on Vial and VisA.
+
+### Still open, not blocking M3
+
+- **What M2 means.** The README scopes it to every method's GPU backend; this file's ordered list
+  says PatchCore's gate closes it. The checkbox is still deliberately unticked.
+- **VisA's §6 debt.** Seed 0 alone is a first reading; seeds 1 and 2 are ~8 h more for a check
+  that cannot change a verdict. Flagged as a budget decision, not decided.
+- **VisA's released image dimensions**, for the square-resize hypothesis registered 2026-09-19.
+  MVTec AD 2's are now confirmed from Table 4 and *none is square*, which makes the question
+  larger than VisA. One line against the data, recorded in `datasets-access.md` first.
+
+Older handoff (2026-09-18, after the seeds session) follows.
+
 ## Where to pick up (session handoff, 2026-09-18, after the seeds session)
 
 **PatchCore's reproduction gate PASSED** (see "THE GATE PASSED" above): 98.02 ± 0.07 against a
