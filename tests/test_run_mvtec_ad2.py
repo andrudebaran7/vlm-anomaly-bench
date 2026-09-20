@@ -203,3 +203,77 @@ def test_it_prints_the_commit_it_is_running_from(harness, capsys):
     out = capsys.readouterr().out
     assert "running from commit" in out
     assert out.index("running from commit") < out.index("seed 1/1")
+
+
+# --- summarise() must aggregate ONE SEED AT A TIME -----------------------------------------
+# The first version pooled all three seeds into one `aggregate` call and died on
+# `aggregate._require_single_seed` -- after every seed had already been computed and saved. The
+# guard was right and the caller was wrong: I-AUROC over 3N rows is not the mean of three
+# I-AUROCs, it scores every image three times and treats the copies as independent samples.
+#
+# The fake below runs the REAL guard, so this test reproduces the original failure exactly
+# rather than approximating it.
+
+
+def _seeded_frame(seeds=(0, 1, 2), lightings=("regular", "overexposed")):
+    import pandas as pd
+
+    rows = [{"seed": s, "meta_lighting": light, "label": i % 2, "score": float(i)}
+            for s in seeds for light in lightings for i in range(4)]
+    return pd.DataFrame(rows)
+
+
+def _patch_summarise_deps(monkeypatch, frame, calls):
+    import pandas as pd
+
+    import vlmab.eval.aggregate as agg_mod
+    import vlmab.eval.store as store_mod
+
+    def fake_aggregate(df, by=None, **kw):
+        agg_mod._require_single_seed(df)          # the real guard, not a stand-in
+        calls.append(sorted(df["seed"].unique()))
+        return pd.DataFrame({by: sorted(df[by].unique()),
+                             "i_auroc": [90.0 + len(calls)] * df[by].nunique()})
+
+    monkeypatch.setattr(agg_mod, "aggregate", fake_aggregate)
+    monkeypatch.setattr(store_mod.ResultStore, "load_all", lambda self: frame)
+
+
+def test_summarise_never_hands_aggregate_a_pooled_seed_frame(monkeypatch, tmp_path, capsys):
+    calls: list = []
+    _patch_summarise_deps(monkeypatch, _seeded_frame(), calls)
+
+    _module().summarise(tmp_path)
+
+    assert calls == [[0], [1], [2]], f"aggregate saw {calls}; each call must be one seed"
+    out = capsys.readouterr().out
+    assert "3 seed(s)" in out and "§6" in out
+
+
+def test_summarise_reports_a_spread_not_a_single_number(monkeypatch, tmp_path, capsys):
+    """§6 reports mean ± std. A bare mean would hide a seed disagreement, which for PatchCore is
+    the measurement the whole seed apparatus exists to produce."""
+    calls: list = []
+    _patch_summarise_deps(monkeypatch, _seeded_frame(), calls)
+
+    _module().summarise(tmp_path)
+
+    out = capsys.readouterr().out
+    assert "±" in out
+    for lighting in ("regular", "overexposed"):
+        assert lighting in out
+
+
+def test_summarise_handles_a_single_seed_and_says_it_is_not_reportable(monkeypatch, tmp_path,
+                                                                       capsys):
+    """std over one seed is NaN, which must print as 0.00 rather than leaking 'nan' into a
+    table, and one seed has to be flagged at the point it is shown."""
+    calls: list = []
+    _patch_summarise_deps(monkeypatch, _seeded_frame(seeds=(0,)), calls)
+
+    _module().summarise(tmp_path)
+
+    out = capsys.readouterr().out
+    assert calls == [[0]]
+    assert "nan" not in out.lower()
+    assert "1 seed(s)" in out and "requires three" in out

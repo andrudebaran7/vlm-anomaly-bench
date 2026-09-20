@@ -146,19 +146,51 @@ def save_to_drive(results: Path, dest: Path) -> None:
     print(f"  saved to {dest / 'shards'} ({n} shard(s) there now)")
 
 
+#: Metrics worth showing per lighting condition. MVTec AD 2 exists to measure the lighting shift,
+#: so this view is the point of the whole grid rather than a convenience.
+SUMMARY_METRICS = ("i_auroc", "au_pro_030", "au_pro_005")
+
+
 def summarise(results: Path) -> None:
-    """Per-lighting-condition aggregation — the thing MVTec AD 2 exists to measure."""
+    """Per lighting condition, one aggregation PER SEED, combined as mean ± std (protocol §6).
+
+    The first version of this pooled every seed into one `aggregate` call and died on the guard
+    in `aggregate._require_single_seed` — after all three seeds had already been computed and
+    saved. The guard was right and the caller was wrong: I-AUROC over 3N rows is not the mean of
+    three I-AUROCs, it scores every image three times and treats the copies as independent.
+    Metrics are computed once per seed and combined afterwards, which is what this now does.
+    """
+    import pandas as pd
+
     from vlmab.eval.aggregate import aggregate
     from vlmab.eval.store import ResultStore
 
     df = ResultStore(results / "shards").load_all()
-    print("\nPer lighting condition, pooled over the seeds present:")
-    cols = ["meta_lighting", "i_auroc", "au_pro_030", "au_pro_005", "n"]
-    table = aggregate(df, by="meta_lighting")
-    print(table[[c for c in cols if c in table.columns]].to_string(index=False))
-    print("\nNOTE: pooled across seeds for a first look only. Protocol §6 reports a mean over "
-          "seeds with its standard deviation, and the metric functions refuse a pooled-seed "
-          "frame — so this is a session convenience, never a reportable table.")
+    # NaN is how parquet round-trips an unseeded run's None; fold it back so it groups as one.
+    tags = df["seed"].where(df["seed"].notna(), None) if "seed" in df.columns else None
+    groups = list(df.groupby(tags, dropna=False)) if tags is not None else [(None, df)]
+
+    per_seed = []
+    for seed, group in groups:
+        table = aggregate(group, by="meta_lighting")
+        per_seed.append(table.assign(seed=seed))
+    combined = pd.concat(per_seed, ignore_index=True)
+
+    metrics = [m for m in SUMMARY_METRICS if m in combined.columns]
+    stats = combined.groupby("meta_lighting")[metrics].agg(["mean", "std"])
+    n_seeds = combined["seed"].nunique(dropna=False)
+
+    print(f"\nPer lighting condition — mean ± std over {n_seeds} seed(s), "
+          "each aggregated separately (protocol §6):")
+    for lighting, row in stats.iterrows():
+        parts = " | ".join(
+            f"{m} {row[(m, 'mean')]:6.2f} ± {0.0 if pd.isna(row[(m, 'std')]) else row[(m, 'std')]:.2f}"
+            for m in metrics
+        )
+        print(f"  {lighting:<14} {parts}")
+
+    if n_seeds < 3:
+        print(f"\nNOTE: {n_seeds} seed(s). Protocol §6 requires three for any reported number.")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
