@@ -67,18 +67,31 @@ Verified from the official download page, 2026-07-23:
 - The bundled `readme.txt` carries attribution and the CC BY-NC-SA 4.0 licence only. It does
   **not** document the official metric definitions — those remain behind the evaluation server.
 
-Per-category image format (record on download):
+Per-category image format and set sizes — **filled 2026-09-20 from the dataset paper's Table 4**
+(arXiv:2503.21622, read directly; provenance: `../vlm-anomaly-paper/docs/verified-literature-facts.md`).
+Vial's row was verified against the archive on disk and matches exactly; the channel column is
+still "record on download", since Table 4 gives geometry but not bit depth.
 
-| Category | Resolution | Channels |
-|---|---|---|
-| Vial | 1400x1900 | 8-bit grayscale |
-| Can | ____ | ____ |
-| Fabric | ____ | ____ |
-| Fruit Jelly | ____ | ____ |
-| Rice | ____ | ____ |
-| Sheet Metal | ____ | ____ |
-| Wallplugs | ____ | ____ |
-| Walnuts | ____ | ____ |
+| Category | Resolution (W×H) | Aspect | Channels | Train | Val | test_public |
+|---|---|---|---|---|---|---|
+| Vial | 1400x1900 | 0.74:1 | 8-bit grayscale | 291 | 41 | 140 |
+| Can | 2232x1024 | 2.18:1 | ____ | 412 | 46 | 162 |
+| Fabric | 2448x2048 | 1.20:1 | ____ | 387 | 43 | 156 |
+| Fruit Jelly | 2100x1520 | 1.38:1 | ____ | 263 | 37 | 80 |
+| Rice | 2448x2048 | 1.20:1 | ____ | 313 | 35 | 132 |
+| Sheet Metal | 4224x1056 | **4.00:1** | ____ | 137 | 19 | 114 |
+| Wallplugs | 2448x2048 | 1.20:1 | ____ | 293 | 33 | 150 |
+| Walnuts | 2448x2048 | 1.20:1 | ____ | 432 | 48 | 150 |
+
+**The archive sizes above are driven by resolution, not image count.** Fabric is 13x Vial's
+download and has *fewer* training images. Any cost estimate extrapolated from GB is wrong by an
+order of magnitude — see the M3 cost model in `docs/next-steps.md`.
+
+**⚠️ Not one category is square, and Sheet Metal is 4:1.** anomalib 2.6.0's pre-processor is a
+fixed square `Resize([256, 256])` with no aspect-ratio preservation. MVTec AD classic's images are
+square, so no reproduction number in this repo is affected; every MVTec AD 2 number is. This is a
+property of the pinned configuration the gate was passed at, not something to change after seeing
+a result (protocol §7), and it is recorded here before the first AD 2 number exists.
 
 **This is why per-category downloads matter.** 30.4 GB does not fit Google Drive's free 15 GB
 tier, and re-fetching it whole every session is the dominant cost on a platform that

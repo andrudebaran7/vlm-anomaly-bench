@@ -897,6 +897,83 @@ runs **without its per-object prompts and without its property rules**, which is
 published. Protocol §3 v0.2.9 already requires that disclosure; the 0/8 makes it universal rather
 than partial.
 
+## M3 is costed, and the cost is NOT where it looked (2026-09-20)
+
+Before any category was uploaded, the grid's cost was estimated — and the first estimate, made
+from archive sizes, was wrong by an order of magnitude in the alarming direction. Fabric is 10 GB
+against Vial's 0.77 GB, so extrapolating quadratically from Vial's 291 training images suggested
+a single category could cost twenty hours. **The dataset paper's Table 4 refutes that**, and the
+row for Vial was cross-checked against the archive on disk before the other seven were trusted
+(provenance: paper repo, `verified-literature-facts.md`, 2026-09-20).
+
+**Train sets are small and tightly clustered: 137 to 432 images.** The archive sizes are driven by
+**resolution, not image count** — Fabric is 2448x2048 against Vial's 1400x1900, with *fewer*
+training images. Full table in `docs/datasets-access.md`.
+
+### The fit cost, from the two points we have measured
+
+The exponent fitted across Vial (291 images, 2m19s) and VisA's candle (900, 23m39s), same GPU,
+is **2.06** — quadratic, confirmed independently on two datasets. Extrapolating:
+
+| category | train | fit/seed | x3 seeds |
+|---|---|---|---|
+| Sheet Metal | 137 | 0.5m | 1.5m |
+| Fruit Jelly | 263 | 1.9m | 5.7m |
+| Vial | 291 | 2.3m | 7.0m |
+| Wallplugs | 293 | 2.3m | 7.0m |
+| Rice | 313 | 2.7m | 8.0m |
+| Fabric | 387 | 4.1m | 12.3m |
+| Can | 412 | 4.6m | 13.9m |
+| Walnuts | 432 | 5.1m | 15.3m |
+
+**The whole M3 grid is ~1.2 h of coreset fitting.** Less than a third of what one seed of VisA
+cost. Scoring, image I/O at these resolutions and map writing sit on top, and those *do* scale
+with resolution — but the fit, which dominated everything so far, does not.
+
+### Where the cost actually is
+
+1. **Uploading 30.4 GB to Drive, one category at a time, by hand.** The archives sit behind
+   mvtec.com's registration form, so no session can fetch them. This is the human bottleneck and
+   the reason the runner takes one category and runs every seed before moving on: the alternative
+   needs each category on Drive three separate times.
+2. **Anomaly maps at native resolution.** Stored as float16 `.npy`, so a Fabric map is 10.0 MB
+   and its 156 public-test images are 1.56 GB per seed. Across eight categories and three seeds
+   the grid writes **~26.7 GB of maps** — which does not fit Drive's free tier at all.
+   `scripts/run_mvtec_ad2.py` therefore copies **shards only** to Drive and leaves the maps on the
+   VM. That is safe because the metrics are already in the shards and the maps are genuinely
+   regenerable: same seed, same commit, same data, and the fit is now minutes rather than hours.
+   Maps that a figure or the M4 submission actually needs get kept deliberately, per category,
+   rather than by default.
+
+### The tool, and what it deliberately does not do
+
+`scripts/run_mvtec_ad2.py --category <name>` fetches from Drive, verifies the layout with
+`prepare_data.py`, runs seeds 0/1/2, copies shards to Drive **after every seed**, and prints a
+per-lighting aggregation. Ten tests.
+
+**It does not score the `validation` split.** `run_evaluation` re-fits per call, so a second split
+roughly doubles the fit cost per seed; more importantly, the threshold rule's seed semantics —
+one calibration per seed, or one for the seed that gets submitted — are **not pre-registered**, so
+producing those scores now risks producing the wrong ones. The cost of that decision is a second
+upload of each category when M4 runs. Recorded rather than absorbed, and pinned by a test so it
+is not quietly added.
+
+### ⚠️ The pre-processing note that now applies to every AD 2 number
+
+**Not one of the eight categories is square, and Sheet Metal is 4224x1056 — a 4:1 frame.**
+anomalib 2.6.0's pre-processor is a fixed square `Resize([256, 256])` with no aspect-ratio
+preservation, read off the transform object itself on 2026-09-17. MVTec AD classic's images are
+square, so **no reproduction number in this repo is affected; every MVTec AD 2 number will be**,
+and Sheet Metal most extremely.
+
+This is a property of the pinned configuration the gate was passed at, not a defect to fix after
+seeing a result (§7). It is recorded **before the first AD 2 number exists** so that it is a
+stated property of the study rather than an explanation produced afterwards, and it belongs in the
+paper's Threats to Validity — where, unlike the field-level findings in §5.E, it genuinely is one.
+It is also the same mechanism registered on 2026-09-19 as an untested hypothesis for the VisA
+shortfall; VisA's released image dimensions are still unverified, MVTec AD 2's are now
+primary-source confirmed.
+
 ## VisA ran: 86.26 against a published 92.4 (2026-09-20) — reported, cannot fail the method
 
 Twelve objects, none dropped, seed 0, Tesla T4, anomalib 2.6.0, `preprocess=anomalib`, commit
