@@ -92,11 +92,18 @@ conditions is not constant across categories**. Read from `prepare_data.py` on t
 |---|---|---|---|
 | Vial | **7** | regular, overexposed, underexposed, shift_1–4 | 20 |
 | Sheet Metal | **6** | regular, overexposed, underexposed, shift_1–**3** | 19 |
+| Fruit Jelly | **4** | regular, overexposed, underexposed, shift_1 | 20 |
 
-**Images per condition is the near-constant, not the condition count** — 20 and 19 on the two
-measured so far. Project per-condition cost with ~20 images, never with `test_public_total / 7`.
-Fill the rest of this table as each category is extracted; the count is printed before any fit
-runs, so it is known within seconds of starting a category.
+**Images per condition is the near-constant, not the condition count** — 20, 19 and 20 on the
+three measured so far, while the condition count falls 7 → 6 → 4. Project per-condition cost with
+~20 images, never with `test_public_total / 7`. Fill the rest of this table as each category is
+extracted; the count is printed before any fit runs, so it is known within seconds of starting a
+category.
+
+**Fruit Jelly also confirms Table 4's private-split claim against real data** (2026-09-29):
+`test_private` = 255 regular and `test_private_mixed` = 255 mixed, equal-sized as the paper states,
+and 263 + 37 + 80 + 255 + 255 = 890 images total. Its `test_public` conditions are the three named
+ones plus `shift_1` only — there is no `shift_2`, `shift_3` or `shift_4` in this category.
 
 **Why it matters beyond bookkeeping:** `pixel_metrics` aggregates one lighting condition at a
 time and guards at 6 GB, at a measured 80 bytes/pixel. Sheet Metal's 4224×1056 at 19 images is
@@ -107,7 +114,7 @@ to the byte by the failure message. Projecting with ~20 images/condition:
 |---|---|---|---|
 | Can | 2232×1024 | 3.66 GB | ok |
 | Vial | 1400×1900 | 4.26 GB | ok (measured, passed) |
-| Fruit Jelly | 2100×1520 | 5.11 GB | ok |
+| Fruit Jelly | 2100×1520 | 5.11 GB | ok (measured, passed) |
 | Sheet Metal | 4224×1056 | 6.78 GB | **trips** (measured) |
 | Fabric / Rice / Wallplugs / Walnuts | 2448×2048 | 8.02 GB | **trips** |
 

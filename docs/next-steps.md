@@ -112,11 +112,12 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    is total budget, not session length. Its CPU half is done and registered
    (`src/vlmab/methods/saa.py`, `configs/methods/saa_prompts.yaml`); what remains is the GPU backend and
    phases A–D.
-6. **M3 — full MVTec AD 2 grid. STARTED: 2 of 8 categories done for PatchCore (2026-09-21).**
+6. **M3 — full MVTec AD 2 grid. STARTED: 3 of 8 categories done for PatchCore (2026-09-29).**
    Once each method's VisA gate passes, run the full public-test grid over all eight categories,
    one category at a time (the download/resume/shard unit). Mechanical. Vial and Sheet Metal are
    run and reported; **Sheet Metal put the anchor at chance**, which is a result, not a bug — see
-   the 2026-09-29 handoff below and `results/mvtec_ad2/sheet_metal.md`. Next: `fruit_jelly`.
+   the handoffs below and `results/mvtec_ad2/sheet_metal.md`. Fruit Jelly is done too.
+   Next: `wallplugs`.
 7. **M4 — evaluation server.** Score the private split. Access is **granted** (2026-07-30) and the
    threshold rule is built and pre-registered (v0.2.11); what remains is the submission packaging,
    which needs the server's own format — confirm it on first login. On first login, confirm
@@ -1307,6 +1308,83 @@ resuming cold should not have to find them. Commits are on `master` in both repo
 reproduction that is **not even** — six of fifteen categories sit outside ±1.0 and `toothbrush`
 (-8.22) contributes -0.548 of the -0.98 by itself. Every table that cites PatchCore as the anchor
 owes both facts.
+
+## Fruit Jelly ran, and it settled three things besides the category (2026-09-29)
+
+The category's own result is in `results/mvtec_ad2/fruit_jelly.md`: detection swings with the
+lighting (I-AUROC 0.684–0.853) while localisation does not move (AU-PRO@30% 0.6295–0.6453,
+per-seed ± of 0.001–0.002). That is **not** the Vial pattern, where both metrics fell together
+under `underexposed`, so localisation-under-lighting is a per-category question on the evidence of
+two, not a finding.
+
+### 1. The seeding reproduces across sessions and machines — first evidence
+
+The category had already been run on **2026-09-20 at commit `a7bc7bd`**, in the same session as
+Sheet Metal, and no report was ever written. The 2026-09-29 session restored those shards from
+Drive, skipped every seed, and re-derived the same four numbers. They were then deleted and the
+category re-run from scratch on a different VM, nine days later. **All four I-AUROC values came
+back identical to four decimals** (0.8533 / 0.7911 / 0.6844 / 0.8044).
+
+`git diff a7bc7bd..61704b4 -- src scripts configs` is empty, so this tests the seed, not the code.
+It is the first time `PatchCoreBackend(seed=n)` has been shown to reproduce end to end across
+sessions and machines — the seed-provenance work of 2026-09-07 wired it, and this is the check
+that it holds. Both runs used a Tesla T4; nothing here says anything across GPU models.
+
+### 2. The coreset formula in the reports is off by one, three times out of three
+
+`floor(N × 102.4)` predicts 26931 for Fruit Jelly's 263 training images. The fit reported
+**26930** — and Vial (29797 against 29798) and Sheet Metal (14027 against 14028) are the same one
+step low. The prediction was written down before this run, so it is a confirmed pattern rather
+than a noticed coincidence.
+
+**What is NOT established:** whether the memory bank itself holds one fewer patch, or whether
+anomalib's `Selecting Coreset Indices` progress bar counts one iteration short of what it selects.
+All three figures were read off that bar. One line settles it — `model.memory_bank.shape[0]` after
+a fit — and it costs nothing on top of a category that is fitting anyway. Do it on `wallplugs`,
+and correct the three reports once the answer is known rather than now.
+
+### 3. A defect in `run_mvtec_ad2.py`, found by using it
+
+`write_report` stamps `git rev-parse HEAD` of the machine writing the report. On a resumed run
+that is **the wrong commit**: the 2026-09-29 session wrote a Fruit Jelly report claiming `61704b4`
+for numbers computed at `a7bc7bd`. The shards carry the truth — `run_meta` stamps a `commit`
+column on every row — so the fix is to read it from there, and to refuse to write a single-commit
+provenance line when the shards disagree among themselves. Owed, not yet done. The report now in
+the repo is from the clean re-run, so its commit line is correct.
+
+**The wider gap it exposes:** `tests/test_results_are_tracked.py` guards a report from being
+silently gitignored, but nothing guards against a run that produced shards and *no report at all*.
+That is how Fruit Jelly's first run vanished for nine days. The check would have to live where the
+shards are, not in the repo, so it is not obviously a test — recorded as a known hole.
+
+## Where to pick up (session handoff, 2026-09-29, after Fruit Jelly) — wallplugs
+
+**M3 is 3 of 8.** Vial, Sheet Metal and Fruit Jelly are run and reported, three seeds each.
+Fruit Jelly's shards are on Drive; its first, unreported run's shards were deleted from both the
+VM and Drive on 2026-09-29 and must not come back.
+
+**Next: `wallplugs` (293 train, 2448×2048, 2.05 GB).** Upload `wallplugs.tar.gz` to
+`MyDrive/mvtec_ad2/` first; `fruit_jelly.tar.gz` can be deleted once its shards are confirmed on
+Drive. Then phase 0 → cell 1.1 → cell 50 with `CATEGORY = "wallplugs"`.
+
+**Expect the memory guard to trip, unlike the three so far.** 2448×2048 at ~20 images per
+condition is 8.02 GB against the 6 GB `pixel_metrics` guard. The shards are written before the
+summary runs, so the recovery is the same one Sheet Metal used:
+`--summarise-only --max-bytes 8000000000`. This is the expected path for `wallplugs`, `rice`,
+`fabric` and `walnuts` — four of the five that remain. Only `can` (2232×1024, 3.66 GB) should pass
+cleanly.
+
+**Budget:** 2.3m fit per seed, ~7m for three, by the cost model — which has now been right three
+times (Vial 2m19s, Sheet Metal 29s against 31s predicted, Fruit Jelly 1m51s against 1.9m).
+
+**Two things to capture, beyond the usual lighting count and coreset size:**
+
+1. **`model.memory_bank.shape[0]` after a fit**, to settle whether the coreset off-by-one is the
+   bank or the progress bar. See the 2026-09-29 section above.
+2. **Whether AU-PRO stays flat under lighting.** Fruit Jelly's did and Vial's did not. A third
+   reading is what turns this from two anecdotes into something §6.2 can be written from.
+
+Older handoff (2026-09-29, before Fruit Jelly ran) follows.
 
 ## Where to pick up (session handoff, 2026-09-29) — M3 continues, with Fruit Jelly
 
