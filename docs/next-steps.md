@@ -112,8 +112,11 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    is total budget, not session length. Its CPU half is done and registered
    (`src/vlmab/methods/saa.py`, `configs/methods/saa_prompts.yaml`); what remains is the GPU backend and
    phases A–D.
-6. **M3 — full MVTec AD 2 grid.** Once each method's VisA gate passes, run the full public-test grid
-   over all eight categories, one category at a time (the download/resume/shard unit). Mechanical.
+6. **M3 — full MVTec AD 2 grid. STARTED: 2 of 8 categories done for PatchCore (2026-09-21).**
+   Once each method's VisA gate passes, run the full public-test grid over all eight categories,
+   one category at a time (the download/resume/shard unit). Mechanical. Vial and Sheet Metal are
+   run and reported; **Sheet Metal put the anchor at chance**, which is a result, not a bug — see
+   the 2026-09-29 handoff below and `results/mvtec_ad2/sheet_metal.md`. Next: `fruit_jelly`.
 7. **M4 — evaluation server.** Score the private split. Access is **granted** (2026-07-30) and the
    threshold rule is built and pre-registered (v0.2.11); what remains is the submission packaging,
    which needs the server's own format — confirm it on first login. On first login, confirm
@@ -1304,6 +1307,86 @@ resuming cold should not have to find them. Commits are on `master` in both repo
 reproduction that is **not even** — six of fifteen categories sit outside ±1.0 and `toothbrush`
 (-8.22) contributes -0.548 of the -0.98 by itself. Every table that cites PatchCore as the anchor
 owes both facts.
+
+## Where to pick up (session handoff, 2026-09-29) — M3 continues, with Fruit Jelly
+
+**M3 is 2 of 8.** Vial and Sheet Metal are run, three seeds each, reports committed
+(`results/mvtec_ad2/vial.md`, `results/mvtec_ad2/sheet_metal.md`, commit `a350e04`). Shards are on
+Drive at `MyDrive/mvtec_ad2_results/<category>/`. Nothing from that session is outstanding: the
+runner now writes its own report file, restores shards from Drive, and survives missing maps.
+
+**The two results do not tell the same story, and that is the finding so far.** Vial's anchor
+works and degrades under lighting exactly as the dataset intends (0.95 `regular` → 0.87
+`underexposed`). Sheet Metal's anchor is **at chance in every condition including `regular`** —
+the pre-registered aspect-ratio mechanism's most extreme case, though causation is untested and
+must not be claimed. Both outcomes are now recorded in the paper repo
+(`docs/verified-literature-facts.md`, addendum 2026-09-29, plus comment blocks at the two sites in
+§5 and §6 that owe them), so the provenance is current up to Sheet Metal.
+
+### The prerequisite, and it is the only slow part
+
+**Upload `fruit_jelly.tar.gz` (1.2 GB) to `MyDrive/mvtec_ad2/` before the session starts.** It is
+behind mvtec.com's registration form, so no session can fetch it. Vial (0.77 GB) and Sheet Metal
+can be deleted from Drive first — their shards are already safe under `mvtec_ad2_results/`.
+
+### The session, in full
+
+1. **Phase 0** entire, fresh runtime. Cell 0.1's `%cd` + `pip install -e .` is what makes
+   `!python scripts/...` work at all; a subprocess does not inherit cell 1.1's `sys.path`.
+2. **Cell 1.1** — hard sync.
+3. **One typed line:** `!python scripts/run_mvtec_ad2.py --category fruit_jelly`
+
+**Budget: well under half an hour.** The cost model puts the fit at 1.9m per seed, 5.7m for three
+(263 train images, exponent 2.06 fitted on Vial and VisA's candle). Scoring 80 public-test images
+three times sits on top.
+
+**The memory guard should NOT trip, unlike Sheet Metal.** Fruit Jelly is 2100×1520, projected at
+5.11 GB peak against the 6 GB `pixel_metrics` guard — but that projection assumes ~20 images per
+lighting condition, and Fruit Jelly's condition count is **not measured**. If it trips, the run is
+recoverable exactly as Sheet Metal's was: re-invoke with
+`--summarise-only --max-bytes 8000000000`. The shards are already written by then; only the
+aggregation is repeated.
+
+### Three things to watch, in the order they will appear
+
+1. **The lighting-condition count**, printed within seconds of extraction, before any fit. It
+   fills the third row of the table in `docs/datasets-access.md`, which currently has Vial (7
+   conditions, 20 images each) and Sheet Metal (6, 19). Fruit Jelly's `test_public` is 80 images
+   (20 normal / 60 anomalous, Table 4), so ~20 per condition implies **4 conditions** — an
+   inference from the near-constant, not a measurement. Record what the script actually prints.
+2. **The coreset size, which is a live discrepancy in our own record.** Both existing reports
+   write the formula as `floor(N × 102.4)` and both report a number **exactly one less** than it
+   gives: Vial 29797 against 29798, Sheet Metal 14027 against 14028. For Fruit Jelly the formula
+   gives 26931, so the pattern predicts **26930**. Either value resolves it — record which, then
+   correct the formula in both reports if it is off by one. Separately, the coreset size still
+   cross-checks the train count against Table 4, which is what it was there for.
+3. **Per-condition granularity, for the report's caveats.** At 4 conditions Fruit Jelly gets 5
+   normal and 15 anomalous per condition — 75 pairs, so I-AUROC moves in steps of 0.0133 and a
+   ±0.0000 across seeds means the metric could not resolve a difference. Sheet Metal's report
+   states this for 60 pairs; Fruit Jelly's needs its own version with the real counts.
+
+### After Fruit Jelly
+
+`wallplugs` (293 train), `rice` (313), `fabric` (387), `can` (412), `walnuts` (432) — smallest
+first, so any cost surprise arrives early and cheap. **Four of those five are 2448×2048 and are
+projected at 8.02 GB, over the guard**: `--summarise-only --max-bytes 8000000000` is the expected
+path for `rice`, `fabric`, `wallplugs` and `walnuts`, not an exception. Only `can` (2232×1024,
+3.66 GB) should pass cleanly. Each needs its archive uploaded by hand, one at a time.
+
+### Still open, not blocking M3
+
+- **What M2 means.** The README scopes it to every method's GPU backend; this file's ordered list
+  says PatchCore's gate closes it. The checkbox is still deliberately unticked.
+- **VisA's §6 debt.** Seed 0 alone is a first reading; seeds 1 and 2 are ~8 h more for a check
+  that cannot change a verdict. A budget decision, still not decided.
+- **VisA's released image dimensions**, for the square-resize hypothesis registered 2026-09-19.
+  MVTec AD 2's are confirmed and *none is square*. One line against the data, into
+  `datasets-access.md` first.
+- **The confirming experiment for Sheet Metal** — the same category under an aspect-preserving
+  transform. §7 permits it only as a separate, dated experiment whose outcome is recorded either
+  way. Not scheduled, and deliberately not part of M3.
+
+Older handoff (2026-09-20, the session that started M3) follows.
 
 ## Where to pick up (session handoff, 2026-09-20) — M3 starts, with Vial
 
