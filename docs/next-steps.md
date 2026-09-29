@@ -112,12 +112,13 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    is total budget, not session length. Its CPU half is done and registered
    (`src/vlmab/methods/saa.py`, `configs/methods/saa_prompts.yaml`); what remains is the GPU backend and
    phases A–D.
-6. **M3 — full MVTec AD 2 grid. STARTED: 3 of 8 categories done for PatchCore (2026-09-29).**
+6. **M3 — full MVTec AD 2 grid. STARTED: 4 of 8 categories done for PatchCore (2026-09-29).**
    Once each method's VisA gate passes, run the full public-test grid over all eight categories,
    one category at a time (the download/resume/shard unit). Mechanical. Vial and Sheet Metal are
    run and reported; **Sheet Metal put the anchor at chance**, which is a result, not a bug — see
-   the handoffs below and `results/mvtec_ad2/sheet_metal.md`. Fruit Jelly is done too.
-   Next: `wallplugs`.
+   the handoffs below. **The anchor is now unusable on two of the four run** — Sheet Metal
+   (at chance) and Wall Plugs (at or below chance in all six conditions) — and only one of them
+   has an extreme aspect ratio, so that mechanism does not explain both. Next: `rice`.
 7. **M4 — evaluation server.** Score the private split. Access is **granted** (2026-07-30) and the
    threshold rule is built and pre-registered (v0.2.11); what remains is the submission packaging,
    which needs the server's own format — confirm it on first login. On first login, confirm
@@ -1356,6 +1357,83 @@ the repo is from the clean re-run, so its commit line is correct.
 silently gitignored, but nothing guards against a run that produced shards and *no report at all*.
 That is how Fruit Jelly's first run vanished for nine days. The check would have to live where the
 shards are, not in the repo, so it is not obviously a test — recorded as a known hole.
+
+## Wall Plugs: the anchor fails again, and this time aspect ratio cannot be the reason (2026-09-29)
+
+Full result in `results/mvtec_ad2/wallplugs.md`. **All six lighting conditions are at or below
+0.50 I-AUROC** (mean 0.447, best 0.5000, worst 0.3956) while **AU-PRO@30% runs 0.2773–0.5132
+against a random baseline of 0.1487**. The maps find the defects; the image-level score does not
+rank the images containing them. Fruit Jelly showed this in one condition; here it is the category.
+
+**Two of the eight categories now have an unusable anchor, and the pre-registered mechanism covers
+only one.** Wall Plugs is 2448×2048, 1.20:1 — the mildest reshaping in the dataset after Vial,
+where the anchor works well. Sheet Metal's 4:1 compression has nothing to say about this failure,
+so "the square resize breaks the anchor" is not a general explanation and must not be written as
+one. It also is not a lighting story: `regular` itself is 0.4600.
+
+### AU-PRO now has a reference point, and it is measured
+
+`au_pro_005 = 0.0292` on `shift_2` was unreadable — good or terrible depends on what random looks
+like, and nothing in this repo said. It is derivable (for an uninformative map PRO(fpr) ~ fpr, so
+the normalised area over [0, L] is L/2) and now it is **measured through this repo's own `au_pro`**:
+**0.1487 at the 30% limit, 0.0249 at 5%**, five trials of fifteen images.
+`tests/test_au_pro_random_baseline.py` pins it, so a change to normalisation, thresholding or
+connectivity fails a test instead of quietly moving the reference every published AU-PRO number is
+read against. `shift_2`'s 0.0292 is within 17% of uninformative.
+
+### The "~20 images per condition" rule is dead, and it cost a failed summary
+
+It held three times — Vial 20, Sheet Metal 19, Fruit Jelly 20 — and Wall Plugs has **25**. Both
+numbers vary: conditions go 7 → 6 → 4 → 6, images per condition 20 → 19 → 20 → 25. The 8.02 GB
+projected for 2448×2048 was computed at 20 images; the real peak was **10.03 GB**, so the guard
+tripped above the budget the projection implied. Corrected in `docs/datasets-access.md`, with the
+remaining 2448×2048 categories now budgeted at 25 until their counts are printed.
+
+### A second defect in `run_mvtec_ad2.py`, in the recovery path
+
+When the guard trips, the script prints a suggested command. On Wall Plugs that suggestion was
+wrong twice over:
+
+* **it omits `--summarise-only`**, so the retry re-enters the seed loop and holds ~3 GB of torch
+  while aggregating — the exact overhead the flag exists to shed, documented in this file since
+  2026-09-20;
+* **its budget comes from available RAM, not from the requirement it just computed.** It suggested
+  9 GB for a peak it had measured at 10.03 GB, so following it verbatim fails again.
+
+The fix is mechanical: suggest the computed requirement with headroom, include the flag, and say
+plainly when the requirement exceeds what the machine reports. The run went through with
+`--summarise-only --max-bytes 11000000000`. Owed, with the `write_report` commit-stamp defect from
+the same week.
+
+## Where to pick up (session handoff, 2026-09-29, after Wall Plugs) — rice
+
+**M3 is 4 of 8.** Vial, Sheet Metal, Fruit Jelly and Wall Plugs are run and reported, three seeds
+each. Shards for all four are on Drive.
+
+**Next: `rice` (313 train, 2448×2048).** Upload its archive to `MyDrive/mvtec_ad2/` and delete
+`wallplugs.tar.gz` once its shards are confirmed. Then phase 0 → cell 1.1 → cell 50 with
+`CATEGORY = "rice"`. Fit ~2.7m per seed, ~8m for three.
+
+**The guard will trip. Budget for 25 images per condition, not 20** — that is 10.03 GB, and the
+recovery is `--summarise-only --max-bytes 11000000000`. Do not follow the command the script
+prints; see the defect above. Read the real images-per-condition off the layout check, which runs
+seconds after extraction and before any fit.
+
+**Three things to capture, and the first two have been missed twice now:**
+
+1. **The coreset line** (`Selecting Coreset Indices`) from the fit. Predicted 31283 for rice
+   (`floor(313 × 102.4) − 1`). Wall Plugs' was not recorded, so the pattern is still at three
+   confirmations.
+2. **`model.memory_bank.shape[0]`**, to settle whether that figure is the bank or an off-by-one in
+   the progress bar. The cheap probe does not need the category at all — 30 synthetic 256×256
+   images through `PatchCoreBackend(seed=0).fit(...)` gives the same answer in seconds, because
+   the patch count is `N × 1024` regardless of input resolution.
+3. **Whether AU-PRO degrades under the direction shifts.** Wall Plugs separates cleanly at strict
+   FPR: the three intensity conditions inside 0.0035 of each other, the three `shift_*` a mean
+   2.5× worse. Vial degraded, Fruit Jelly did not, Wall Plugs does at `au_pro_005` only. A fourth
+   reading is what decides whether §6.1 can say anything general.
+
+Older handoff (2026-09-29, after Fruit Jelly) follows.
 
 ## Where to pick up (session handoff, 2026-09-29, after Fruit Jelly) — wallplugs
 

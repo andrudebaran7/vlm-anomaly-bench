@@ -93,12 +93,18 @@ conditions is not constant across categories**. Read from `prepare_data.py` on t
 | Vial | **7** | regular, overexposed, underexposed, shift_1–4 | 20 |
 | Sheet Metal | **6** | regular, overexposed, underexposed, shift_1–**3** | 19 |
 | Fruit Jelly | **4** | regular, overexposed, underexposed, shift_1 | 20 |
+| Wall Plugs | **6** | regular, overexposed, underexposed, shift_1–**3** | **25** |
 
-**Images per condition is the near-constant, not the condition count** — 20, 19 and 20 on the
-three measured so far, while the condition count falls 7 → 6 → 4. Project per-condition cost with
-~20 images, never with `test_public_total / 7`. Fill the rest of this table as each category is
-extracted; the count is printed before any fit runs, so it is known within seconds of starting a
-category.
+**⚠️ THE "~20 PER CONDITION" RULE IS DEAD (2026-09-29).** It held for Vial (20), Sheet Metal
+(19) and Fruit Jelly (20), and Wall Plugs broke it with **25**. Neither number is constant: the
+condition count goes 7 → 6 → 4 → 6 and images-per-condition goes 20 → 19 → 20 → 25. **Do not
+project either one.** The real cost is `images_per_condition × W × H × 80 bytes`, and
+images-per-condition is printed before any fit runs, seconds after extraction — read it, do not
+estimate it.
+
+That is not bookkeeping: projecting Wall Plugs with ~20 images gave 8.02 GB against an actual
+**10.03 GB** peak, 25% low, and the guard tripped above the budget the projection implied. Fill
+the rest of this table as each category is extracted.
 
 **Fruit Jelly also confirms Table 4's private-split claim against real data** (2026-09-29):
 `test_private` = 255 regular and `test_private_mixed` = 255 mixed, equal-sized as the paper states,
@@ -110,13 +116,22 @@ time and guards at 6 GB, at a measured 80 bytes/pixel. Sheet Metal's 4224×1056 
 **84,750,336 pooled pixels = 6.78 GB**, which trips it — predicted before the run and confirmed
 to the byte by the failure message. Projecting with ~20 images/condition:
 
-| category | resolution | peak | 6 GB guard |
-|---|---|---|---|
-| Can | 2232×1024 | 3.66 GB | ok |
-| Vial | 1400×1900 | 4.26 GB | ok (measured, passed) |
-| Fruit Jelly | 2100×1520 | 5.11 GB | ok (measured, passed) |
-| Sheet Metal | 4224×1056 | 6.78 GB | **trips** (measured) |
-| Fabric / Rice / Wallplugs / Walnuts | 2448×2048 | 8.02 GB | **trips** |
+Peak is `images_per_condition × W × H × 80 bytes`. Where the image count is measured the peak
+is too; where it is not, the row says what it assumes, because Wall Plugs proved that assumption
+can be 25% low.
+
+| category | resolution | imgs/cond | peak | 6 GB guard |
+|---|---|---|---|---|
+| Vial | 1400×1900 | 20 (measured) | 4.26 GB | ok (measured, passed) |
+| Fruit Jelly | 2100×1520 | 20 (measured) | 5.11 GB | ok (measured, passed) |
+| Sheet Metal | 4224×1056 | 19 (measured) | 6.78 GB | **trips** (measured) |
+| Wall Plugs | 2448×2048 | **25 (measured)** | **10.03 GB** | **trips** (measured) |
+| Can | 2232×1024 | *unknown* | 3.66 GB at 20, 4.57 at 25 | ok either way |
+| Rice / Fabric / Walnuts | 2448×2048 | *unknown* | 8.02 GB at 20, **10.03 at 25** | **trips** |
+
+**For the three remaining 2448×2048 categories, budget for 25 until their count is printed.** A
+`--max-bytes` chosen for 20 images fails on a category that has 25, after the fits have already
+run — which is exactly what happened on Wall Plugs.
 
 The way through is `--summarise-only --max-bytes <n>`: the seed loop builds a `PatchCoreBackend`
 per seed before the runner checks `is_done`, so even an all-done category otherwise holds ~3 GB
