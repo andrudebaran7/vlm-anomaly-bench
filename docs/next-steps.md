@@ -118,7 +118,7 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    run and reported; **Sheet Metal put the anchor at chance**, which is a result, not a bug — see
    the handoffs below. **The anchor is now unusable on two of the four run** — Sheet Metal
    (at chance) and Wall Plugs (at or below chance in all six conditions) — and only one of them
-   has an extreme aspect ratio, so that mechanism does not explain both. Next: `rice`.
+   has an extreme aspect ratio, so that mechanism does not explain both. Next: `can`.
 7. **M4 — evaluation server.** Score the private split. Access is **granted** (2026-07-30) and the
    threshold rule is built and pre-registered (v0.2.11); what remains is the submission packaging,
    which needs the server's own format — confirm it on first login. On first login, confirm
@@ -1405,25 +1405,47 @@ plainly when the requirement exceeds what the machine reports. The run went thro
 `--summarise-only --max-bytes 11000000000`. Owed, with the `write_report` commit-stamp defect from
 the same week.
 
-## Where to pick up (session handoff, 2026-09-29, after Wall Plugs) — rice
+## Where to pick up (session handoff, 2026-09-29, after Wall Plugs; reordered 2026-09-30) — can
 
 **M3 is 4 of 8.** Vial, Sheet Metal, Fruit Jelly and Wall Plugs are run and reported, three seeds
 each. Shards for all four are on Drive.
 
-**Next: `rice` (313 train, 2448×2048).** Upload its archive to `MyDrive/mvtec_ad2/` and delete
-`wallplugs.tar.gz` once its shards are confirmed. Then phase 0 → cell 1.1 → cell 50 with
-`CATEGORY = "rice"`. Fit ~2.7m per seed, ~8m for three.
+### The order changed on 2026-09-30, and the reason is worth keeping
 
-**The guard will trip. Budget for 25 images per condition, not 20** — that is 10.03 GB, and the
-recovery is `--summarise-only --max-bytes 11000000000`. Do not follow the command the script
-prints; see the defect above. Read the real images-per-condition off the layout check, which runs
-seconds after extraction and before any fit.
+The remaining four were ordered smallest-train-set-first, so that a cost surprise would arrive
+early and cheap. Four categories in, **that is the wrong axis**: the fit costs 2.7–5.1 minutes per
+seed, 8–15 minutes for three, and it has never been the bottleneck. The bottleneck is the manual
+upload, which scales with the archive, and by archive the order is different:
+
+| order by train count (old) | order by upload (new) |
+|---|---|
+| rice 313, fabric 387, can 412, walnuts 432 | can 2.65 GB, walnuts 5.88, rice 6.29, fabric 10 |
+
+`can` is both the cheapest upload and the only one of the four that does **not** trip the memory
+guard, so it is the shortest possible session. `fabric` stays last regardless: 10 GB is a third of
+what remains to upload, against Drive's free 15 GB.
+
+**Nothing about this affects a number.** Category order enters no metric and each is aggregated
+separately; this is purely which upload costs least first.
+
+**Next: `can` (412 train, 2232×1024, 2.65 GB).** Upload its archive to `MyDrive/mvtec_ad2/` and
+delete `wallplugs.tar.gz` once its shards are confirmed. Then phase 0 → cell 1.1 → cell 50 with
+`CATEGORY = "can"`. Fit ~4.6m per seed, ~14m for three — the longest fit of the grid so far, and
+still not the slow part.
+
+**The guard should NOT trip on this one.** 2232×1024 is 2,285,568 pixels per image: 4.57 GB at 25
+images per condition, 3.66 GB at 20, both under the 6 GB limit. It is the only remaining category
+where the plain `!python scripts/run_mvtec_ad2.py --category can` should run start to finish.
+`rice`, `walnuts` and `fabric` are all 2448×2048 and all need
+`--summarise-only --max-bytes 11000000000` — budget for 25 images per condition, not 20, and do
+not follow the command the script prints (see the defect above). Read the real
+images-per-condition off the layout check, which runs seconds after extraction and before any fit.
 
 **Three things to capture, and the first two have been missed twice now:**
 
-1. **The coreset line** (`Selecting Coreset Indices`) from the fit. Predicted 31283 for rice
-   (`floor(313 × 102.4) − 1`). Wall Plugs' was not recorded, so the pattern is still at three
-   confirmations.
+1. **The coreset line** (`Selecting Coreset Indices`) from the fit. Predicted **42187** for can
+   (`floor(412 × 102.4) − 1`); for reference, rice is 32050, fabric 39627, walnuts 44235. Wall
+   Plugs' was not recorded, so the pattern is still at three confirmations.
 2. **`model.memory_bank.shape[0]`**, to settle whether that figure is the bank or an off-by-one in
    the progress bar. The cheap probe does not need the category at all — 30 synthetic 256×256
    images through `PatchCoreBackend(seed=0).fit(...)` gives the same answer in seconds, because
