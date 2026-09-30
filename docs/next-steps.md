@@ -112,13 +112,15 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    is total budget, not session length. Its CPU half is done and registered
    (`src/vlmab/methods/saa.py`, `configs/methods/saa_prompts.yaml`); what remains is the GPU backend and
    phases A–D.
-6. **M3 — full MVTec AD 2 grid. STARTED: 4 of 8 categories done for PatchCore (2026-09-29).**
+6. **M3 — full MVTec AD 2 grid. STARTED: 5 of 8 categories done for PatchCore (2026-09-30).**
    Once each method's VisA gate passes, run the full public-test grid over all eight categories,
    one category at a time (the download/resume/shard unit). Mechanical. Vial and Sheet Metal are
    run and reported; **Sheet Metal put the anchor at chance**, which is a result, not a bug — see
    the handoffs below. **The anchor is now unusable on two of the four run** — Sheet Metal
    (at chance) and Wall Plugs (at or below chance in all six conditions) — and only one of them
-   has an extreme aspect ratio, so that mechanism does not explain both. Next: `can`.
+   has an extreme aspect ratio, so that mechanism does not explain them. **The anchor is now
+   unusable on three of the five run** — Sheet Metal, Wall Plugs and Can, the last of these
+   *below* its own random baseline on `au_pro_005`. Next: `walnuts`.
 7. **M4 — evaluation server.** Score the private split. Access is **granted** (2026-07-30) and the
    threshold rule is built and pre-registered (v0.2.11); what remains is the submission packaging,
    which needs the server's own format — confirm it on first login. On first login, confirm
@@ -1344,6 +1346,29 @@ All three figures were read off that bar. One line settles it — `model.memory_
 a fit — and it costs nothing on top of a category that is fitting anyway. Do it on `wallplugs`,
 and correct the three reports once the answer is known rather than now.
 
+**ANSWERED 2026-09-30, and the conclusion is the opposite of what the section above implies.** A
+fit on 30 synthetic 256×256 images: the bar ran **3071** iterations and `_model.model.memory_bank`
+came out **(3072, 1536)**, against `int(0.1 × 30 × 1024) = 3072`. So **the memory bank is exactly
+`floor(N × 102.4)` and the progress bar runs one short of it.**
+
+The formula in the reports was right all along; **the three figures were wrong**, because all three
+were read off the bar and recorded as bank sizes. Corrected in place, with the reason, in
+`vial.md` (29797 → 29798), `sheet_metal.md` (14027 → 14028) and `fruit_jelly.md` (26930 → 26931).
+Wall Plugs is 30003 by formula and was never observed.
+
+The 1536 is a free cross-check: `layer2` + `layer3` of `wide_resnet50_2` is 512 + 1024, so the
+bank's second dimension is the concatenated feature width the config asks for.
+
+**A plausible mechanism, NOT verified:** a greedy k-center sampler picks its first centre before
+the loop and iterates for the remaining `k − 1`, which would produce exactly this. Nothing here
+read anomalib's sampler, so that stays a guess — the measured relationship is what to rely on.
+
+**Deliberately not recorded in `src/`.** A comment in `patchcore_backend.py` would be the obvious
+home, and it would also make every remaining category run at a different code commit than the four
+already run. The 2026-09-29 determinism check depended on there being *no* code difference across
+a span of commits; that property is worth more than a comment's convenience. `src/` stays untouched
+until M3 is finished.
+
 ### 3. A defect in `run_mvtec_ad2.py`, found by using it
 
 `write_report` stamps `git rev-parse HEAD` of the machine writing the report. On a resumed run
@@ -1405,6 +1430,86 @@ plainly when the requirement exceeds what the machine reports. The run went thro
 `--summarise-only --max-bytes 11000000000`. Owed, with the `write_report` commit-stamp defect from
 the same week.
 
+## Can: the anchor scores below random, and two mechanical causes are refuted (2026-09-30)
+
+Full result in `results/mvtec_ad2/can.md`. **All six conditions well below chance on I-AUROC**
+(0.326–0.443, mean 0.388, with the training condition `regular` the *worst* of the six), and
+**`au_pro_005` averaging 0.0024 against the measured random baseline of 0.0249** — a tenth of
+uninformative, with three conditions at exactly 0.0000. `au_pro_030` is the only metric above its
+baseline (0.298 against 0.1487).
+
+**A number below its own random baseline is a claim about anti-correlation, not difficulty**, so it
+was not written down until two mechanical explanations had been tested. Both were run in the same
+session, with the maps still on the VM, and both are recorded either way:
+
+* **map/mask geometry — REFUTED.** Both are `(1024, 2232)`; same shape, same orientation, no
+  transpose. Eight anomalous images at seed 0.
+* **the map lighting up the frame border — REFUTED.** The fraction of each map's top 1% of values
+  in the outer 5% band is **0.000 across all twelve images sampled**, six normal and six anomalous,
+  where a diffuse top 1% would give ~0.19. The hottest regions are entirely interior. That is the
+  healthy behaviour — the background is the most consistent region across training images, so the
+  least anomalous.
+
+What the two establish together: the map responds to the object and not to its defects, and on five
+of eight sampled anomalous images the mean map value *inside* the ground-truth region is lower than
+outside (0.796–0.880 against 1.047–1.404 for the other three). The anti-correlation is in the
+scores, not the geometry. **Why is not established and no hypothesis is offered** — testing one now
+would be searching for a configuration that improves a number after seeing it (§7). A
+pre-registered mechanism as a separate dated experiment is the only route open, and none was
+registered for this category.
+
+### The "direction shifts cost localisation" pattern has a second reading
+
+On both Can and Wall Plugs the three `shift_*` conditions score below the three intensity
+conditions on `au_pro_005` — Wall Plugs 0.0985/0.0292/0.0753 against 0.1688/0.1723/0.1694, Can
+0.0001/0.0000/0.0000 against 0.0036/0.0028/0.0077 — and on `au_pro_030` here as well (shifts 0.261,
+intensity 0.336). Two categories in the same direction, both of them ones where detection has
+failed, so the reading rests on localisation alone. Vial degraded on both metrics; Fruit Jelly on
+neither. Still not a finding; now worth watching deliberately.
+
+### A fourth defect, and this one has cost three categories
+
+**The coreset size is provenance and it is being read off a tqdm bar.** It was missed on Wall
+Plugs, Can and (as a bank figure) on all three before them, and reading the bar instead of the bank
+is what put a wrong number in three reports. `PatchCoreBackend` knows
+`self._model.model.memory_bank.shape[0]` the moment `fit` returns; `PatchCoreRef` already stamps
+`seed` and `preprocess` into every shard's provenance and should stamp this the same way. Then no
+human copies anything and the figure is in the parquet next to the numbers it describes.
+
+Owed, with the `write_report` commit-stamp defect and the guard's wrong recovery suggestion. **All
+three are deliberately not being fixed until M3 finishes**, for the reason in the 2026-09-30
+coreset section: the four categories already run share a code tree with no differences across
+their commits, and that property is what made the determinism check possible. `src/` stays frozen.
+
+## Where to pick up (session handoff, 2026-09-30, after Can) — walnuts
+
+**M3 is 5 of 8.** Vial, Sheet Metal, Fruit Jelly, Wall Plugs and Can are run and reported, three
+seeds each. **Three of the five have an unusable anchor** — a fact Table 2 now has to be designed
+around rather than footnoted; see `sections/05-results.tex` in the paper repo.
+
+**Next: `walnuts` (432 train, 2448×2048, 5.88 GB)**, by upload size. Then `rice` (6.29 GB) and
+`fabric` (10 GB) last.
+
+**The guard will trip, and 11 GB may not be enough.** Budget for **27** images per condition, not
+25: at 2448×2048 that is **10.83 GB**, against the 11 GB that carried Wall Plugs at 25 images
+(10.03 GB). Use `--summarise-only --max-bytes 12000000000`, and read the real count off the layout
+check first — it prints seconds after extraction, before any fit.
+
+**Budget:** 5.1m fit per seed, ~15m for three. The longest fit of the grid.
+
+**What to capture:**
+
+1. **The coreset line** as a cross-check of the train count. The bar will read **44235**; the bank
+   is **44236** = `floor(432 × 102.4)`. Record the bank.
+2. **The fit times**, which have gone unrecorded for two categories running.
+3. **Whether `au_pro_005` separates intensity conditions from direction shifts**, as it did on Wall
+   Plugs and Can. A third reading in the same direction is what would make it writable in §6.1.
+4. **If the anchor fails here too**, that is four of six, and the study's comparison design needs
+   the decision that `05-results.tex` has been asking for since 2026-09-29 — before `rice` and
+   `fabric` are uploaded, because it may change what is worth running.
+
+Older handoff (2026-09-29, after Wall Plugs; reordered 2026-09-30) follows.
+
 ## Where to pick up (session handoff, 2026-09-29, after Wall Plugs; reordered 2026-09-30) — can
 
 **M3 is 4 of 8.** Vial, Sheet Metal, Fruit Jelly and Wall Plugs are run and reported, three seeds
@@ -1443,13 +1548,13 @@ images-per-condition off the layout check, which runs seconds after extraction a
 
 **Three things to capture, and the first two have been missed twice now:**
 
-1. **The coreset line** (`Selecting Coreset Indices`) from the fit. Predicted **42187** for can
-   (`floor(412 × 102.4) − 1`); for reference, rice is 32050, fabric 39627, walnuts 44235. Wall
-   Plugs' was not recorded, so the pattern is still at three confirmations.
-2. **`model.memory_bank.shape[0]`**, to settle whether that figure is the bank or an off-by-one in
-   the progress bar. The cheap probe does not need the category at all — 30 synthetic 256×256
-   images through `PatchCoreBackend(seed=0).fit(...)` gives the same answer in seconds, because
-   the patch count is `N × 1024` regardless of input resolution.
+1. ~~**`model.memory_bank.shape[0]`**, to settle the coreset off-by-one.~~ **DONE 2026-09-30:
+   the bank is `floor(N × 102.4)` and the progress bar shows one less.** See the section above.
+2. **The coreset line** (`Selecting Coreset Indices`) from the fit, now as a plain cross-check of
+   the train count rather than an open question. The bar will read **42187** for can; the bank is
+   **42188** = `floor(412 × 102.4)`. For the rest: rice bar 32050 / bank 32051, fabric 39627 /
+   39628, walnuts 44235 / 44236. **Record the bank figure, not the bar's** — reading the bar as the
+   bank is what put a wrong number in three reports.
 3. **Whether AU-PRO degrades under the direction shifts.** Wall Plugs separates cleanly at strict
    FPR: the three intensity conditions inside 0.0035 of each other, the three `shift_*` a mean
    2.5× worse. Vial degraded, Fruit Jelly did not, Wall Plugs does at `au_pro_005` only. A fourth

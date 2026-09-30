@@ -89,7 +89,10 @@ re-run rather than reported from the restored shards.
 ## Provenance
 
 - shards: `results/mvtec_ad2/fruit_jelly/shards`, and `MyDrive/mvtec_ad2_results/fruit_jelly/`
-- seeds: `0, 1, 2`; coreset **26930** indices each, at every seed
+- seeds: `0, 1, 2`; coreset **26931** entries each, at every seed — `floor(263 × 102.4)`.
+  **Corrected 2026-09-30 from 26930**: that was the progress bar's iteration count, which runs one
+  short of the memory bank it builds. The prediction this run was set up to test (26930) matched
+  the bar exactly, which is how the discrepancy was localised to the bar rather than the formula
 - fit: 1m51s at every seed, against the 1.9m the cost model predicted
 - the summary needed no `--max-bytes`: 20 images × 2100×1520 is 63,840,000 pooled pixels =
   5.11 GB, under the 6 GB pixel-metric guard, as projected

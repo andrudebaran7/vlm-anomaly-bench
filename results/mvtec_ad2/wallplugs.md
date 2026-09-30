@@ -75,10 +75,10 @@ slightly worse; it did not cause it.
 
 - shards: `results/mvtec_ad2/wallplugs/shards`, and `MyDrive/mvtec_ad2_results/wallplugs/`
 - seeds: `0, 1, 2`
-- coreset: **not captured** for this category. Predicted 30002 by the pattern that held three
-  times (`floor(293 × 102.4) − 1 = 30002`); the fit's progress bar was not recorded, so nothing
-  here confirms or refutes it. The open question of whether that figure is the memory bank or an
-  off-by-one in the bar is therefore still open — see `docs/next-steps.md`.
+- coreset: **not captured** for this category; it is **30003** by `floor(293 × 102.4)`, the
+  relationship measured directly on 2026-09-30 (`memory_bank` is exactly `floor(N × 102.4)`; the
+  progress bar shows one less). Nothing was read off this run, so this is the formula rather than
+  an observation — but the formula is no longer in question.
 - the summary needed `--summarise-only --max-bytes 11000000000`: 25 images × 2448×2048 is
   125,337,600 pooled pixels = **10.03 GB**, over the 6 GB pixel-metric guard. The docs had
   projected 8.02 GB for this resolution from ~20 images per condition; this category has 25, and

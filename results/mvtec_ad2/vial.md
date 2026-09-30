@@ -58,7 +58,10 @@ Later categories are written by the runner at four decimals.
 
 - shards: `results/mvtec_ad2/vial/shards`, also on Drive at `MyDrive/mvtec_ad2_results/vial/`
 - seeds: `0, 1, 2`
-- coreset: 29797 indices at every seed — `floor(291 × 102.4)`, the 32×32 grid, confirming the
-  `anomalib` transform reached all three runs
+- coreset: **29798** entries at every seed — `floor(291 × 102.4)`, the 32×32 grid, confirming
+  the `anomalib` transform reached all three runs. **Corrected 2026-09-30 from 29797**, which was
+  the `Selecting Coreset Indices` progress bar's iteration count. The bar runs one short of the
+  bank it builds; measured directly on 2026-09-30 (bar 3071, `memory_bank` (3072, 1536) on 30
+  images). The formula was always right; the figure read off the bar was not.
 - fit: 2m19s / 2m20s / 2m20s, against the ~2m20s the cost model predicted
 - commit: `7a03f14` or later

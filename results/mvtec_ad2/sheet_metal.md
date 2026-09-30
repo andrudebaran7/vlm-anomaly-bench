@@ -79,7 +79,9 @@ attached rather than as an ordinary row.
 ## Provenance
 
 - shards: `results/mvtec_ad2/sheet_metal/shards`, and `MyDrive/mvtec_ad2_results/sheet_metal/`
-- seeds: `0, 1, 2`; coreset 14027 indices each — `floor(137 × 102.4)`, the 32×32 grid
+- seeds: `0, 1, 2`; coreset **14028** entries each — `floor(137 × 102.4)`, the 32×32 grid.
+  **Corrected 2026-09-30 from 14027**: that was the progress bar's iteration count, which runs one
+  short of the memory bank it builds (measured directly, see `docs/next-steps.md`)
 - fit: 29s / 29s / 30s, against the 31s the cost model predicted
 - the summary needed `--summarise-only --max-bytes 8000000000`: 19 images × 4224×1056 is
   84,750,336 pooled pixels = 6.78 GB, over the 6 GB pixel-metric guard
