@@ -95,12 +95,14 @@ conditions is not constant across categories**. Read from `prepare_data.py` on t
 | Fruit Jelly | **4** | regular, overexposed, underexposed, shift_1 | 20 |
 | Wall Plugs | **6** | regular, overexposed, underexposed, shift_1–**3** | **25** |
 | Can | **6** | regular, overexposed, underexposed, shift_1–**3** | **27** |
+| Walnuts | **6** | regular, overexposed, underexposed, shift_1–**3** | **25** |
 
-**⚠️ THE "~20 PER CONDITION" RULE IS DEAD (2026-09-29, worse on 2026-09-30).** It held for Vial
-(20), Sheet Metal (19) and Fruit Jelly (20); Wall Plugs broke it with **25** and Can went to
-**27**. Neither number is constant and images-per-condition is *trending up*: the condition count
-goes 7 → 6 → 4 → 6 → 6 and images-per-condition goes 20 → 19 → 20 → 25 → 27. **Do not project
-either one.** The real cost is `images_per_condition × W × H × 80 bytes`, and
+**⚠️ THE "~20 PER CONDITION" RULE IS DEAD (2026-09-29).** It held for Vial (20), Sheet Metal (19)
+and Fruit Jelly (20); Wall Plugs broke it with **25**, Can went to **27**, Walnuts came back to
+**25**. Neither number is constant and **it is not trending either** — an earlier version of this
+note called it "climbing" after Can, and Walnuts refuted that the next day. The measured series is
+conditions 7 → 6 → 4 → 6 → 6 → 6 and images-per-condition 20 → 19 → 20 → 25 → 27 → 25. **Do not
+project either one.** The real cost is `images_per_condition × W × H × 80 bytes`, and
 images-per-condition is printed before any fit runs, seconds after extraction — read it, do not
 estimate it.
 
@@ -129,14 +131,14 @@ can be 25% low.
 | Sheet Metal | 4224×1056 | 19 (measured) | 6.78 GB | **trips** (measured) |
 | Wall Plugs | 2448×2048 | **25 (measured)** | **10.03 GB** | **trips** (measured) |
 | Can | 2232×1024 | **27 (measured)** | **4.94 GB** | ok (measured, passed) |
-| Rice / Fabric / Walnuts | 2448×2048 | *unknown* | **10.83 GB at 27** | **trips** |
+| Walnuts | 2448×2048 | **25 (measured)** | **10.03 GB** | **trips** (measured) |
+| Rice / Fabric | 2448×2048 | *unknown* | 10.03 GB at 25, **10.83 at 27** | **trips** |
 
-**For the three remaining 2448×2048 categories, budget for 27, not 25 and certainly not 20.** The
-measured counts are climbing (25 on Wall Plugs, 27 on Can), and at 27 images a 2448×2048 category
-peaks at **10.83 GB** — above the 11 GB that worked for Wall Plugs only by a hair. Use
-`--max-bytes 12000000000` for those three, and read the real count off the layout check before
-committing to it: a `--max-bytes` chosen for the wrong count fails *after* the fits have run,
-which is what happened on Wall Plugs.
+**For the two remaining categories use `--max-bytes 12000000000`**, which covers 27 images per
+condition (10.83 GB) as well as 25 (10.03 GB). It is what Walnuts ran with. Read the real count
+off the layout check anyway — it prints seconds after extraction, before any fit, and a
+`--max-bytes` chosen for the wrong count fails *after* the fits have run, which is what happened
+on Wall Plugs.
 
 The way through is `--summarise-only --max-bytes <n>`: the seed loop builds a `PatchCoreBackend`
 per seed before the runner checks `is_done`, so even an all-done category otherwise holds ~3 GB
