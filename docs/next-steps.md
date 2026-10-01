@@ -943,7 +943,10 @@ with resolution — but the fit, which dominated everything so far, does not.
 ### Where the cost actually is
 
 1. **Uploading 30.4 GB to Drive, one category at a time, by hand.** The archives sit behind
-   mvtec.com's registration form, so no session can fetch them. This is the human bottleneck and
+   mvtec.com's registration form, so no session can fetch them. **[SUPERSEDED 2026-10-01: the form
+   issues a direct `mydrive.ch` link that needs no login or cookies, so a session CAN fetch them
+   with `wget` — see `docs/datasets-access.md`. Everything below describes the cost as it stood
+   before that was tried.]** This is the human bottleneck and
    the reason the runner takes one category and runs every seed before moving on: the alternative
    needs each category on Drive three separate times.
 2. **Anomaly maps at native resolution.** Stored as float16 `.npy`, so a Fabric map is 9.6 MB
@@ -1581,7 +1584,38 @@ not, across categories: the two metrics move together.** The dissociation this s
 for is between **lighting conditions within a category**, not between the metrics as such. Both
 reports stand as written; the generalisation does not, and is corrected here and in §6.2.
 
+## The archives can be fetched in-session, and the GPU ran out before Fabric (2026-10-01)
+
+**The project's largest cost was an untested assumption.** This file has said since 2026-09-20 that
+"no session can fetch them", because the archives sit behind mvtec.com's form. The form issues a
+**direct `mydrive.ch` share link per archive, with no login, no cookies and no session state** — a
+`HEAD` on Fabric's returned `HTTP 200`, `application/gzip`, `Content-Length: 10837826502`
+(10.84 GB), no redirect to authentication. Procedure and caveats in `docs/datasets-access.md`.
+
+Measured against what it replaces: Drive upload ran at ~7 Mbit/s on the author's connection — two
+hours for Rice's 6.29 GB, over three projected for Fabric. The in-session download runs at
+datacenter bandwidth. **It also converts M4's ~30 GB of re-upload into a `wget` per category**,
+which is the larger consequence, since every archive is needed again for `test_private`,
+`test_private_mixed` and the `validation` split M3 deliberately did not score.
+
+### The mistake that cost the session, written down so it is not repeated
+
+Fabric's archive was downloaded **on a GPU runtime**. Colab's free GPU allowance is spent by
+wall-clock time on a GPU runtime, so ~11 GB of transfer burned the scarce resource on work needing
+no accelerator, and the session hit the GPU limit before a single seed was fitted. Nothing was lost
+— no shard was written, so there is nothing stale anywhere — but the allowance was.
+
+**The sequence that avoids it:** CPU runtime → `wget` to the VM → copy to `MyDrive/mvtec_ad2/`, a
+Google-internal transfer measured in minutes → **then** a GPU runtime, which only mounts Drive and
+fits. Drive's free 15 GB holds Fabric's 10.84 GB only if the other archives are deleted first.
+
 ## Where to pick up (session handoff, 2026-10-01, after Rice) — fabric, the last one
+
+**Updated the same day, after a session that ran out of GPU before fitting anything.** Fabric's
+archive was pulled with `wget` on a GPU runtime, which works but spends the GPU allowance on a
+transfer. **Do the download on a CPU runtime and park the archive in Drive first** — see the
+2026-10-01 section above. Nothing was written, so nothing is stale: the category has never run.
+
 
 **M3 is 7 of 8: three usable anchors, four unusable.** All seven are run and reported, three seeds
 each, shards on Drive.

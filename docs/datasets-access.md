@@ -42,6 +42,42 @@ Verified from the official download page, 2026-07-23:
 | Fruit Jelly | 1.2 GB |
 | Vial | 0.77 GB |
 
+### The archives CAN be fetched in-session — verified 2026-10-01
+
+**The claim that a session cannot fetch them was too strong.** The download page issues a **direct
+`mydrive.ch` share link** per archive, and it needs no login, no cookies and no session state. A
+`HEAD` on `fabric`'s returned `HTTP 200`, `Content-Type: application/gzip`,
+`Content-Length: 10837826502` (10.84 GB) with no redirect to an authentication page.
+
+So the procedure is:
+
+1. Submit the form in a browser once, start the download, copy the real URL out of
+   `chrome://downloads` (right-click → copy link address). Cancel the local download.
+2. In Colab: `!wget --progress=dot:giga -O /content/<category>.tar.gz "<URL>"`, then verify the
+   byte count matches `Content-Length` exactly and that `tar -tzf | head -3` lists `<category>/`
+   paths. A short file or a `tar` complaint means an error page came down.
+3. Run with `--archives /content`.
+
+**This removes the project's largest cost.** Uploading through Drive measured ~7 Mbit/s on the
+author's connection — two hours for Rice's 6.29 GB, over three projected for Fabric's 10.84 GB.
+The in-session download runs at datacenter bandwidth.
+
+**It also changes M4's cost profile.** M4 needs every archive again, because `test_private` and
+`test_private_mixed` live inside them and the `validation` split the threshold rule will need was
+deliberately not scored during M3. That was ~30 GB of manual upload; it is now a `wget` per
+category.
+
+**⚠️ Do the download on a CPU runtime, not a GPU one.** Colab's free GPU allowance is consumed by
+wall-clock time on a GPU runtime, so pulling 10.84 GB there spends the scarce resource on work that
+needs no accelerator — which is exactly how the 2026-10-01 session ran out of GPU before Fabric
+could be fitted. The sequence that avoids it: CPU runtime → `wget` to the VM → copy to
+`MyDrive/mvtec_ad2/` (a Google-internal transfer, minutes rather than hours) → **then** start a GPU
+runtime and run from Drive as usual. Drive's free 15 GB holds Fabric's 10.84 GB only if the other
+archives are deleted first.
+
+**The share links carry access tokens and MVTec's terms do not permit redistributing the dataset.**
+No URL is recorded in this repository, deliberately. Re-issue one from the form when needed.
+
 ### Verified directory layout (read from `vial.tar.gz`, 2026-07-23)
 
     <root>/<category>/
