@@ -112,7 +112,7 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    is total budget, not session length. Its CPU half is done and registered
    (`src/vlmab/methods/saa.py`, `configs/methods/saa_prompts.yaml`); what remains is the GPU backend and
    phases A–D.
-6. **M3 — full MVTec AD 2 grid. STARTED: 6 of 8 categories done for PatchCore (2026-09-30).**
+6. **M3 — full MVTec AD 2 grid. STARTED: 7 of 8 categories done for PatchCore (2026-10-01).**
    Once each method's VisA gate passes, run the full public-test grid over all eight categories,
    one category at a time (the download/resume/shard unit). Mechanical. Vial and Sheet Metal are
    run and reported; **Sheet Metal put the anchor at chance**, which is a result, not a bug — see
@@ -122,8 +122,8 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    unusable on three of the five run** — Sheet Metal, Wall Plugs and Can, the last of these
    *below* its own random baseline on `au_pro_005`. **Walnuts then worked, at the same
    2448×2048 as the failing Wall Plugs, which rules geometry out entirely.** The grid stands
-   **3 usable anchors against 3 unusable**, and the two unrun categories are the tiebreaker.
-   Next: `rice`, then `fabric`.
+   **3 usable anchors against 4 unusable** after Rice came in at chance. Only `fabric` is
+   left. Next: `fabric`.
 7. **M4 — evaluation server.** Score the private split. Access is **granted** (2026-07-30) and the
    threshold rule is built and pre-registered (v0.2.11); what remains is the submission packaging,
    which needs the server's own format — confirm it on first login. On first login, confirm
@@ -1532,6 +1532,101 @@ Yesterday's note called the count "trending up" after Wall Plugs' 25 and Can's 2
 back to 25.** The series is 20, 19, 20, 25, 27, 25 — variable, with no direction. Corrected in
 `docs/datasets-access.md`. `--max-bytes 12000000000` covers both 25 and 27 at 2448×2048 and is
 what Walnuts ran with.
+
+## Rice is at chance, and it ends the direction-shift pattern (2026-10-01)
+
+Full result in `results/mvtec_ad2/rice.md`. **Detection at chance, localisation real**: I-AUROC
+averages 0.519 (range 0.438–0.562) while `au_pro_030` is 2.4× and `au_pro_005` is **6.8×** their
+measured random baselines. The grid is now **three usable anchors against four unusable**.
+
+**Rice has the coarsest detection reading of the eight**: 42 normal images over six conditions is
+**seven normals per condition**, 105 pairs, steps of 0.0095 — which is what the ±0.066 on two
+conditions is made of. "At chance" is honest and low-resolution at the same time.
+
+### The direction-shift pattern is dead, and the prediction that it would consolidate was wrong
+
+Rice **inverts** it: `au_pro_005` intensity 0.1384 against shifts **0.2005**, and `au_pro_030`
+0.3064 against **0.4008**. `shift_2` and `shift_3` are rice's two best conditions on both pixel
+metrics, by a wide margin.
+
+Tally over seven categories: **three for** (Wall Plugs, Can, Walnuts), **three against** (Vial —
+worst condition is `underexposed`; Fruit Jelly — `shift_1` is its best; Rice — shifts are much
+better). Sheet Metal's anchor measures nothing, so it does not vote. **Not writable as a finding.**
+
+The 2026-09-30 handoff said a fourth reading "would make it writable in §6.1 as a tendency with
+named exceptions". The fourth reading refuted it. That is the whole value of having written the
+prediction down before the run, and the §6.1 comment in the paper has been corrected rather than
+extended.
+
+### What seven categories DO show, and it corrects an earlier reading of our own
+
+Per-category means, pixel metrics as multiples of their random baselines:
+
+| category | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| Vial | 0.910 | 5.7× | 22.9× |
+| Walnuts | 0.824 | 5.1× | 18.0× |
+| Fruit Jelly | 0.783 | 4.3× | 15.5× |
+| Rice | 0.519 | 2.4× | 6.8× |
+| Sheet Metal | 0.510 | 1.7× | 2.7× |
+| Wall Plugs | 0.447 | 2.8× | 4.8× |
+| Can | 0.388 | 2.0× | 0.1× |
+
+**Ordering the seven by I-AUROC and by `au_pro_005` gives the same sequence apart from one adjacent
+transposition** (Sheet Metal ↔ Wall Plugs). Where the anchor localises well it detects well.
+
+Wall Plugs' and Can's reports describe detection failing while localisation survives — true inside
+those categories, and it was starting to read as "the image-level score is the weak link". **It is
+not, across categories: the two metrics move together.** The dissociation this study has evidence
+for is between **lighting conditions within a category**, not between the metrics as such. Both
+reports stand as written; the generalisation does not, and is corrected here and in §6.2.
+
+## Where to pick up (session handoff, 2026-10-01, after Rice) — fabric, the last one
+
+**M3 is 7 of 8: three usable anchors, four unusable.** All seven are run and reported, three seeds
+each, shards on Drive.
+
+**Only `fabric` is left** (387 train, 2448×2048, **10 GB**) — the largest archive in the dataset
+and, at ~7 Mbit/s measured on Rice's 6.29 GB in two hours, **more than three hours of upload**.
+
+**Try the direct download first; this is the category where it pays for itself.** Copy the
+archive's true URL out of Chrome (`chrome://downloads` → copy link address, or DevTools → Network →
+Copy as cURL if it is session-gated), then in Colab:
+
+    !wget --progress=dot:giga -O /content/fabric.tar.gz "<URL>"
+    !ls -lh /content/fabric.tar.gz && tar -tzf /content/fabric.tar.gz | head -3
+
+~10 GB and paths beginning `fabric/` means it worked; run with `--archives /content`. A small file
+or a `tar` complaint means an error page came down instead, and the normal upload is the fallback —
+two minutes lost, not three hours. **Mount Drive anyway**: the shards still go there and they are
+what survives the session. If the cURL form is needed it carries mvtec session cookies, so clear
+that cell afterwards.
+
+**The run:** phase 0 → cell 1.1 → `!python scripts/run_mvtec_ad2.py --category fabric --archives
+/content` (drop `--archives` if it came via Drive), then
+`--summarise-only --max-bytes 12000000000`. Fit ~4.1m per seed, ~12m for three.
+
+**What to capture:**
+
+1. **Whether the anchor is usable.** This decides 4–4 or 3–5, and `sections/05-results.tex` has
+   been waiting since 2026-09-29 for the Table 2 design that depends on it.
+2. **The coreset line** — bar 39627, bank **39628**. Record the bank. Missed four categories
+   running now.
+3. **The fit times.**
+4. **Images per condition**, for the last row of the table in `docs/datasets-access.md`.
+
+### After fabric, M3 is closed and the four held defects come due
+
+All four were deliberately left unfixed so that `src/` stayed frozen across the grid — the property
+the 2026-09-29 determinism check depended on. With M3 finished that constraint lifts:
+
+1. `write_report` stamps the writing machine's HEAD rather than the shards' `commit` column.
+2. The guard's suggested recovery command omits `--summarise-only` and derives its budget from
+   available RAM instead of the requirement it just computed.
+3. The coreset size is provenance read off a tqdm bar; `PatchCoreRef` should stamp
+   `memory_bank.shape[0]` the way it already stamps `seed` and `preprocess`.
+4. Nothing guards against a run that produced shards and no report — how Fruit Jelly's first run
+   vanished for nine days.
 
 ## Where to pick up (session handoff, 2026-09-30, after Walnuts) — rice, then fabric
 
