@@ -311,9 +311,21 @@ def summarise(results: Path, max_bytes: int | None = None) -> None:
     # existed only in a console until they were transcribed by hand (2026-09-21).
     report = results.parent / f"{results.name}.md"
     seeds = sorted(str(s) for s in combined["seed"].dropna().unique()) or ["unseeded"]
-    head = subprocess.run(["git", "-C", str(Path(__file__).resolve().parent.parent),
-                           "rev-parse", "--short", "HEAD"],
-                          capture_output=True, text=True).stdout.strip() or "unknown"
+    # The commit that computed these numbers is in the shards, not on this machine. A resumed
+    # run restored from Drive carries shards from an earlier session, and stamping the writing
+    # machine's HEAD claimed 61704b4 for numbers computed at a7bc7bd (2026-09-29). Read it.
+    # Read from `df`, the raw shard rows -- NOT `combined`, which holds the aggregated metric
+    # tables and carries no provenance column at all.
+    commits = (sorted({str(c)[:7] for c in df["commit"].dropna().unique()})
+               if "commit" in df.columns else [])
+    if not commits:
+        commit_line = "`unknown` — the shards carry no `commit` column"
+    elif len(commits) == 1:
+        commit_line = f"`{commits[0]}`"
+    else:
+        commit_line = (f"**MIXED, {len(commits)} commits**: "
+                       + ", ".join(f"`{c}`" for c in commits)
+                       + " — these numbers do not come from one code state")
     lines = [
         f"# MVTec AD 2 — patchcore_ref on {results.name}",
         "",
@@ -343,7 +355,7 @@ def summarise(results: Path, max_bytes: int | None = None) -> None:
         "",
         f"- shards: `{results / 'shards'}`",
         f"- seeds: `{', '.join(seeds)}`",
-        f"- commit: `{head}`",
+        f"- commit: {commit_line}",
         "",
     ]
     report.parent.mkdir(parents=True, exist_ok=True)

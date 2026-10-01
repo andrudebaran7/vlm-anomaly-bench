@@ -528,14 +528,17 @@ def test_an_empty_category_directory_exits_2_rather_than_fitting_over_nothing(fa
 # --- Task 3 (2026-10-01): a shard directory holding two methods is refused -------------------
 
 
-def _write_shard(shards, method, seed=0):
+def _write_shard(shards, method, seed=0, commit="a" * 40):
     import pandas as pd
     shards.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame({
+    frame = {
         "method": [method] * 2, "seed": [seed, seed], "meta_lighting": ["regular"] * 2,
         "label": [0, 1], "image_score": [0.1, 0.9], "map_path": [None, None],
-        "commit": ["a" * 40] * 2,
-    }).to_parquet(shards / f"mvtec_ad2__{method}__vial__seed{seed}.parquet")
+    }
+    if commit is not None:
+        frame["commit"] = [commit] * 2
+    pd.DataFrame(frame).to_parquet(
+        shards / f"mvtec_ad2__{method}__vial__seed{seed}.parquet")
 
 
 def test_summarise_refuses_a_directory_holding_two_methods(tmp_path):
@@ -550,3 +553,39 @@ def test_summarise_refuses_a_directory_holding_two_methods(tmp_path):
     message = str(exc.value)
     assert "patchcore_ref" in message and "winclip" in message
     assert "pool" in message.lower()
+
+
+# --- Task 4 (2026-10-01): the report's commit comes from the shards --------------------------
+
+
+def _report_text(tmp_path):
+    return (tmp_path.parent / f"{tmp_path.name}.md").read_text()
+
+
+def test_the_report_records_the_shards_commit_not_the_machines(tmp_path):
+    """2026-09-29: a Fruit Jelly report claimed 61704b4 for numbers computed at a7bc7bd."""
+    mod = _module()
+    _write_shard(tmp_path / "shards", "patchcore_ref",
+                 commit="a7bc7bd7d13b28c7b548c3dd50997f34e0161147")
+    mod.summarise(tmp_path)
+    report = _report_text(tmp_path)
+    assert "a7bc7bd" in report
+
+
+def test_a_report_from_shards_at_two_commits_lists_both(tmp_path):
+    """A resumed run mixes commits. One of them printed as THE commit is a false claim."""
+    mod = _module()
+    _write_shard(tmp_path / "shards", "patchcore_ref", seed=0, commit="a" * 40)
+    _write_shard(tmp_path / "shards", "patchcore_ref", seed=1, commit="b" * 40)
+    mod.summarise(tmp_path)
+    report = _report_text(tmp_path)
+    assert "aaaaaaa" in report and "bbbbbbb" in report
+    assert "MIXED" in report
+
+
+def test_shards_without_a_commit_column_report_unknown_rather_than_raising(tmp_path):
+    """Shards predating provenance must not crash the report."""
+    mod = _module()
+    _write_shard(tmp_path / "shards", "patchcore_ref", commit=None)
+    mod.summarise(tmp_path)
+    assert "unknown" in _report_text(tmp_path)
