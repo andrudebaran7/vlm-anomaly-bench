@@ -222,3 +222,82 @@ def test_fetch_is_skipped_when_the_split_file_is_already_there(monkeypatch, tmp_
     (tmp_path / "split_csv").mkdir(parents=True)
     (tmp_path / "split_csv" / "1cls.csv").write_text("object,split,label,image,mask\n")
     mod.fetch(tmp_path)
+
+
+# --- Task 7 (2026-10-01): the runner works for any method with a GPU backend ----------------
+
+
+def _fake_factory(monkeypatch, built):
+    """Patch the factory so a method whose backend module does not exist can still be asked for."""
+    import vlmab.methods.gpu as gpu_mod
+
+    class _FakeMethod:
+        def __init__(self, name, seed):
+            self.name, self.seed = name, seed
+            self.zero_shot = name != "patchcore_ref"
+            if name == "patchcore_ref":
+                self.preprocess = "anomalib"
+
+    def _build(name, seed=None):
+        if name not in ("patchcore_ref", "winclip"):
+            raise KeyError(f"no GPU backend for {name!r}; methods with one: "
+                           "['patchcore_ref', 'winclip']")
+        built.append((name, seed))
+        return _FakeMethod(name, seed)
+
+    monkeypatch.setattr(gpu_mod, "build_runnable", _build)
+
+
+def test_results_and_report_paths_are_method_scoped():
+    mod = _module()
+    assert mod.default_results("winclip").parts[-2:] == ("winclip", "visa")
+    assert mod.default_out("winclip").name == "winclip_visa.md"
+    assert mod.default_results("patchcore_ref").parts[-2:] == ("patchcore_ref", "visa")
+
+
+def test_the_method_is_selectable_and_comes_from_the_factory(monkeypatch, tmp_path):
+    calls: list[dict] = []
+    built: list[tuple[str, int | None]] = []
+    _install_fakes(monkeypatch, calls)
+    _fake_factory(monkeypatch, built)
+    mod = _module()
+    _intercept_only_the_gate(monkeypatch, mod)
+
+    rc = mod.main(["--skip-fetch", "--method", "winclip",
+                   "--root", str(tmp_path / "data"),
+                   "--results", str(tmp_path / "results"),
+                   "--out", str(tmp_path / "report.md")])
+    assert rc == 0
+    assert {name for name, _ in built} == {"winclip"}
+
+
+def test_the_targets_file_and_block_follow_the_method(monkeypatch, tmp_path):
+    """WinCLIP's VisA figure GATES (78.1 ±1.0, §2 v0.2.14) where PatchCore's is a non-gating
+    secondary. The script must not decide that — it passes the block the config declares."""
+    calls: list[dict] = []
+    built: list[tuple[str, int | None]] = []
+    _install_fakes(monkeypatch, calls)
+    _fake_factory(monkeypatch, built)
+    mod = _module()
+    seen = _intercept_only_the_gate(monkeypatch, mod)
+
+    mod.main(["--skip-fetch", "--method", "winclip",
+              "--root", str(tmp_path / "data"),
+              "--results", str(tmp_path / "results"),
+              "--out", str(tmp_path / "report.md")])
+    argv = seen["argv"]
+    assert argv[argv.index("--targets") + 1] == "configs/reproduction/winclip.yaml"
+    assert argv[argv.index("--which") + 1] == "gate_visa"
+
+
+def test_a_method_without_a_gpu_backend_exits_2(monkeypatch, tmp_path, capsys):
+    calls: list[dict] = []
+    built: list[tuple[str, int | None]] = []
+    _install_fakes(monkeypatch, calls)
+    _fake_factory(monkeypatch, built)
+    mod = _module()
+
+    rc = mod.main(["--skip-fetch", "--method", "saa", "--root", str(tmp_path / "data")])
+    assert rc == 2
+    assert "saa" in (capsys.readouterr().err)
+    assert built == [], "it must refuse before building anything"
