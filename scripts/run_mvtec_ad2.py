@@ -208,6 +208,18 @@ def save_to_drive(results: Path, dest: Path) -> None:
 SUMMARY_METRICS = ("i_auroc", "au_pro_030", "au_pro_005")
 
 
+def _bytes_from_guard_message(message: str) -> int | None:
+    """The guard states its requirement in bytes; take it from there rather than re-deriving.
+
+    A budget computed from free RAM instead of the requirement is what suggested 9 GB for a
+    10.03 GB peak on Wall Plugs (2026-09-30), so the retry failed a second time.
+    """
+    import re
+
+    match = re.search(r"about ([\d,]+) bytes", message)
+    return int(match.group(1).replace(",", "")) if match else None
+
+
 def summarise(results: Path, max_bytes: int | None = None) -> None:
     """Per lighting condition, one aggregation PER SEED, combined as mean ± std (protocol §6).
 
@@ -283,9 +295,27 @@ def summarise(results: Path, max_bytes: int | None = None) -> None:
             if available:
                 print(f"This machine reports {available / 1e9:.1f} GB available right now.",
                       file=sys.stderr)
-            print("Re-run with an explicit budget you have checked against that number, e.g.:\n"
-                  f"    python scripts/run_mvtec_ad2.py --category {results.name} "
-                  "--max-bytes 9000000000\n", file=sys.stderr)
+            # The budget has to cover the peak the guard just measured, not a fraction of
+            # free RAM. And the retry needs --summarise-only, or the seed loop builds a backend
+            # per seed and holds ~3 GB of torch while aggregating -- the overhead the flag
+            # exists to shed.
+            needed = _bytes_from_guard_message(str(exc))
+            budget = int(needed * 1.15) if needed else None
+            if budget:
+                if available and budget > available:
+                    print("⚠️  the requirement is above what this machine reports free. A "
+                          "high-RAM runtime, or one lighting condition at a time.",
+                          file=sys.stderr)
+                print("Re-run with:\n"
+                      f"    python scripts/run_mvtec_ad2.py --category {results.name} "
+                      f"--method {method_name} --summarise-only --max-bytes {budget}\n",
+                      file=sys.stderr)
+            else:
+                # The requirement could not be parsed out of the guard's message -- its wording
+                # changed. Still name both flags: a vague instruction is what cost the Wall
+                # Plugs retry, and the operator can read the byte count off the message above.
+                print("Re-run with `--summarise-only --max-bytes <bytes>`, using a budget above "
+                      "the requirement printed above.\n", file=sys.stderr)
             raise SystemExit(1) from exc
         per_seed.append(table.assign(seed=seed))
     combined = pd.concat(per_seed, ignore_index=True)

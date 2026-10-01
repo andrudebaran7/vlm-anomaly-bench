@@ -391,7 +391,13 @@ def test_summarise_turns_the_memory_guard_into_a_recoverable_instruction(monkeyp
     monkeypatch.setattr(store_mod.ResultStore, "load_all", lambda self: frame)
 
     def exploding_aggregate(df, by=None, **kw):
-        raise ValueError("... exceeds max_bytes=6,000,000,000 (6.0 GB). Aggregate a smaller group")
+        # The real wording, from aggregate.py:158 — the "about N bytes" clause is what the
+        # recovery suggestion reads its budget out of, so a stub that omits it tests a path
+        # the guard never takes.
+        raise ValueError(
+            "group meta_lighting='regular': 110,297,088 pooled pixels need about "
+            "8,823,767,040 bytes (8.8 GB) at peak, which exceeds max_bytes=6,000,000,000 "
+            "(6.0 GB). Aggregate a smaller group")
 
     monkeypatch.setattr(agg_mod, "aggregate", exploding_aggregate)
 
@@ -589,3 +595,34 @@ def test_shards_without_a_commit_column_report_unknown_rather_than_raising(tmp_p
     _write_shard(tmp_path / "shards", "patchcore_ref", commit=None)
     mod.summarise(tmp_path)
     assert "unknown" in _report_text(tmp_path)
+
+
+# --- Task 5 (2026-10-01): the guard's recovery suggestion is runnable -----------------------
+
+
+def test_the_recovery_suggestion_is_runnable(monkeypatch, tmp_path, capsys):
+    """On Wall Plugs it suggested 9 GB for a peak it had just measured at 10.03 GB, and omitted
+    --summarise-only, so following it verbatim failed twice over."""
+    import vlmab.eval.aggregate as agg_mod
+    mod = _module()
+    needed = 10_027_008_000
+
+    def _boom(*a, **kw):
+        raise ValueError(
+            f"group meta_lighting='overexposed': 125,337,600 pooled pixels need about "
+            f"{needed:,} bytes (10.0 GB) at peak, which exceeds max_bytes=6,000,000,000"
+        )
+
+    monkeypatch.setattr(agg_mod, "aggregate", _boom)
+    _write_shard(tmp_path / "vial" / "shards", "winclip")
+
+    with pytest.raises(SystemExit):
+        mod.summarise(tmp_path / "vial", 6_000_000_000)
+    err = capsys.readouterr().err
+
+    assert "--summarise-only" in err, "without the flag the retry reloads torch it does not need"
+    assert "--method winclip" in err, "the retry must name the method it was run for"
+    suggested = int(err.split("--max-bytes")[1].split()[0])
+    assert suggested >= needed, (
+        f"suggested {suggested:,} for a peak of {needed:,} — following it fails again"
+    )
