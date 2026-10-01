@@ -39,6 +39,34 @@ _GPU_BUILDERS: dict[str, Callable[[int | None], AnomalyMethod]] = {
     "winclip": _winclip,
 }
 
+#: The backend module each builder needs. Registration is not viability: a builder can be
+#: registered here while its backend module does not exist yet (WinCLIP's, until spec item B
+#: lands). Without this, the runners' up-front name check passed, `fetch` downloaded and
+#: extracted up to 10 GB, and the run died inside the lazy import — found in review 2026-10-02.
+_BACKEND_MODULES: dict[str, str] = {
+    "patchcore_ref": "vlmab.methods.patchcore_backend",
+    "winclip": "vlmab.methods.winclip_backend",
+}
+
+
+def missing_backend(name: str) -> str | None:
+    """The backend module `name` needs and does not have, or None when it is importable.
+
+    Uses `find_spec`, which LOCATES without executing, so this is safe to call before a download
+    and imports no torch — a check that imported the backend to test it would defeat its own
+    purpose. Raises KeyError for a name with no builder, like `build_runnable`.
+    """
+    import importlib.util
+
+    if name not in _GPU_BUILDERS:
+        raise KeyError(f"no GPU backend for {name!r}; methods with one: {gpu_builders()}")
+    module = _BACKEND_MODULES[name]
+    try:
+        found = importlib.util.find_spec(module) is not None
+    except ModuleNotFoundError:
+        found = False
+    return None if found else module
+
 
 def gpu_builders() -> list[str]:
     """Method names that can be built with a GPU backend."""

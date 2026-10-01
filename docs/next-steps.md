@@ -1663,9 +1663,16 @@ constraint is now lifted.** In rough order of what they cost:
 The eight reports moved to `results/mvtec_ad2/patchcore_ref/<category>.md` and new runs write
 shards to `results/mvtec_ad2/<method>/<category>/shards`. `summarise` loads every parquet in a
 shard directory, so without the method in the path two methods would pool into one row — silently,
-because the filenames already differ. **Handoffs dated before 2026-10-01 name the old paths and
-are left as written**: they describe where those runs actually wrote, and rewriting them would
-make a historical note claim a layout that did not exist.
+because the filenames already differ.
+
+**Pointers to a report were repointed everywhere, including inside dated handoffs**, because a
+reference to a file that moved is a broken link rather than a historical fact. What was *not*
+rewritten is any statement about where a run **wrote at the time**: the 2026-09-20 handoff still
+says the Vial run wrote to `results/mvtec_ad2/vial/`, and that is true of that run.
+
+(An earlier version of this note claimed pre-2026-10-01 handoffs were left as written. They were
+not — their report pointers were updated, and the claim was corrected on 2026-10-02 after review
+caught the contradiction.)
 
 ### What M3 does NOT include
 

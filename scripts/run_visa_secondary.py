@@ -101,7 +101,11 @@ def run(root: Path, results: Path, seed: int | None, device: str,
 
     visa = VisA(root)
     store = ResultStore(results / "shards")
-    meta = run_meta({"method": method_name, "split": "test", "preprocess": PREPROCESS})
+    # `meta` is built on the FIRST object, not before the loop, so the cfg that `config_hash` is
+    # computed from carries the pre-processor the method actually applies. Built from the module
+    # constant, a zero-shot run hashed "anomalib" while its own column said None -- found in
+    # review 2026-10-02.
+    meta: dict | None = None
 
     categories = visa.categories()
     print(f"{len(categories)} objects: {categories}")
@@ -109,10 +113,12 @@ def run(root: Path, results: Path, seed: int | None, device: str,
         # A fresh backend per object: the memory bank is per-category by construction, and
         # reusing one would carry the previous object's bank over.
         method = build_runnable(method_name, seed=seed)
-        # `preprocess` is stamped from the method, not from the constant above: the value
-        # recorded has to be the one that was applied. A zero-shot method has none, and None
-        # records that rather than claiming a property it lacks.
+        # `preprocess` is stamped from the method, never from a constant: the value recorded has
+        # to be the one that was applied. A zero-shot method has none, and None records that
+        # rather than claiming a property it lacks.
         preprocess = getattr(method, "preprocess", None)
+        if meta is None:
+            meta = run_meta({"method": method_name, "split": "test", "preprocess": preprocess})
         run_evaluation(
             visa, method, store, {**meta, "preprocess": preprocess},
             categories=[cat], split="test", fit_split="train",
@@ -143,10 +149,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     # Checked before fetch: a wrong method must cost nothing, not a download.
-    from vlmab.methods.gpu import gpu_builders
+    from vlmab.methods.gpu import gpu_builders, missing_backend
     if args.method not in gpu_builders():
         print(f"\ncannot start: no GPU backend for {args.method!r}; "
               f"methods with one: {gpu_builders()}", file=sys.stderr)
+        return 2
+
+    # Registration is not viability: a builder can be registered while its backend module does
+    # not exist yet. Without this the name check passed, VisA's 1.9 GB came down, and the run died inside the
+    # lazy import (found in review 2026-10-02). `find_spec` imports nothing.
+    absent = missing_backend(args.method)
+    if absent:
+        print(f"\ncannot start: {args.method!r} is registered but has no backend yet — "
+              f"{absent} does not exist. Nothing was fetched.", file=sys.stderr)
         return 2
 
     results = args.results or default_results(args.method)

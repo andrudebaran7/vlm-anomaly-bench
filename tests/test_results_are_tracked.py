@@ -57,3 +57,26 @@ def test_a_method_scoped_report_is_committable():
     probe = ROOT / "results/mvtec_ad2/patchcore_ref/vial.md"
     assert probe.exists(), "the eight reports moved here on 2026-10-01"
     assert not _ignored(probe)
+
+
+def test_reproduction_maps_and_shards_stay_out_too():
+    """Found in review 2026-10-02: `!results/reproduction/` was a WHOLE-DIRECTORY negation, and
+    this branch routed two new map trees into it (`<method>/visa/` and `<method>/mvtec_ad/`).
+    MVTec AD classic is ~1,725 test images x 3 seeds of native-resolution maps.
+
+    Beyond repo size: the Colab sync cell ends in `assert not dirty` over `git status
+    --porcelain`, so thousands of untracked map files break the "re-run cell 1.1 to pick up
+    fixes" path the whole workflow depends on.
+    """
+    for probe in ("results/reproduction/patchcore_ref/visa/maps/x.npy",
+                  "results/reproduction/patchcore_ref/visa/shards/x.parquet",
+                  "results/reproduction/winclip/mvtec_ad/maps/x.npy",
+                  "results/reproduction/winclip/mvtec_ad/shards/x.parquet"):
+        assert _ignored(ROOT / probe), f"{probe} would be committable; it must not be"
+
+
+def test_the_reproduction_reports_themselves_stay_committable():
+    """The other half: the gate's reports live directly under reproduction/ and must come in."""
+    for probe in ROOT.glob("results/reproduction/*.md"):
+        assert not _ignored(probe), f"{probe.name} is ignored; the gate commits it (§2)"
+    assert any(ROOT.glob("results/reproduction/*.md")), "there are four of these"

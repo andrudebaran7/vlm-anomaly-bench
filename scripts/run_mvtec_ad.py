@@ -92,10 +92,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"{Path(__file__).name} running from commit {head}\n")
 
     # Checked before anything is read from disk: a wrong method must cost nothing.
-    from vlmab.methods.gpu import gpu_builders
+    from vlmab.methods.gpu import gpu_builders, missing_backend
     if args.method not in gpu_builders():
         print(f"\ncannot start: no GPU backend for {args.method!r}; "
               f"methods with one: {gpu_builders()}", file=sys.stderr)
+        return 2
+
+    # Registration is not viability: a builder can be registered while its backend module does
+    # not exist yet. Without this the name check passed, the model was constructed three times, and the run died inside the
+    # lazy import (found in review 2026-10-02). `find_spec` imports nothing.
+    absent = missing_backend(args.method)
+    if absent:
+        print(f"\ncannot start: {args.method!r} is registered but has no backend yet — "
+              f"{absent} does not exist. Nothing was fetched.", file=sys.stderr)
         return 2
 
     if len(args.seeds) != len(set(args.seeds)):
@@ -103,7 +112,19 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
 
     from vlmab.datasets.mvtec_ad import MVTecAD
-    categories = args.categories or MVTecAD(args.root).categories()
+    try:
+        categories = args.categories or MVTecAD(args.root).categories()
+    except OSError as exc:
+        # The docstring promises 2 for "could not start", and a missing root is exactly that.
+        print(f"\ncannot start: {exc}", file=sys.stderr)
+        return 2
+    if not categories:
+        # Found in review: an empty root gave `categories == []`, the seed loop still built the
+        # model three times, run_evaluation returned [] over an empty todo, and the script
+        # printed "done" and exited 0 having written no shard at all.
+        print(f"\ncannot start: no categories under {args.root}. MVTec AD classic downloads "
+              "directly; check the root is extracted.", file=sys.stderr)
+        return 2
     if len(categories) != N_CATEGORIES:
         print(f"⚠️  {len(categories)} categories, not {N_CATEGORIES}. The published figure every "
               "gate compares against is the mean over all of them, so this is a probe and its "

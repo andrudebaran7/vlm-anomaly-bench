@@ -28,7 +28,7 @@
 | `src/vlmab/methods/patchcore_backend.py` | the `PatchCoreBackend` bridging the seam to anomalib (lazy import) |
 | `configs/methods/patchcore_ref.yaml` | record the resolved anomalib version (Phase 4) |
 | `notebooks/patchcore_colab.ipynb` | the Colab driver (env, smoke test, VisA gate) — kept in-repo for provenance |
-| `results/reproduction/patchcore_visa.md` | the recorded VisA reproduction table (Phase 3) |
+| `results/reproduction/patchcore_ref_visa.md` | the recorded VisA reproduction table (Phase 3) |
 
 ---
 
@@ -350,11 +350,11 @@ i.e. `res["delta"].abs().max() <= 1.0`.**
 
 - [ ] **Step 3.3 — Record the reproduction result**
 
-Write `results/reproduction/patchcore_visa.md` with the table (object, ours, published, delta),
+Write `results/reproduction/patchcore_ref_visa.md` with the table (object, ours, published, delta),
 the anomalib version, and the pass/fail verdict against the ±1.0 gate. Commit it.
 
 ```bash
-git add results/reproduction/patchcore_visa.md
+git add results/reproduction/patchcore_ref_visa.md
 git commit -m "results: PatchCore VisA reproduction (protocol §2 gate)"
 ```
 

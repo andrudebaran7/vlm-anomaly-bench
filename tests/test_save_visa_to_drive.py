@@ -101,3 +101,23 @@ def test_the_destination_is_not_the_mvtec_folders():
     copy has already happened."""
     mod = _module()
     assert mod.DEST.name == "reproduction_visa"
+
+
+def test_its_defaults_are_the_paths_the_visa_runner_actually_writes():
+    """Found in review 2026-10-02: the runner's defaults became method-scoped and this script's
+    did not, so a default PatchCore re-run wrote to new paths while this reported "nothing to
+    copy" on the shards and copied the SEPTEMBER report to Drive as if it were the new one.
+
+    The invariant is that the two agree for the same method — not that either path is a
+    particular string.
+    """
+    import importlib.util
+
+    runner_spec = importlib.util.spec_from_file_location(
+        "run_visa_secondary", ROOT / "scripts" / "run_visa_secondary.py")
+    runner = importlib.util.module_from_spec(runner_spec)
+    runner_spec.loader.exec_module(runner)
+
+    mod = _module()
+    assert mod.SHARDS == runner.default_results("patchcore_ref") / "shards"
+    assert mod.REPORT == runner.default_out("patchcore_ref")

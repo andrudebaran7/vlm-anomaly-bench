@@ -33,7 +33,7 @@ No per-category breakdown is published for this target, so the measured values s
 
 ## Provenance
 
-- results_root: `results/reproduction/visa/shards`
+- results_root: `results/reproduction/patchcore_ref/visa/shards`
 - targets: `configs/reproduction/patchcore_ref.yaml`
 - n_categories: `12`
 - commit: `8f043c7dcbb88a6161b10235edf27621303681d8`

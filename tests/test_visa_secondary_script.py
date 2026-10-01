@@ -246,6 +246,9 @@ def _fake_factory(monkeypatch, built):
         return _FakeMethod(name, seed)
 
     monkeypatch.setattr(gpu_mod, "build_runnable", _build)
+    # These tests exercise the method-generic path, not the viability guard, which has its own
+    # tests against the real factory. Without this stub they would all stop at the guard.
+    monkeypatch.setattr(gpu_mod, "missing_backend", lambda name: None)
 
 
 def test_results_and_report_paths_are_method_scoped():
@@ -301,3 +304,40 @@ def test_a_method_without_a_gpu_backend_exits_2(monkeypatch, tmp_path, capsys):
     assert rc == 2
     assert "saa" in (capsys.readouterr().err)
     assert built == [], "it must refuse before building anything"
+
+
+def test_a_method_whose_backend_does_not_exist_is_refused_up_front(tmp_path, capsys):
+    """Found in review: registration is not viability, and VisA is a 1.9 GB download."""
+    mod = _module()
+    rc = mod.main(["--skip-fetch", "--method", "winclip", "--root", str(tmp_path / "nope")])
+    assert rc == 2
+    assert "winclip_backend" in capsys.readouterr().err
+
+
+def test_the_hashed_config_carries_the_methods_real_preprocess(monkeypatch, tmp_path):
+    """Found in review: the row COLUMN was the method's value but `run_meta`'s cfg — which is
+    what `config_hash` is computed from — still got the module constant. A WinCLIP run would
+    hash a pre-processor it does not have while its own column said None."""
+    import vlmab.eval.provenance as prov_mod
+    calls: list[dict] = []
+    built: list[tuple[str, int | None]] = []
+    _install_fakes(monkeypatch, calls)
+    _fake_factory(monkeypatch, built)
+
+    hashed: list[dict] = []
+    real = prov_mod.run_meta
+    monkeypatch.setattr(prov_mod, "run_meta",
+                        lambda cfg: hashed.append(dict(cfg)) or real(cfg))
+
+    mod = _module()
+    _intercept_only_the_gate(monkeypatch, mod)
+    mod.main(["--skip-fetch", "--method", "winclip",
+              "--root", str(tmp_path / "data"),
+              "--results", str(tmp_path / "results"),
+              "--out", str(tmp_path / "report.md")])
+
+    assert hashed, "run_meta was never called"
+    assert hashed[0]["method"] == "winclip"
+    assert hashed[0]["preprocess"] is None, (
+        "config_hash must not encode a pre-processor the method does not apply"
+    )

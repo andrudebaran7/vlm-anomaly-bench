@@ -6,9 +6,16 @@ data/
 # way to turn it off that is part of the verified configuration. Untracked files there tripped
 # the Colab sync cell's cleanliness assert mid-session. Ignore the lot -- results are large
 # artifacts, not source -- except the reproduction record, which the VisA gate commits
-# (results/reproduction/patchcore_visa.md, protocol §2).
+# (results/reproduction/patchcore_ref_visa.md, protocol §2).
 results/*
+# NARROW, for the same reason as mvtec_ad2 below: the gate's reports live directly under
+# reproduction/ and come in, but `<method>/<dataset>/maps|shards` must stay out. This was a
+# whole-directory negation until 2026-10-02, when run_mvtec_ad.py and run_visa_secondary.py
+# started writing method-scoped trees into it -- MVTec AD classic alone is ~1,725 test images
+# x 3 seeds of native-resolution maps. test_results_are_tracked.py holds both halves.
 !results/reproduction/
+results/reproduction/*
+!results/reproduction/*.md
 # M3's per-category reports, same reason as the reproduction ones: they are the result, and a
 # result that is not in the repository is a result nobody has. The negation is narrow on
 # purpose -- `results/mvtec_ad2/<category>/` holds shards and native-resolution maps (24.9 GB

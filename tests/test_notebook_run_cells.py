@@ -107,7 +107,7 @@ def test_the_visa_result_is_copied_off_the_runtime_before_anything_can_delete_it
     assert len(copy_cells) == 1
     src = copy_cells[0]
     assert "drive.mount" in src, "the copy step has to mount Drive itself"
-    assert "patchcore_visa.md" in src and "shards" in src, (
+    assert "patchcore_ref_visa.md" in src and "shards" in src, (
         "both the report and the shards go to Drive: the shards are what let the gate be "
         "re-scored without repeating the two-hour fit"
     )

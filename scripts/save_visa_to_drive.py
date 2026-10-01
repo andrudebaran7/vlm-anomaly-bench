@@ -32,19 +32,32 @@ from typing import Sequence
 #: filenames that carry no dataset name. The gate refuses a root whose shards disagree, but only
 #: after someone has already merged two runs into one folder.
 DEST = Path("/content/drive/MyDrive/reproduction_visa")
-SHARDS = Path("results/reproduction/visa/shards")
-REPORT = Path("results/reproduction/patchcore_visa.md")
+
+#: These MUST match `run_visa_secondary.default_results` / `default_out` for the same method.
+#: They drifted once: the runner's defaults became method-scoped on 2026-10-01 and these did
+#: not, so a default re-run wrote to new paths while this script reported "nothing to copy" and
+#: copied the previous month's report to Drive as if it were the new one.
+#: `test_its_defaults_are_the_paths_the_visa_runner_actually_writes` is what stops it recurring.
+DEFAULT_METHOD = "patchcore_ref"
+SHARDS = Path("results/reproduction") / DEFAULT_METHOD / "visa" / "shards"
+REPORT = Path("results/reproduction") / f"{DEFAULT_METHOD}_visa.md"
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--shards", type=Path, default=SHARDS)
-    parser.add_argument("--report", type=Path, default=REPORT)
+    parser.add_argument("--method", default=DEFAULT_METHOD,
+                        help="resolves --shards and --report the way the runner writes them")
+    parser.add_argument("--shards", type=Path, default=None)
+    parser.add_argument("--report", type=Path, default=None)
     parser.add_argument("--dest", type=Path, default=DEST)
     parser.add_argument("--no-mount", action="store_true",
                         help="Drive is already mounted (or this is not Colab)")
     args = parser.parse_args(argv)
+    if args.shards is None:
+        args.shards = Path("results/reproduction") / args.method / "visa" / "shards"
+    if args.report is None:
+        args.report = Path("results/reproduction") / f"{args.method}_visa.md"
 
     if not args.no_mount:
         try:

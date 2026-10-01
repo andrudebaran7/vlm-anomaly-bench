@@ -471,6 +471,9 @@ def factory_harness(monkeypatch, harness):
         return _FakeMethod(name, seed)
 
     monkeypatch.setattr(gpu_mod, "build_runnable", _build)
+    # These tests exercise the method-generic path, not the viability guard, which has its own
+    # tests against the real factory. Without this stub they would all stop at the guard.
+    monkeypatch.setattr(gpu_mod, "missing_backend", lambda name: None)
     monkeypatch.setattr(mod, "fetch", lambda category, root_, archives: fetched.append(category))
     return {"mod": mod, "calls": calls, "root": root, "tmp_path": tmp_path,
             "built": built, "fetched": fetched}
@@ -625,4 +628,53 @@ def test_the_recovery_suggestion_is_runnable(monkeypatch, tmp_path, capsys):
     suggested = int(err.split("--max-bytes")[1].split()[0])
     assert suggested >= needed, (
         f"suggested {suggested:,} for a peak of {needed:,} — following it fails again"
+    )
+
+
+# --- Final review fixes (2026-10-02) --------------------------------------------------------
+
+
+def test_the_report_names_the_method_that_produced_it(tmp_path):
+    """Critical, found in review: the title was hardcoded, so a WinCLIP run wrote a committed
+    report titled `patchcore_ref` — and these files are the paper's `% SOURCE:` references."""
+    mod = _module()
+    _write_shard(tmp_path / "shards", "winclip")
+    mod.summarise(tmp_path)
+    report = _report_text(tmp_path)
+    assert report.splitlines()[0].startswith(f"# MVTec AD 2 — winclip on {tmp_path.name}")
+    assert "patchcore_ref" not in report
+
+
+def test_a_zero_shot_report_does_not_assert_patchcores_caveats(tmp_path):
+    """The prose asserted what the `preprocess` column eleven lines earlier refuses to assert:
+    that the method is the full-shot anchor and applies the anomalib 256x256 transform."""
+    mod = _module()
+    _write_shard(tmp_path / "shards", "winclip")
+    mod.summarise(tmp_path)
+    report = _report_text(tmp_path)
+    assert "full-shot anchor" not in report
+    assert "Resize([256, 256])" not in report
+    assert "One category is not a dataset result" in report, "the method-neutral caveat stays"
+
+
+def test_patchcores_report_keeps_both_of_its_caveats(tmp_path):
+    mod = _module()
+    _write_shard(tmp_path / "shards", "patchcore_ref")
+    mod.summarise(tmp_path)
+    report = _report_text(tmp_path)
+    assert "full-shot anchor" in report and "Resize([256, 256])" in report
+
+
+def test_a_method_whose_backend_does_not_exist_is_refused_before_any_download(tmp_path, capsys):
+    """Critical-adjacent, found in review: `winclip` is registered, so the name check passed,
+    fetch extracted up to 10 GB, and the run died in the lazy import. No fakes here — this is
+    the real factory."""
+    mod = _module()
+    rc = mod.main(["--category", "vial", "--method", "winclip",
+                   "--root", str(tmp_path / "nope"),
+                   "--results", str(tmp_path / "out"), "--no-save"])
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "winclip_backend" in err, (
+        "the refusal must name the module that is missing, not look like a missing archive"
     )

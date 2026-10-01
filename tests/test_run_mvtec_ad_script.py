@@ -49,6 +49,9 @@ def harness(monkeypatch, tmp_path):
         return _FakeMethod(name, seed)
 
     monkeypatch.setattr(gpu_mod, "build_runnable", _build)
+    # These tests exercise the method-generic path, not the viability guard, which has its own
+    # tests against the real factory. Without this stub they would all stop at the guard.
+    monkeypatch.setattr(gpu_mod, "missing_backend", lambda name: None)
     monkeypatch.setattr(ds_mod, "MVTecAD",
                         lambda root: types.SimpleNamespace(root=root,
                                                            categories=lambda: list(FIFTEEN)))
@@ -115,7 +118,8 @@ def test_a_repeated_seed_is_refused(harness):
 
 
 def test_shards_are_written_under_a_method_scoped_reproduction_path(harness):
-    """run_evaluation takes a store, not a path, so assert on the store's own root."""
+    """The DEFAULT path is method-scoped, for the reason run_mvtec_ad2.default_results gives.
+    That the store is rooted at <results>/shards is a separate claim, asserted below."""
     mod = harness["mod"]
     assert mod.default_results("winclip").parts[-2:] == ("winclip", "mvtec_ad")
 
@@ -123,3 +127,21 @@ def test_shards_are_written_under_a_method_scoped_reproduction_path(harness):
 def test_preprocess_is_stamped_only_when_the_method_has_one(harness):
     harness["main"](["--method", "winclip", "--seeds", "0"])
     assert harness["calls"][0]["meta"]["preprocess"] is None
+
+
+def test_a_method_whose_backend_does_not_exist_is_refused_up_front(tmp_path, capsys):
+    """Found in review: registration is not viability."""
+    mod = _module()
+    rc = mod.main(["--method", "winclip", "--root", str(tmp_path / "nope"),
+                   "--results", str(tmp_path / "out")])
+    assert rc == 2
+    assert "winclip_backend" in capsys.readouterr().err
+
+
+def test_the_store_is_rooted_at_the_shards_subdirectory(harness, tmp_path):
+    """Found in review: the earlier version of this test asserted only the shape of
+    default_results() while its docstring claimed to assert the store's own root, so nothing
+    verified that run_one_seed points ResultStore at <results>/shards."""
+    harness["main"](["--method", "winclip", "--seeds", "0"])
+    store = harness["stores"][0]
+    assert Path(store.root) == tmp_path / "out" / "shards"

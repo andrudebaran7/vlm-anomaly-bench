@@ -357,7 +357,7 @@ def summarise(results: Path, max_bytes: int | None = None) -> None:
                        + ", ".join(f"`{c}`" for c in commits)
                        + " — these numbers do not come from one code state")
     lines = [
-        f"# MVTec AD 2 — patchcore_ref on {results.name}",
+        f"# MVTec AD 2 — {method_name} on {results.name}",
         "",
         f"Generated {dt.datetime.now(dt.UTC):%Y-%m-%d %H:%M} UTC by `scripts/run_mvtec_ad2.py`.",
         "",
@@ -369,17 +369,26 @@ def summarise(results: Path, max_bytes: int | None = None) -> None:
     ]
     lines += [f"| {lighting} | " + " | ".join(cell(m, row) for m in metrics) + " |"
               for lighting, row in stats.iterrows()]
+    # Method-SPECIFIC caveats are emitted only for the method they are true of. The anchor
+    # sentence and the 256x256 sentence are PatchCore's; asserting them on a zero-shot run would
+    # claim in prose exactly what the `preprocess` column declines to claim about that run.
+    caveats = []
+    if method_name == "patchcore_ref":
+        caveats.append(
+            "- **PatchCore is the full-shot anchor, not a zero-shot method.** It is the ceiling "
+            "the zero-shot numbers are measured against, never a comparable entry.")
+    caveats.append("- **One category is not a dataset result.** MVTec AD 2 has eight.")
+    if method_name == "patchcore_ref":
+        caveats.append(
+            "- **The pre-processor is a fixed square `Resize([256, 256])`** with no aspect-ratio "
+            "preservation, and no MVTec AD 2 category is square. This is the pinned "
+            "configuration the reproduction gate was passed at (protocol §7); it is a stated "
+            "property of the study, not an explanation produced afterwards.")
     lines += [
         "",
         "## Caveats recorded with the result",
         "",
-        "- **PatchCore is the full-shot anchor, not a zero-shot method.** It is the ceiling the "
-        "zero-shot numbers are measured against, never a comparable entry.",
-        "- **One category is not a dataset result.** MVTec AD 2 has eight.",
-        "- **The pre-processor is a fixed square `Resize([256, 256])`** with no aspect-ratio "
-        "preservation, and no MVTec AD 2 category is square. This is the pinned configuration "
-        "the reproduction gate was passed at (protocol §7); it is a stated property of the "
-        "study, not an explanation produced afterwards.",
+        *caveats,
         "",
         "## Provenance",
         "",
@@ -430,10 +439,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     print(f"{Path(__file__).name} running from commit {head}\n")
 
     # Checked before fetch: a wrong method must cost nothing, not a 10 GB download.
-    from vlmab.methods.gpu import gpu_builders
+    from vlmab.methods.gpu import gpu_builders, missing_backend
     if args.method not in gpu_builders():
         print(f"\ncannot start: no GPU backend for {args.method!r}; "
               f"methods with one: {gpu_builders()}", file=sys.stderr)
+        return 2
+
+    # Registration is not viability: a builder can be registered while its backend module does
+    # not exist yet. Without this the name check passed, fetch extracted up to 10 GB, and the run died inside the
+    # lazy import (found in review 2026-10-02). `find_spec` imports nothing.
+    absent = missing_backend(args.method)
+    if absent:
+        print(f"\ncannot start: {args.method!r} is registered but has no backend yet — "
+              f"{absent} does not exist. Nothing was fetched.", file=sys.stderr)
         return 2
 
     results = args.results or default_results(args.method, args.category)
