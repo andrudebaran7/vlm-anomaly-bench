@@ -133,13 +133,16 @@ conditions is not constant across categories**. Read from `prepare_data.py` on t
 | Can | **6** | regular, overexposed, underexposed, shift_1–**3** | **27** |
 | Walnuts | **6** | regular, overexposed, underexposed, shift_1–**3** | **25** |
 | Rice | **6** | regular, overexposed, underexposed, shift_1–**3** | **22** |
+| Fabric | **6** | regular, overexposed, underexposed, shift_1–**3** | **26** |
 
 **⚠️ THE "~20 PER CONDITION" RULE IS DEAD (2026-09-29).** It held for Vial (20), Sheet Metal (19)
 and Fruit Jelly (20); Wall Plugs broke it with **25**, Can went to **27**, Walnuts came back to
-**25** and Rice to **22**. Neither number is constant and **it is not trending either** — an
-earlier version of this note called it "climbing" after Can, and Walnuts refuted that the next
-day. The measured series is conditions 7 → 6 → 4 → 6 → 6 → 6 → 6 and images-per-condition
-20 → 19 → 20 → 25 → 27 → 25 → 22. **Do not project either one.** The real cost is `images_per_condition × W × H × 80 bytes`, and
+**25**, Rice to **22** and Fabric to **26**. Neither number is constant and **it is not trending
+either** — an earlier version of this note called it "climbing" after Can, and Walnuts refuted
+that the next day. **All eight are now measured**: conditions 7 → 6 → 4 → 6 → 6 → 6 → 6 → 6 and
+images-per-condition 20 → 19 → 20 → 25 → 27 → 25 → 22 → 26. Seven of the eight have six
+conditions; Vial has seven and Fruit Jelly four. Images per condition span 19 to 27 with no
+pattern. **Nothing needs projecting any more — the table below is complete.** The real cost is `images_per_condition × W × H × 80 bytes`, and
 images-per-condition is printed before any fit runs, seconds after extraction — read it, do not
 estimate it.
 
@@ -170,10 +173,11 @@ can be 25% low.
 | Can | 2232×1024 | **27 (measured)** | **4.94 GB** | ok (measured, passed) |
 | Walnuts | 2448×2048 | **25 (measured)** | **10.03 GB** | **trips** (measured) |
 | Rice | 2448×2048 | **22 (measured)** | **8.82 GB** | **trips** (measured) |
-| Fabric | 2448×2048 | *unknown* | 8.82–10.83 GB (22–27 images) | **trips** |
+| Fabric | 2448×2048 | **26 (measured)** | **10.43 GB** | **trips** (measured) |
 
-**For `fabric` use `--max-bytes 12000000000`**, which covers the whole measured range of
-images-per-condition at this resolution. It is what Walnuts and Rice ran with. Read the real count
+**All eight measured.** `--max-bytes 12000000000` covers every category in the dataset and is what
+Walnuts, Rice and Fabric ran with. **Five of the eight trip the 6 GB default** — Sheet Metal, Wall
+Plugs, Walnuts, Rice and Fabric; only Vial, Fruit Jelly and Can pass cleanly. Read the real count
 off the layout check anyway — it prints seconds after extraction, before any fit, and a
 `--max-bytes` chosen for the wrong count fails *after* the fits have run, which is what happened
 on Wall Plugs.

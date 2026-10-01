@@ -112,7 +112,7 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    is total budget, not session length. Its CPU half is done and registered
    (`src/vlmab/methods/saa.py`, `configs/methods/saa_prompts.yaml`); what remains is the GPU backend and
    phases A–D.
-6. **M3 — full MVTec AD 2 grid. STARTED: 7 of 8 categories done for PatchCore (2026-10-01).**
+6. **M3 — full MVTec AD 2 grid. ✅ COMPLETE for PatchCore, all 8 categories (2026-10-01).**
    Once each method's VisA gate passes, run the full public-test grid over all eight categories,
    one category at a time (the download/resume/shard unit). Mechanical. Vial and Sheet Metal are
    run and reported; **Sheet Metal put the anchor at chance**, which is a result, not a bug — see
@@ -122,8 +122,9 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    unusable on three of the five run** — Sheet Metal, Wall Plugs and Can, the last of these
    *below* its own random baseline on `au_pro_005`. **Walnuts then worked, at the same
    2448×2048 as the failing Wall Plugs, which rules geometry out entirely.** The grid stands
-   **3 usable anchors against 4 unusable** after Rice came in at chance. Only `fabric` is
-   left. Next: `fabric`.
+   **3 usable anchors against 5 unusable.** The majority of MVTec AD 2 has no usable full-shot
+   detection ceiling under the pinned configuration. See the M3 closeout below. The grid still
+   has to be re-run per zero-shot method once each has a GPU backend.
 7. **M4 — evaluation server.** Score the private split. Access is **granted** (2026-07-30) and the
    threshold rule is built and pre-registered (v0.2.11); what remains is the submission packaging,
    which needs the server's own format — confirm it on first login. On first login, confirm
@@ -1583,6 +1584,89 @@ those categories, and it was starting to read as "the image-level score is the w
 not, across categories: the two metrics move together.** The dissociation this study has evidence
 for is between **lighting conditions within a category**, not between the metrics as such. Both
 reports stand as written; the generalisation does not, and is corrected here and in §6.2.
+
+## M3 IS COMPLETE — all eight categories, and five anchors are unusable (2026-10-01)
+
+Fabric finished the public-split grid for the full-shot anchor: eight categories, three seeds each,
+each aggregated per lighting condition. Per-category means, pixel metrics as multiples of their
+**measured** random baselines (0.1487 at the 30% FPR limit, 0.0249 at 5%; see
+`tests/test_au_pro_random_baseline.py`):
+
+| category | W×H | aspect | i_auroc | au_pro_030 | ×rnd | au_pro_005 | ×rnd | anchor |
+|---|---|---|---|---|---|---|---|---|
+| Vial | 1400×1900 | 0.74:1 | 0.910 | 0.8414 | 5.66 | 0.5714 | 22.95 | **usable** |
+| Walnuts | 2448×2048 | 1.20:1 | 0.824 | 0.7595 | 5.11 | 0.4479 | 17.99 | **usable** |
+| Fruit Jelly | 2100×1520 | 1.38:1 | 0.783 | 0.6394 | 4.30 | 0.3865 | 15.52 | **usable** |
+| Fabric | 2448×2048 | 1.20:1 | 0.562 | 0.1460 | **0.98** | 0.0076 | **0.30** | no |
+| Rice | 2448×2048 | 1.20:1 | 0.519 | 0.3536 | 2.38 | 0.1695 | 6.81 | no |
+| Sheet Metal | 4224×1056 | 4.00:1 | 0.510 | 0.2523 | 1.70 | 0.0677 | 2.72 | no |
+| Wall Plugs | 2448×2048 | 1.20:1 | 0.447 | 0.4194 | 2.82 | 0.1189 | 4.78 | no |
+| Can | 2232×1024 | 2.18:1 | 0.388 | 0.2984 | 2.01 | 0.0024 | **0.10** | no |
+
+### The four things the grid established
+
+**1. Five of eight categories have no usable full-shot anchor.** That is the headline, and it is a
+result rather than a caveat: on most of this benchmark there is no meaningful ceiling for a
+zero-shot method to be measured against, which is the comparison the whole study is built on.
+
+**2. Geometry explains none of it.** Four categories share 2448×2048 at 1.20:1 — Walnuts (the best
+anchor in the grid), Fabric, Rice and Wall Plugs (three failures, in three different shapes).
+The aspect-ratio mechanism registered on 2026-09-20 predicted Sheet Metal and remains the only
+candidate for that category alone.
+
+**3. The failures take four distinct forms, and no mechanism covers two of them.**
+  * *Sheet Metal* — at chance on detection, weak localisation (1.70× / 2.72×).
+  * *Wall Plugs, Rice* — detection at or below chance, localisation clearly above random
+    (2.82×/4.78× and 2.38×/6.81×).
+  * *Can* — detection well below chance, localisation 2× at the loose limit and **below random**
+    at the strict one.
+  * *Fabric* — the inverse: detection weakly above chance in all six conditions, localisation **at
+    the random baseline** (0.98×).
+
+**4. The two metrics agree strongly but not perfectly across categories.** Spearman ρ = **0.833**
+over the eight. The top three are identical in both orderings; Fabric is 4th by detection and 7th
+by localisation, Wall Plugs the reverse. **Both dissociation directions occur**, which is a
+stronger case for reporting the metrics separately than either direction alone.
+
+### Two claims of ours that the grid retracted
+
+* **The intensity-versus-direction split** (recorded 2026-09-29, predicted on 2026-09-30 to become
+  writable with a fourth reading). Rice inverted it; final tally three for, three against. Dead.
+* **"The same order apart from one adjacent transposition"** (recorded 2026-10-01 on seven
+  categories). Fabric shifted three places and took ρ from near-1 to 0.833. The weaker, true
+  version is above.
+
+Both were written down before the runs that refuted them, which is the only reason they could be
+retracted rather than quietly dropped.
+
+### The four held defects are now due
+
+`src/` was deliberately frozen for the whole grid so that every category ran on a code tree with no
+differences across its commits — the property the 2026-09-29 determinism check depended on. **That
+constraint is now lifted.** In rough order of what they cost:
+
+1. **The coreset size is provenance read off a tqdm bar.** Missed on five of eight categories, and
+   reading the bar instead of the bank put a wrong figure in three reports.
+   `PatchCoreRef` should stamp `memory_bank.shape[0]` the way it already stamps `seed` and
+   `preprocess`.
+2. **`write_report` stamps the writing machine's HEAD** rather than the shards' `commit` column, so
+   a resumed run produces a report claiming a commit that did not compute its numbers. It should
+   read the column and refuse a single-commit provenance line when the shards disagree.
+3. **The guard's suggested recovery command** omits `--summarise-only` and derives its budget from
+   available RAM instead of the requirement it just computed — it suggested 9 GB for a 10.03 GB
+   peak.
+4. **Nothing guards a run that produced shards and no report.** That is how Fruit Jelly's first run
+   vanished for nine days.
+
+### What M3 does NOT include
+
+* **Fit times and coreset figures** for five of the eight categories, as above.
+* **The `validation` split**, deliberately unscored: `run_evaluation` re-fits per call and the
+  threshold rule's seed semantics are not pre-registered. M4 needs it, and needs every archive
+  again — now a `wget` per category rather than an upload.
+* **Any zero-shot number.** This is the anchor only. Five methods still have no GPU backend
+  (WinCLIP, AnomalyCLIP, AdaCLIP, SAA+, the Qwen2.5-VL baseline), each with its own pre-registered
+  gate, and the grid above has to be re-run for each one that passes.
 
 ## The archives can be fetched in-session, and the GPU ran out before Fabric (2026-10-01)
 
