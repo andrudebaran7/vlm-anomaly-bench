@@ -37,7 +37,23 @@ def test_a_result_report_is_not_silently_ignored(report):
 
 def test_the_shards_and_maps_beside_a_report_stay_out():
     """The negation has to stay narrow. A whole-directory negation would sweep in the
-    native-resolution anomaly maps, which are 24.9 GB across the grid."""
+    native-resolution anomaly maps, which are 24.9 GB across the grid.
+
+    Both layouts are probed: the pre-2026-10-01 one, and the method-scoped one the runner writes
+    now (`results/mvtec_ad2/<method>/<category>/`). Widening the negation for the second layout
+    is exactly the edit that could have let the maps in.
+    """
     for probe in ("results/mvtec_ad2/vial/shards/x.parquet",
-                  "results/mvtec_ad2/vial/maps/x.npy"):
+                  "results/mvtec_ad2/vial/maps/x.npy",
+                  "results/mvtec_ad2/patchcore_ref/vial/shards/x.parquet",
+                  "results/mvtec_ad2/patchcore_ref/vial/maps/x.npy",
+                  "results/mvtec_ad2/winclip/vial/maps/x.npy"):
         assert _ignored(ROOT / probe), f"{probe} would be committable; it must not be"
+
+
+def test_a_method_scoped_report_is_committable():
+    """The other half: the reports under <method>/ must NOT be ignored, or `git add -A` skips
+    them silently and a commit claims a result it does not carry (2026-09-21, vial.md)."""
+    probe = ROOT / "results/mvtec_ad2/patchcore_ref/vial.md"
+    assert probe.exists(), "the eight reports moved here on 2026-10-01"
+    assert not _ignored(probe)

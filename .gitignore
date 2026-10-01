@@ -19,6 +19,13 @@ results/*
 !results/mvtec_ad2/
 results/mvtec_ad2/*
 !results/mvtec_ad2/*.md
+# 2026-10-01: reports moved under <method>/ so two methods cannot pool into one directory
+# (scripts/run_mvtec_ad2.py default_results). The negation stays NARROW -- one level of method
+# directory and its .md files only -- because a whole-directory negation would sweep in the
+# native-resolution maps, 24.9 GB across the grid.
+!results/mvtec_ad2/*/
+results/mvtec_ad2/*/*
+!results/mvtec_ad2/*/*.md
 .cache/
 checkpoints/
 .superpowers/

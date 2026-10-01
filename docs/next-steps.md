@@ -1321,7 +1321,7 @@ owes both facts.
 
 ## Fruit Jelly ran, and it settled three things besides the category (2026-09-29)
 
-The category's own result is in `results/mvtec_ad2/fruit_jelly.md`: detection swings with the
+The category's own result is in `results/mvtec_ad2/patchcore_ref/fruit_jelly.md`: detection swings with the
 lighting (I-AUROC 0.684–0.853) while localisation does not move (AU-PRO@30% 0.6295–0.6453,
 per-seed ± of 0.001–0.002). That is **not** the Vial pattern, where both metrics fell together
 under `underexposed`, so localisation-under-lighting is a per-category question on the evidence of
@@ -1392,7 +1392,7 @@ shards are, not in the repo, so it is not obviously a test — recorded as a kno
 
 ## Wall Plugs: the anchor fails again, and this time aspect ratio cannot be the reason (2026-09-29)
 
-Full result in `results/mvtec_ad2/wallplugs.md`. **All six lighting conditions are at or below
+Full result in `results/mvtec_ad2/patchcore_ref/wallplugs.md`. **All six lighting conditions are at or below
 0.50 I-AUROC** (mean 0.447, best 0.5000, worst 0.3956) while **AU-PRO@30% runs 0.2773–0.5132
 against a random baseline of 0.1487**. The maps find the defects; the image-level score does not
 rank the images containing them. Fruit Jelly showed this in one condition; here it is the category.
@@ -1439,7 +1439,7 @@ the same week.
 
 ## Can: the anchor scores below random, and two mechanical causes are refuted (2026-09-30)
 
-Full result in `results/mvtec_ad2/can.md`. **All six conditions well below chance on I-AUROC**
+Full result in `results/mvtec_ad2/patchcore_ref/can.md`. **All six conditions well below chance on I-AUROC**
 (0.326–0.443, mean 0.388, with the training condition `regular` the *worst* of the six), and
 **`au_pro_005` averaging 0.0024 against the measured random baseline of 0.0249** — a tenth of
 uninformative, with three conditions at exactly 0.0000. `au_pro_030` is the only metric above its
@@ -1490,7 +1490,7 @@ their commits, and that property is what made the determinism check possible. `s
 
 ## Walnuts works, at Wall Plugs' exact resolution — geometry is out (2026-09-30)
 
-Full result in `results/mvtec_ad2/walnuts.md`. **The best localisation in the grid**: `au_pro_030`
+Full result in `results/mvtec_ad2/patchcore_ref/walnuts.md`. **The best localisation in the grid**: `au_pro_030`
 averages 0.7595 (5.1× the 0.1487 random baseline) and `au_pro_005` averages 0.4479 (**18×** the
 0.0249 baseline), with I-AUROC 0.802–0.862 — a spread of 0.060, the most stable detection of any
 category run.
@@ -1539,7 +1539,7 @@ what Walnuts ran with.
 
 ## Rice is at chance, and it ends the direction-shift pattern (2026-10-01)
 
-Full result in `results/mvtec_ad2/rice.md`. **Detection at chance, localisation real**: I-AUROC
+Full result in `results/mvtec_ad2/patchcore_ref/rice.md`. **Detection at chance, localisation real**: I-AUROC
 averages 0.519 (range 0.438–0.562) while `au_pro_030` is 2.4× and `au_pro_005` is **6.8×** their
 measured random baselines. The grid is now **three usable anchors against four unusable**.
 
@@ -1657,6 +1657,15 @@ constraint is now lifted.** In rough order of what they cost:
    peak.
 4. **Nothing guards a run that produced shards and no report.** That is how Fruit Jelly's first run
    vanished for nine days.
+
+### Where the reports live, changed 2026-10-01
+
+The eight reports moved to `results/mvtec_ad2/patchcore_ref/<category>.md` and new runs write
+shards to `results/mvtec_ad2/<method>/<category>/shards`. `summarise` loads every parquet in a
+shard directory, so without the method in the path two methods would pool into one row — silently,
+because the filenames already differ. **Handoffs dated before 2026-10-01 name the old paths and
+are left as written**: they describe where those runs actually wrote, and rewriting them would
+make a historical note claim a layout that did not exist.
 
 ### What M3 does NOT include
 
@@ -1896,7 +1905,7 @@ Older handoff (2026-09-29, before Fruit Jelly ran) follows.
 ## Where to pick up (session handoff, 2026-09-29) — M3 continues, with Fruit Jelly
 
 **M3 is 2 of 8.** Vial and Sheet Metal are run, three seeds each, reports committed
-(`results/mvtec_ad2/vial.md`, `results/mvtec_ad2/sheet_metal.md`, commit `a350e04`). Shards are on
+(`results/mvtec_ad2/patchcore_ref/vial.md`, `results/mvtec_ad2/patchcore_ref/sheet_metal.md`, commit `a350e04`). Shards are on
 Drive at `MyDrive/mvtec_ad2_results/<category>/`. Nothing from that session is outstanding: the
 runner now writes its own report file, restores shards from Drive, and survives missing maps.
 

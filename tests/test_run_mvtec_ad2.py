@@ -433,3 +433,93 @@ def test_summarise_only_runs_no_seed_and_loads_no_backend(harness, monkeypatch, 
     assert rc == 0
     assert calls == [], "no seed may run"
     assert seen == [8000000000], "the budget must reach summarise"
+
+
+# --- Task 2 (2026-10-01): the runner works for any method with a GPU backend -----------------
+
+
+class _FakeMethod:
+    """A method as the runner sees it. WinCLIP has no `preprocess`; PatchCore does."""
+
+    def __init__(self, name, seed):
+        self.name, self.seed = name, seed
+        self.zero_shot = name != "patchcore_ref"
+        if name == "patchcore_ref":
+            self.preprocess = "anomalib"
+
+
+@pytest.fixture
+def factory_harness(monkeypatch, harness):
+    """The shared harness plus a patched factory, so a method with no backend can be asked for."""
+    import vlmab.methods.gpu as gpu_mod
+
+    mod, calls, root, tmp_path = harness
+    built: list[tuple[str, int | None]] = []
+    fetched: list[str] = []
+
+    def _build(name, seed=None):
+        if name not in ("patchcore_ref", "winclip"):
+            raise KeyError(f"no GPU backend for {name!r}; methods with one: "
+                           "['patchcore_ref', 'winclip']")
+        built.append((name, seed))
+        return _FakeMethod(name, seed)
+
+    monkeypatch.setattr(gpu_mod, "build_runnable", _build)
+    monkeypatch.setattr(mod, "fetch", lambda category, root_, archives: fetched.append(category))
+    return {"mod": mod, "calls": calls, "root": root, "tmp_path": tmp_path,
+            "built": built, "fetched": fetched}
+
+
+def test_two_methods_do_not_share_a_shard_directory(harness):
+    mod, *_ = harness
+    a = mod.default_results("patchcore_ref", "vial")
+    b = mod.default_results("winclip", "vial")
+    assert a != b
+    assert a.parts[-2:] == ("patchcore_ref", "vial")
+    assert b.parts[-2:] == ("winclip", "vial")
+
+
+def test_drive_results_are_method_scoped_too(harness):
+    mod, *_ = harness
+    assert mod.default_drive_results("winclip", "vial").parts[-2:] == ("winclip", "vial")
+
+
+def test_the_method_comes_from_the_factory_not_a_hardcoded_backend(factory_harness):
+    h = factory_harness
+    _run(h["mod"], h["root"], h["tmp_path"])
+    assert [name for name, _ in h["built"]] == ["patchcore_ref"] * 3
+
+
+def test_a_method_without_a_gpu_backend_exits_2_before_extracting(factory_harness, capsys):
+    h = factory_harness
+    rc = _run(h["mod"], h["root"], h["tmp_path"], "--method", "saa")
+    assert rc == 2
+    out = capsys.readouterr()
+    assert "saa" in (out.out + out.err)
+    assert h["fetched"] == [], "it must refuse before touching the archive"
+
+
+def test_preprocess_is_stamped_only_when_the_method_has_one(factory_harness):
+    """WinCLIP has no pre-processing identity. A null column records that; a fabricated
+    "anomalib" would claim a property the method does not have."""
+    h = factory_harness
+    _run(h["mod"], h["root"], h["tmp_path"], "--method", "winclip")
+    assert h["calls"][0]["meta"]["preprocess"] is None
+
+
+def test_an_empty_category_directory_exits_2_rather_than_fitting_over_nothing(factory_harness):
+    """An interrupted extraction leaves the directory present and useless."""
+    h = factory_harness
+
+    def _reject(category, root_):
+        raise RuntimeError("prepare_data.py rejected the layout")
+
+    import importlib
+    monkey = pytest.MonkeyPatch()
+    monkey.setattr(h["mod"], "verify_layout", _reject)
+    try:
+        rc = _run(h["mod"], h["root"], h["tmp_path"])
+    finally:
+        monkey.undo()
+    assert rc == 2
+    assert h["calls"] == []

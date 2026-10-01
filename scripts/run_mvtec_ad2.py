@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Run one MVTec AD 2 category through PatchCore, at every seed protocol §6 requires (M3).
+"""Run one MVTec AD 2 category through a method, at every seed protocol §6 requires (M3).
 
     # In a notebook cell FIRST — this script cannot mount Drive, see fetch():
     #     from google.colab import drive; drive.mount('/content/drive')
     python scripts/run_mvtec_ad2.py --category vial
+    python scripts/run_mvtec_ad2.py --category vial --method winclip
     python scripts/run_mvtec_ad2.py --category vial --seeds 0   # a measurement, not a result
 
 **One category is the whole unit of work here**, and that is not a style choice: it is
@@ -46,6 +47,24 @@ DEFAULT_SEEDS = (0, 1, 2)
 PREPROCESS = "anomalib"
 DRIVE_ARCHIVES = Path("/content/drive/MyDrive/mvtec_ad2")
 DRIVE_RESULTS = Path("/content/drive/MyDrive/mvtec_ad2_results")
+
+
+def default_results(method: str, category: str) -> Path:
+    """Shards land in <results>/shards and `summarise` loads EVERY parquet there.
+
+    Without the method in the path, two methods pool into one row and overwrite each other's
+    report. The shard filenames already carry the method, so nothing would collide on disk --
+    the pooling would be silent, which is the failure class this repo keeps finding.
+
+    PatchCore's pre-2026-10-01 shards at the un-scoped location are not migrated: M3 is closed
+    and its numbers live in committed reports, so a re-run for figures re-fits rather than
+    restoring, which is what figure regeneration wants anyway.
+    """
+    return Path("results/mvtec_ad2") / method / category
+
+
+def default_drive_results(method: str, category: str) -> Path:
+    return DRIVE_RESULTS / method / category
 
 
 class DriveNotMounted(RuntimeError):
@@ -104,35 +123,38 @@ def verify_layout(category: str, root: Path) -> None:
         )
 
 
-def run_one_seed(category: str, root: Path, results: Path, seed: int, device: str) -> None:
+def run_one_seed(category: str, root: Path, results: Path, seed: int, device: str,
+                 method_name: str = "patchcore_ref") -> None:
     """Fit and score one category at one seed. Needs anomalib and a GPU; imported here for that."""
     from vlmab.datasets.mvtec_ad2 import MVTecAD2
     from vlmab.eval.provenance import run_meta
     from vlmab.eval.runner import run_evaluation
     from vlmab.eval.store import ResultStore
-    from vlmab.methods.patchcore_backend import PatchCoreBackend
-    from vlmab.methods.patchcore_ref import PatchCoreRef
+    from vlmab.methods.gpu import build_runnable
 
     # A fresh backend per seed: the memory bank is what the seed changes, and reusing one would
     # carry the previous seed's bank into the next seed's scores while the shard claimed
     # otherwise. This is the defect the seed-provenance work already had to undo once.
-    method = PatchCoreRef(backend=PatchCoreBackend(seed=seed, preprocess=PREPROCESS))
+    method = build_runnable(method_name, seed=seed)
     store = ResultStore(results / "shards")
     # run_meta HASHES its cfg into config_hash; it does not pass the keys through as columns.
     # So `preprocess` is added on top, as a real column, exactly as the VisA runner does --
     # otherwise the value that decides a run's identity would be recoverable only by recomputing
     # a hash. Stamped from the method, not from the constant above: what is recorded has to be
     # what was applied.
-    meta = run_meta({"method": "patchcore_ref", "split": "test_public",
-                     "preprocess": method.preprocess})
-    meta = {**meta, "preprocess": method.preprocess}
+    # `preprocess` decides a run's identity for PatchCore and does not exist for WinCLIP. None
+    # records that honestly; a fabricated "anomalib" would claim a property the method lacks.
+    preprocess = getattr(method, "preprocess", None)
+    meta = run_meta({"method": method_name, "split": "test_public",
+                     "preprocess": preprocess})
+    meta = {**meta, "preprocess": preprocess}
 
     run_evaluation(
         MVTecAD2(root), method, store, meta,
         categories=[category], split="test_public", fit_split="train",
         maps_dir=results / "maps", device=device,
     )
-    print(f"  {category} seed {seed}: done (preprocess {method.preprocess})")
+    print(f"  {category} seed {seed}: done (preprocess {preprocess})")
 
 
 def restore_from_drive(results: Path, source: Path) -> None:
@@ -318,13 +340,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--category", required=True)
+    parser.add_argument("--method", default="patchcore_ref",
+                        help="a method with a GPU backend; see vlmab.methods.gpu")
     parser.add_argument("--seeds", type=int, nargs="+", default=list(DEFAULT_SEEDS))
     parser.add_argument("--root", type=Path, default=Path("data/mvtec_ad2"))
     parser.add_argument("--results", type=Path, default=None,
-                        help="default: results/mvtec_ad2/<category>")
+                        help="default: results/mvtec_ad2/<method>/<category>")
     parser.add_argument("--archives", type=Path, default=DRIVE_ARCHIVES)
     parser.add_argument("--drive-results", type=Path, default=None,
-                        help="default: <DRIVE_RESULTS>/<category>")
+                        help="default: <DRIVE_RESULTS>/<method>/<category>")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--summarise-only", action="store_true",
                         help="skip the seed loop entirely and only re-read the shards. This "
@@ -348,8 +372,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                           capture_output=True, text=True).stdout.strip() or "unknown"
     print(f"{Path(__file__).name} running from commit {head}\n")
 
-    results = args.results or Path("results/mvtec_ad2") / args.category
-    drive_results = args.drive_results or DRIVE_RESULTS / args.category
+    # Checked before fetch: a wrong method must cost nothing, not a 10 GB download.
+    from vlmab.methods.gpu import gpu_builders
+    if args.method not in gpu_builders():
+        print(f"\ncannot start: no GPU backend for {args.method!r}; "
+              f"methods with one: {gpu_builders()}", file=sys.stderr)
+        return 2
+
+    results = args.results or default_results(args.method, args.category)
+    drive_results = args.drive_results or default_drive_results(args.method, args.category)
 
     try:
         fetch(args.category, args.root, args.archives)
@@ -376,7 +407,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     for i, seed in enumerate(args.seeds, 1):
         print(f"[seed {i}/{len(args.seeds)}] {args.category} at seed {seed}")
-        run_one_seed(args.category, args.root, results, seed, args.device)
+        run_one_seed(args.category, args.root, results, seed, args.device, args.method)
         if not args.no_save:
             save_to_drive(results, drive_results)
 
