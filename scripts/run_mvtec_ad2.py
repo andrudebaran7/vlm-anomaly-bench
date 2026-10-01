@@ -224,6 +224,21 @@ def summarise(results: Path, max_bytes: int | None = None) -> None:
 
     df = ResultStore(results / "shards").load_all()
 
+    # Shard filenames carry the method, so two methods coexist here without colliding on disk.
+    # Averaging them produces a row that describes no method at all, and nothing downstream
+    # would notice. Same shape as the per-seed guard in `aggregate`, same reason.
+    methods = (sorted(str(m) for m in df["method"].dropna().unique())
+               if "method" in df.columns else [])
+    if len(methods) > 1:
+        raise ValueError(
+            f"the shards under {results / 'shards'} hold {len(methods)} methods "
+            f"({methods}): summarising them would pool two methods into one row. Point "
+            "--results at one method's directory (see default_results)."
+        )
+    # The recovery suggestion below needs the method name, and this guard has just proved the
+    # shards hold exactly one. No new parameter, and nothing to pass wrongly.
+    method_name = methods[0] if methods else "patchcore_ref"
+
     # A shard restored from Drive references maps that never left the VM it was computed on.
     # `pixel_metrics` loads every `map_path` from disk, so a missing file would raise from
     # inside np.load with no hint of why. Nulling the column instead makes `pixel_metrics`

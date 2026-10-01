@@ -523,3 +523,30 @@ def test_an_empty_category_directory_exits_2_rather_than_fitting_over_nothing(fa
         monkey.undo()
     assert rc == 2
     assert h["calls"] == []
+
+
+# --- Task 3 (2026-10-01): a shard directory holding two methods is refused -------------------
+
+
+def _write_shard(shards, method, seed=0):
+    import pandas as pd
+    shards.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame({
+        "method": [method] * 2, "seed": [seed, seed], "meta_lighting": ["regular"] * 2,
+        "label": [0, 1], "image_score": [0.1, 0.9], "map_path": [None, None],
+        "commit": ["a" * 40] * 2,
+    }).to_parquet(shards / f"mvtec_ad2__{method}__vial__seed{seed}.parquet")
+
+
+def test_summarise_refuses_a_directory_holding_two_methods(tmp_path):
+    """Shard filenames carry the method, so two methods coexist on disk without colliding.
+    Averaging them would produce a row describing no method at all."""
+    mod = _module()
+    for name in ("patchcore_ref", "winclip"):
+        _write_shard(tmp_path / "shards", name)
+
+    with pytest.raises(ValueError) as exc:
+        mod.summarise(tmp_path)
+    message = str(exc.value)
+    assert "patchcore_ref" in message and "winclip" in message
+    assert "pool" in message.lower()
