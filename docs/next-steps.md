@@ -1585,6 +1585,57 @@ not, across categories: the two metrics move together.** The dissociation this s
 for is between **lighting conditions within a category**, not between the metrics as such. Both
 reports stand as written; the generalisation does not, and is corrected here and in §6.2.
 
+## WinCLIP Phase A.1 — VERIFIED 2026-10-02, and the "256x256" claim is PatchCore's alone
+
+Read off the installed anomalib 2.6.0 (`inspect.signature` + `WinClip.configure_pre_processor()`),
+on a Colab T4 with torch 2.11.0+cu130.
+
+**The constructor matches the plan's expectations exactly**, so nothing in Phase B has to adapt:
+
+    WinClip(class_name: str | None = None, k_shot: int = 0, scales: tuple = (2, 3),
+            few_shot_source=None, pre_processor=True, post_processor=True,
+            evaluator=True, visualizer=True)
+
+`k_shot=0` is the zero-shot default; `class_name` and `scales` are accepted; `scales=(2, 3)` is the
+paper's pair of window scales. `few_shot_source` is WinCLIP+ and out of scope (§ this plan).
+
+**The pre-processor, which is the load-bearing part:**
+
+    Resize(size=[240, 240], interpolation=BICUBIC, antialias=True)
+    Normalize(mean=[0.48145466, 0.4578275, 0.40821073],
+              std=[0.26862954, 0.26130258, 0.27577711])
+
+Three findings, in order of what they change:
+
+**1. 240x240 BICUBIC, not PatchCore's 256x256 BILINEAR — and it AGREES with the paper.** The paper
+specifies ViT-B/16**+**, which is the 240px variant (`ViT-B-16-plus-240`). So anomalib's input
+resolution matches the published configuration; that is one of this plan's priority-2 risks
+retired rather than carried. The `Normalize` constants are CLIP's, not ImageNet's, which
+corroborates that the whole pipeline is CLIP's own.
+
+**2. The double-normalisation trap applies, and now explicitly.** `AnomalibModule.forward` runs
+`self.pre_processor` unconditionally, so `winclip_backend.score()` must hand the model a **raw
+tensor at native resolution** — no resize to 240, no CLIP normalisation. PatchCore's `score()`
+did both for weeks while every test passed, because the operation is monotonic and preserves
+ranking. Probe stage 11 is the standing guard for PatchCore; Phase B owes WinCLIP the equivalent.
+
+**3. ⚠️ THE PAPER'S PRE-PROCESSING CLAIM IS PER-METHOD AND IS CURRENTLY WRITTEN AS GENERAL.**
+`sections/04-benchmark-design.tex` §Metrics and the Threats-to-Validity comment in
+`sections/06-analysis.tex` both say "a fixed square `Resize([256, 256])`". **That is PatchCore's.**
+WinCLIP squashes to 240. Consequences:
+
+* The two methods see **different** amounts of compression on the same image, so nothing may imply
+  they run under one pre-processing pipeline. Protocol §3's own note — that choosing a priority-2
+  implementation also fixes the input pipeline, which is therefore part of a run's identity — is
+  exactly this, and it now has two instances with different numbers.
+* The aspect-ratio mechanism registered for Sheet Metal is stated at 256. At 240 the compression
+  is marginally worse (4224x1056 to a square 240 is 17.6x horizontal against 4.4x vertical). If
+  WinCLIP's Sheet Metal number is also at chance, that is **not** evidence for the mechanism —
+  both methods squash, and Walnuts already showed squashing does not predict failure.
+* Every WinCLIP report must carry its own `Resize([240, 240])` caveat. The runner's report writer
+  already emits PatchCore's caveats only for `patchcore_ref` (fixed 2026-10-02 in review), so the
+  240 line is a WinCLIP-specific addition to make when its first report is written.
+
 ## ⚠️ Colab's torch build has moved: cu128 → cu130 (observed 2026-10-02)
 
 A WinCLIP Phase A session reported `torch 2.11.0+cu130`. **Every PatchCore number in this repo was

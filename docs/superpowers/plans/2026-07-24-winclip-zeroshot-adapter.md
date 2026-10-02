@@ -70,6 +70,10 @@
 
 ## Phase A (2026-10-02 revision) — two dataset-free checks and one measurement
 
+**The driver now exists: `notebooks/winclip_colab.ipynb`, cells 0.1 → 0.2 → restart → 0.3 → 1.1 →
+1.2 → 1.3 → 1.4.** Run it rather than pasting from here; the cell order is load-bearing for a
+reason the next paragraph explains and a markdown plan cannot enforce.
+
 **Replaces A.1–A.2 below.** No dataset, no download; ~10 minutes on a T4. Each step answers a
 question that changes Phase B, so none of them is a formality.
 
@@ -80,6 +84,14 @@ protocol §3 forbids writing an upstream call as if it were verified, and 2.6.0 
 diverged from its own documentation in five recorded ways. Treat a `None` or an `AttributeError`
 in those cells as the expected first outcome and read the object, rather than assuming the cell is
 broken.
+
+**⚠️ anomalib needs its `[clip]` extra, and the import order matters.** Plain
+`anomalib==2.6.0` installs fine and then `WinClip(...)` raises `ImportError: open_clip is required
+for VLM models`. Worse, anomalib runs `try: import open_clip` at **module import time** and caches
+`None` for the whole session, so importing anomalib before the extra is installed poisons the
+kernel and only a restart clears it. Found the hard way 2026-10-02. Install
+`"anomalib[clip]==2.6.0"` — its own declared extra, which constrains `open-clip-torch` to
+`<2.26.1,>=2.23.0`, a **range**: record what it resolves to. Today it gave 2.24.0.
 
 - [ ] **A.0 — Environment, with the pin**
 
@@ -176,7 +188,7 @@ is the standing reminder that a seed can be recorded without being applied.
 | `configs/methods/winclip.yaml` | pre-registered WinCLIP config (CPU) |
 | `src/vlmab/methods/registry.py` | register `winclip` (CPU) |
 | `src/vlmab/methods/winclip_backend.py` | the real anomalib WinCLIP backend, lazy import (Colab) |
-| `notebooks/winclip_colab.ipynb` | the Colab driver — the phases below (Colab) |
+| `notebooks/winclip_colab.ipynb` | the Colab driver — **written 2026-10-02**, cells 0.1–1.4 (Colab) |
 | `results/reproduction/winclip_visa.md` | the recorded VisA reproduction table (Colab) |
 | `results/reproduction/winclip/{mvtec_ad,visa}/shards` | gate shards, method-scoped (Colab) |
 | `results/mvtec_ad2/winclip/<category>/` | the M3 grid's shards and maps (Colab) |
