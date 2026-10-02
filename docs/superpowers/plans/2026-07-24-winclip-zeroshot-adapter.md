@@ -20,9 +20,141 @@
 > `../vlm-anomaly-paper/docs/verified-literature-facts.md` (fifth pass) before the Colab session.
 > Wherever the text below says "the VisA gate", read "either gate".
 
+> **AMENDED 2026-10-02 — Tasks 1–2 are DONE, and the Colab phases now drive scripts instead of
+> hand-written cells.** What changed since this plan was written, in the order it matters:
+>
+> **Tasks 1 and 2 are complete and on `master`.** `src/vlmab/methods/winclip.py` holds
+> `WinClipRef`, `configs/methods/winclip.yaml` holds the pinned config, and `registry.py`
+> registers `winclip`. Do not re-run them. The only missing file is
+> `src/vlmab/methods/winclip_backend.py` — Phase B.
+>
+> **`--method winclip` is refused until that file exists, by design.** `vlmab.methods.gpu`
+> registers a builder for `winclip` and `missing_backend()` checks with `find_spec` whether its
+> backend module is importable; all three runners refuse up front and name the missing module.
+> That guard exists because registration-without-viability once let a run fetch 10 GB and then die
+> in the lazy import. Seeing `cannot start: 'winclip' is registered but has no backend yet` is the
+> guard working, not a bug.
+>
+> **anomalib is pinned, not a range.** `anomalib==2.6.0`, held by a test against
+> `configs/methods/patchcore_ref.yaml`. Every `>=1.1` below is stale; install the pin. The VERIFY
+> steps still matter: `docs/next-steps.md`, section "The PatchCore Colab sessions ... what they
+> settled", records five ways 2.6.0 diverges from its own documentation.
+>
+> **Phase A is now dataset-free and short.** Its two load-bearing checks are properties of the
+> constructed model, so they need no VisA, no MVTec AD and no download. Run them first; both are
+> this plan's named priority-2 risks and either one failing changes what Phase B has to do. See
+> **Phase A (2026-10-02 revision)** below, which replaces A.1–A.2.
+>
+> **Phases C and D no longer write their own cells.** Three scripts now exist and carry the Drive
+> fetch, resume, per-seed shard copy, memory guard and report writing that eight PatchCore
+> categories settled:
+>
+> | what | script | notes |
+> |---|---|---|
+> | MVTec AD 2 grid | `scripts/run_mvtec_ad2.py --category <c> --method winclip` | `--archives /content` when the archive was fetched in-session |
+> | MVTec AD classic gate (91.8) | `scripts/run_mvtec_ad.py --method winclip` | new 2026-10-01; this path was notebook cells before |
+> | VisA gate (78.1) | `scripts/run_visa_secondary.py --method winclip` | despite the filename, WinCLIP's VisA figure **gates** |
+>
+> Scoring stays `scripts/reproduction_gate.py`. Do **not** pass `--which` by hand:
+> `vlmab.eval.targets.block_for` derives the block from the config's `dataset:` key, which is what
+> keeps `not_the_target` (Table 7's 78.9, higher than the real 78.1) from ever being scored
+> against. `run_visa_secondary.py` already calls it.
+>
+> **Results land method-scoped**: `results/reproduction/winclip/{mvtec_ad,visa}/shards`,
+> `results/reproduction/winclip_visa.md`, `results/mvtec_ad2/winclip/<category>/`. Two methods in
+> one shard directory would be summarised as one row, and `summarise` now refuses it.
+>
+> **Neither gate dataset needs an upload.** VisA is a public S3 object and MVTec AD classic is a
+> direct download. The manual-upload problem is confined to MVTec AD 2, and even there the
+> archives can be fetched in-session (`docs/datasets-access.md`, 2026-10-01).
+
+## Phase A (2026-10-02 revision) — two dataset-free checks and one measurement
+
+**Replaces A.1–A.2 below.** No dataset, no download; ~10 minutes on a T4. Each step answers a
+question that changes Phase B, so none of them is a formality.
+
+**⚠️ The code in A.2 and A.3 is DISCOVERY, not a verified API.** Nobody here has read anomalib
+2.6.0's `WinClip` internals, so the attribute names those steps reach for are guesses and the
+`dir()` loops are there to replace them with what the object really exposes. That is deliberate:
+protocol §3 forbids writing an upstream call as if it were verified, and 2.6.0 has already
+diverged from its own documentation in five recorded ways. Treat a `None` or an `AttributeError`
+in those cells as the expected first outcome and read the object, rather than assuming the cell is
+broken.
+
+- [ ] **A.0 — Environment, with the pin**
+
+```python
+!nvidia-smi -L
+!git clone https://github.com/andrudebaran7/vlm-anomaly-bench.git /content/vlm-anomaly-bench
+%cd /content/vlm-anomaly-bench
+!pip install -e .
+!pip install "anomalib==2.6.0" open_clip_torch
+import anomalib, torch; print("anomalib", anomalib.__version__, "| cuda", torch.cuda.is_available())
+```
+
+Record the resolved version: ____ . It must read `2.6.0`; anything else and the pin did not take.
+
+- [ ] **A.1 — VERIFY the WinClip API against the installed version**
+
+```python
+import inspect
+from anomalib.models import WinClip
+print(inspect.signature(WinClip.__init__))
+print(WinClip.configure_pre_processor().transform)
+```
+
+Confirm `k_shot=0` is the zero-shot default and that `class_name` and `scales` are accepted.
+**Also record the transform**: PatchCore's `score()` double-normalised for weeks because
+`AnomalibModule.forward` runs `self.pre_processor` unconditionally, and nothing in the tests could
+see it. Whatever this prints is what Phase B must NOT apply a second time.
+
+- [ ] **A.2 — COUNT the prompt ensemble (priority-2 risk #1)**
+
+The paper's Figure 6 gives **154 normal** and **88 anomaly** prompts (7 and 4 state words × 22
+templates, verified 2026-09-18). Count what anomalib builds:
+
+```python
+m = WinClip(class_name="vial")
+m.setup()                      # if setup() is not the hook, find it from the A.1 signature
+for name in dir(m.model):
+    if "prompt" in name.lower() or "text" in name.lower():
+        print(name, getattr(m.model, name, None).__class__.__name__)
+```
+
+Then print the two counts however the object exposes them, and record: normal ____ / anomaly ____ .
+**A mismatch is the finding, not a failure.** It is this plan's named likely cause of a gate miss,
+and knowing it now means a later miss is explained rather than investigated.
+
+- [ ] **A.3 — Which CLIP weights (priority-2 risk #2)**
+
+The paper uses LAION-400M ViT-B/16+; `configs/methods/winclip.yaml` carries
+`pretrained_resolved: unverified_until_first_colab_run`. Resolve it:
+
+```python
+import open_clip
+print(open_clip.list_pretrained_tags_by_model("ViT-B-16-plus-240"))
+# and from the constructed model, whatever identifies its checkpoint:
+print(getattr(m.model, "backbone", None), getattr(m.model, "pretrained", None))
+```
+
+Record what it actually loaded: ____ . Same architecture with different pre-training is a different
+model, and WinCLIP is entirely a function of its frozen features. **Write the answer into
+`configs/methods/winclip.yaml` in place of the placeholder, and commit it, before any scoring** —
+a configuration recorded after a result is not a pre-registration.
+
+- [ ] **A.4 — MEASURE determinism (decides the seed count)**
+
+`configs/reproduction/winclip.yaml` pre-registers this: one category twice at two seeds,
+bit-identical image scores mean one run is reportable with the measurement recorded beside it;
+anything else means three seeds. Run it once Phase B exists, on the smallest category available,
+and record: bit-identical ____ (yes/no). Do not assume zero-shot implies deterministic — PatchCore
+is the standing reminder that a seed can be recorded without being applied.
+
+---
+
 **Architecture:** WinCLIP is zero-shot — no fit, it slots into the existing `AnomalyMethod` contract with just `prepare` + `predict`. The adapter `WinClipRef` wraps a backend with a single `score(image, category) -> (raw_score, raw_map)`; the category is passed through because it is the object noun in WinCLIP's handcrafted prompt ensemble (verbatim from the paper, protocol §3), which changes the text embeddings. anomalib and CLIP are reached only through the injected backend, so the adapter is fully CPU-tested with a fake and the real CLIP forward is GPU-only. Raw score and map are passed through and the map upsampled to native resolution (protocol v0.2.6).
 
-**Tech Stack:** Python 3.10+, numpy, pytest (CPU tasks); Colab T4 GPU, anomalib `>=1.1`, torch, open-clip (Colab phases).
+**Tech Stack:** Python 3.11/3.13, numpy, pytest (CPU tasks); Colab T4 GPU, **anomalib `==2.6.0`** (pinned 2026-09-17; `>=1.1` below is stale), torch, open-clip (Colab phases).
 
 ## Global Constraints
 
@@ -46,10 +178,12 @@
 | `src/vlmab/methods/winclip_backend.py` | the real anomalib WinCLIP backend, lazy import (Colab) |
 | `notebooks/winclip_colab.ipynb` | the Colab driver — the phases below (Colab) |
 | `results/reproduction/winclip_visa.md` | the recorded VisA reproduction table (Colab) |
+| `results/reproduction/winclip/{mvtec_ad,visa}/shards` | gate shards, method-scoped (Colab) |
+| `results/mvtec_ad2/winclip/<category>/` | the M3 grid's shards and maps (Colab) |
 
 ---
 
-## Task 1: WinClipRef adapter over an injectable backend
+## Task 1: WinClipRef adapter over an injectable backend — ✅ DONE, on `master`
 
 **Files:**
 - Modify: `src/vlmab/methods/winclip.py` (replaces the stub)
@@ -221,7 +355,7 @@ git commit -m "feat: WinCLIP zero-shot adapter over an injectable backend"
 
 ---
 
-## Task 2: Register WinCLIP
+## Task 2: Register WinCLIP — ✅ DONE, on `master`
 
 **Files:**
 - Modify: `src/vlmab/methods/registry.py`
@@ -285,7 +419,7 @@ git commit -m "feat: register the WinCLIP zero-shot adapter"
 These run in a Colab GPU session. Every anomalib call is from the published API; the VERIFY steps
 check it against the installed version. The acceptance gate is Phase D.
 
-## Phase A — Environment and API verification
+## Phase A — Environment and API verification *(SUPERSEDED by the 2026-10-02 revision above)*
 
 - [ ] **A.1 — GPU, repo, anomalib**
 
@@ -413,6 +547,8 @@ Confirm `import vlmab.methods.winclip_backend` works without anomalib (lazy impo
 
 ## Phase C — End to end through the runner on one Vial category
 
+*(2026-10-02: the cells below predate `scripts/run_mvtec_ad2.py --method winclip`. Use the script; keep the reasoning here.)*
+
 - [ ] **C.1 — Verify Vial is present** (per `docs/datasets-access.md`):
 
 ```bash
@@ -452,7 +588,9 @@ print(aggregate(df, by="meta_lighting")[
 Expected: a zero-shot method — I-AUROC above chance on `regular`, but not near PatchCore's full-shot
 ceiling; the point of the study is exactly this gap. Record the table.
 
-## Phase D — The VisA zero-shot reproduction gate (protocol §2)
+## Phase D — The reproduction gates (protocol §2)
+
+*(2026-10-02: TWO gates, and both have scripts now — `run_mvtec_ad.py --method winclip` for 91.8 and `run_visa_secondary.py --method winclip` for 78.1. The hand-written scoring cells below are superseded; the targets and caveats are not.)*
 
 The acceptance criterion. No MVTec AD 2 number until WinCLIP reproduces its published **zero-shot**
 VisA image-AUROC within ±1.0 through this adapter and this repo's metrics.
