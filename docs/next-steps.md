@@ -1585,6 +1585,38 @@ not, across categories: the two metrics move together.** The dissociation this s
 for is between **lighting conditions within a category**, not between the metrics as such. Both
 reports stand as written; the generalisation does not, and is corrected here and in §6.2.
 
+## ⚠️ Colab's torch build has moved: cu128 → cu130 (observed 2026-10-02)
+
+A WinCLIP Phase A session reported `torch 2.11.0+cu130`. **Every PatchCore number in this repo was
+produced on `torch 2.11.0+cu128`** — same torch version, different CUDA build —
+pinned in `configs/methods/patchcore_ref.yaml:6` from the Colab T4 of 2026-08-21. anomalib is
+still 2.6.0 and the pin test passes, so nothing about the method configuration changed.
+
+**For WinCLIP this is immaterial:** it is a new method and cu130 simply goes into its own
+provenance.
+
+**For the figures it is a live risk, and this note exists so it is not investigated as a bug.**
+Spec §5's legitimacy check is: regenerate a category's maps, then compare `image_score` against
+the committed shard **at full precision**; a match proves the regenerated maps are the ones that
+produced the reported numbers. The determinism that justified that check was measured on
+2026-09-29 — Fruit Jelly, same four decimals, nine days and two VMs apart — but **both of those
+runs were on the same torch build.** A different CUDA build is an untested variable, and
+cuDNN/cuBLAS kernel selection can change low-order bits without anything being wrong.
+
+**So if a figure regeneration fails the full-precision comparison, check the torch build BEFORE
+concluding anything.** Three outcomes and what each means:
+
+1. **Scores match exactly** — the check passes as designed, and it additionally establishes
+   reproducibility across CUDA builds, which is a stronger claim than the study currently makes.
+2. **Scores differ in the last decimals only** — environmental, not a defect. The figure is still
+   of the same model on the same data, and its caption has to say the maps were regenerated under
+   a different CUDA build than the numbers. The alternative is relaxing the comparison to a
+   stated tolerance, which weakens the check and should be a recorded decision, not a default.
+3. **Scores differ materially** — that is not a build difference and needs the systematic path.
+
+**It cannot be avoided by pinning:** Colab controls the torch build, cu128 is no longer what a
+fresh runtime gives, and a figure run needs a GPU. Recorded rather than solved.
+
 ## M3 IS COMPLETE — all eight categories, and five anchors are unusable (2026-10-01)
 
 Fabric finished the public-split grid for the full-shot anchor: eight categories, three seeds each,
