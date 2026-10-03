@@ -13,7 +13,7 @@ that cost and what it means for the four methods behind it.
 
 - **Evaluation core:** image/pixel metrics (P-AUROC, AU-PRO, SegF1), provenance, a crash-safe
   result store, a resumable runner with per-sample latency, per-category `fit` for full-shot
-  methods, and lighting-grouped aggregation. Protocol frozen at **v0.2.15**.
+  methods, and lighting-grouped aggregation. Protocol at **v0.2.19** (v0.2.18 = scope reduced to PatchCore + WinCLIP).
 - **MVTec AD 2 data path:** loader (verified against the real Vial archive), layout verification
   (`scripts/prepare_data.py`), and the run_eval CLI. Native-resolution, raw-scale maps (v0.2.6).
 - **Method adapters — CPU halves done and registered** (each wraps an injectable backend; without
@@ -42,6 +42,15 @@ what the protocol forbids. The acceptance gate for every method is the same: **r
 published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 number is reported.**
 
 ## Next steps, in order
+
+> **⚠️ SCOPE REDUCED — protocol v0.2.18 (spec 2026-10-01, written into the protocol 2026-10-03).**
+> Only **PatchCore** and **WinCLIP** are benchmarked. Items 3–5 below (AnomalyCLIP, AdaCLIP, SAA+)
+> and item 8 (M5) are **cut**; their records stay as evidence for the paper. The live order is the
+> spec's: A (runners, done 2026-10-02) → **B (WinCLIP backend — current)** → C (both gates, a cost
+> probe first) → D (WinCLIP's MVTec AD 2 grid) → E (validation + calibration) → F (submission) and
+> G (figures). Read `docs/superpowers/specs/2026-10-01-short-paper-descope-design.md` for each.
+> This list was not updated when the spec was approved, which is how a 2026-10-03 session nearly
+> missed it.
 
 1. **PatchCore — finish the Colab session** (plan:
    `docs/superpowers/plans/2026-07-24-patchcore-anomalib-backend-colab.md`; driver:
@@ -1630,7 +1639,7 @@ explanation on its own.** Whether to run anomalib as shipped or patch `TEMPLATES
 22 is a protocol decision (§3: priority-2 implementation vs. verbatim paper prompts), NOT taken
 here.
 
-**DECIDED 2026-10-03 (protocol §3 v0.2.18): patch to the paper's 22.** Alternatives considered:
+**DECIDED 2026-10-03 (protocol §3 v0.2.19): patch to the paper's 22.** Alternatives considered:
 run as shipped (simpler provenance, but a non-published ensemble under WinCLIP's name), and run
 both at the gate (double the gate GPU cost). The backend replaces `TEMPLATES` before `setup()`.
 

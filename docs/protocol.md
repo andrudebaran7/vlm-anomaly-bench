@@ -144,6 +144,15 @@ datasets and categories, published in `configs/methods/mllm_qwen.yaml`, with no 
 of any kind — the MLLM has no published per-category prompt to reproduce, so there is nothing verbatim
 to substitute.
 
+- **Methods benchmarked (v0.2.18).** This study benchmarks two methods: the full-shot anchor
+  `patchcore_ref` and the zero-shot `winclip`. AnomalyCLIP, AdaCLIP, SAA+ and the Qwen2.5-VL
+  baseline are **not benchmarked**. Their adapters, configs, overlap audits, prompt provenance and
+  pre-registered gates **stay in the repository** and the bullets below that describe them stay
+  as written: they record what was read and decided about each method, which is the evidence the
+  paper reports for why benchmarking them is costly. None of the four has a GPU backend, and the
+  runners refuse each by name. The amendment reduces the method list; it relaxes no evaluation
+  rule.
+
 - **Colour channels.** MVTec AD 2 images are grayscale in at least one category (Vial: 8-bit,
   1400x1900). Every method in this study expects 3-channel RGB input, so the loader converts
   with PIL's `convert("RGB")`, which replicates the single channel and passes an already-RGB
@@ -162,7 +171,7 @@ to substitute.
   elsewhere, and applied identically to every method and category. Recorded here, like the
   colour-channel rule above, because it is a decision that touches every pixel-level number.
 
-- **WinCLIP's prompt templates are the paper's 22, not anomalib's 21 (v0.2.18).** WinCLIP runs on
+- **WinCLIP's prompt templates are the paper's 22, not anomalib's 21 (v0.2.19).** WinCLIP runs on
   the anomalib implementation (priority 2), but "prompts verbatim from the original papers" governs
   the prompt content. anomalib 2.6.0's `prompting.TEMPLATES` departs from the paper's Figure 6 (c):
   it has 21 entries, lacks "a cropped photo of a [c]." and "a jpeg corrupted photo of a [c].", and
@@ -368,6 +377,11 @@ table is measured in M5 in a single session on one rented fixed instance, using 
 AD 2 runtime and memory-footprint utilities, documented in `results/ENVIRONMENT.md` with driver and
 library versions. Every accuracy row records the GPU Colab assigned, so runs stay auditable despite
 varying hardware.
+
+**Not exercised in this study (v0.2.18).** M5 is out of scope: no efficiency table and no latency
+number is reported. The paragraph above stays as the rule any latency number would have to meet.
+Measured accelerator time for *validation* (how long a reproduction gate took) is a cost, not an
+inference latency, and is never presented as one.
 
 ## 6. Statistical hygiene
 
@@ -586,7 +600,19 @@ pre-processing that produced them.
   for Fp**, deliberately: the scale has never been measured on this pipeline. No metric definition
   changed and no existing number moves.
   Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (eighth pass + addendum)
-- 2026-10-03 — v0.2.18. §3 fixes WinCLIP's prompt templates to the paper's 22. Colab phase A read
+- 2026-10-03 — v0.2.18. Scope reduced to a short paper (design:
+  docs/superpowers/specs/2026-10-01-short-paper-descope-design.md, approved 2026-10-01; the code
+  has cited this version since then, and it is written into this document only now). Four
+  clauses. (1) §3: two methods are benchmarked, `patchcore_ref` and `winclip`; AnomalyCLIP,
+  AdaCLIP, SAA+ and the Qwen2.5-VL baseline are not, and everything recorded about them stays.
+  (2) §5: M5 is not exercised; no latency is reported. (3) The private split is in:
+  `per_image_robust_z` (v0.2.11), three calibrations per (method, category) for PatchCore with
+  seed 0 submitted and all three committed before submission, one submission per method (§7).
+  (4) Nothing else changes: §2's gates, §4's metrics, §6's seed rule and §7's prohibitions stand.
+  Pre-registered with it, before any WinCLIP gate ran: if WinCLIP misses either gate by more than
+  1.0, the paper falls back to the anchor and the methodology alone, with no zero-shot numbers.
+  No metric definition changed and no existing number moves.
+- 2026-10-03 — v0.2.19. §3 fixes WinCLIP's prompt templates to the paper's 22. Colab phase A read
   anomalib 2.6.0's ensemble (source and runtime agree): state words identical to the paper, but 21
   templates, two of the paper's missing and one duplicated — 147/84 prompts, not 154/88. Running it
   as shipped would have put a non-published ensemble under the name WinCLIP, against §3's
