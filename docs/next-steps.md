@@ -1634,6 +1634,23 @@ a mismatched pipeline, not classic PatchCore.
 1400x1900 -> 240 without antialiasing, while the paper's pipeline (PIL bicubic) and anomalib's
 own test loop both antialias.
 
+**MEASURED 2026-10-03 (WinCLIP notebook cell 2.2, Colab, anomalib 2.6.0, torch 2.11.0+cu130) —
+the prediction held exactly.** On one 480x640 synthetic image, category noun "vial":
+
+    transform        : Resize([240, 240], BICUBIC, antialias=True)  + CLIP Normalize
+    export_transform : Resize([240, 240], BICUBIC, antialias=False) + CLIP Normalize
+    forward(raw)                 0.36831278
+    model(export_transform(raw)) 0.36831278   <- identical: forward IS the export path
+    model(transform(raw))        0.38136384   <- the antialiased path differs by 1.305e-02
+    model(transform x2 (raw))    0.44140190   (the double-normalisation bug, for scale)
+
+So the mechanism is confirmed **on the runtime, for WinCLIP**: `score()` resizes without
+antialiasing. Uniform noise is close to the worst case for aliasing, so 0.013 bounds nothing about
+real images; it shows the effect is not zero. **For PatchCore this is still inference, not
+measurement:** it is the same `PreProcessor` class, so its `score()` path is all but certainly
+non-antialiased too, but neither the fit-side behaviour on real images nor the size of the effect
+on any PatchCore number has been measured, and H2 (the classic run) is untested.
+
 **How it gets measured, pre-registered now.** (a) WinCLIP notebook cell 2.2 prints both
 transforms and scores one 480x640 image three ways: `forward`, `model.model(transform(x))`,
 `model.model(export_transform(x))`. Prediction from source: forward == export path, and the
