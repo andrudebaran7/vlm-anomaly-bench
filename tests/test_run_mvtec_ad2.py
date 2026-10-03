@@ -665,16 +665,21 @@ def test_patchcores_report_keeps_both_of_its_caveats(tmp_path):
     assert "full-shot anchor" in report and "Resize([256, 256])" in report
 
 
-def test_a_method_whose_backend_does_not_exist_is_refused_before_any_download(tmp_path, capsys):
+def test_a_method_whose_backend_does_not_exist_is_refused_before_any_download(tmp_path, capsys,
+                                                                              monkeypatch):
     """Critical-adjacent, found in review: `winclip` is registered, so the name check passed,
     fetch extracted up to 10 GB, and the run died in the lazy import. No fakes here — this is
     the real factory."""
+    # WinCLIP's backend exists since 2026-10-03, so a backendless method is simulated: the
+    # real factory, with winclip's backend module pointed at one that does not exist.
+    import vlmab.methods.gpu as gpu
+    monkeypatch.setitem(gpu._BACKEND_MODULES, "winclip", "vlmab.methods.not_built_yet")
     mod = _module()
     rc = mod.main(["--category", "vial", "--method", "winclip",
                    "--root", str(tmp_path / "nope"),
                    "--results", str(tmp_path / "out"), "--no-save"])
     assert rc == 2
     err = capsys.readouterr().err
-    assert "winclip_backend" in err, (
+    assert "not_built_yet" in err, (
         "the refusal must name the module that is missing, not look like a missing archive"
     )
