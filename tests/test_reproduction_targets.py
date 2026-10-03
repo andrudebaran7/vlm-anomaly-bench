@@ -129,9 +129,18 @@ def test_winclip_pre_registers_how_the_seed_question_gets_settled():
     has any is unknown. The config has to carry the deciding procedure, not just a count, or
     the answer becomes a choice made after seeing a result."""
     cfg = _winclip()
-    assert cfg["n_seeds"] == 3
     text = WINCLIP.read_text()
     assert "bit-identical" in text and "--all-seeds" in text
+
+
+def test_winclips_seed_count_is_the_pre_registered_outcome_of_its_measurement():
+    """Measured 2026-10-03: two seeds, bit-identical scores. The procedure above then says one
+    run is reportable — so n_seeds may be 1 ONLY with that measurement recorded beside it."""
+    cfg = _winclip()
+    m = cfg["determinism_measured"]
+    assert m["bit_identical"] is True and m["max_abs_delta"] == 0.0
+    assert len(m["seeds"]) >= 2 and m["images"] > 0
+    assert cfg["n_seeds"] == 1
 
 
 # --- AnomalyCLIP -------------------------------------------------------------------------
