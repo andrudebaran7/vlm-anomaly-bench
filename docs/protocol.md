@@ -162,6 +162,19 @@ to substitute.
   elsewhere, and applied identically to every method and category. Recorded here, like the
   colour-channel rule above, because it is a decision that touches every pixel-level number.
 
+- **WinCLIP's prompt templates are the paper's 22, not anomalib's 21 (v0.2.18).** WinCLIP runs on
+  the anomalib implementation (priority 2), but "prompts verbatim from the original papers" governs
+  the prompt content. anomalib 2.6.0's `prompting.TEMPLATES` departs from the paper's Figure 6 (c):
+  it has 21 entries, lacks "a cropped photo of a [c]." and "a jpeg corrupted photo of a [c].", and
+  lists "a jpeg corrupted photo of the [c]." twice, which double-weights it in the per-class mean
+  (147/84 prompts against the paper's 154/88). The backend therefore replaces the template list
+  with the paper's 22, verbatim, before the text embeddings are built, and a test holds the counts
+  at 154/88. The state words (7 normal, 4 anomaly) already match and are not touched; nothing else
+  in anomalib's WinCLIP is changed. This is a correction **to** the published source, not prompt
+  content we wrote, so §3's prohibition does not reach it — and it is fixed here before any WinCLIP
+  number exists. Every WinCLIP table carries the provenance line *anomalib 2.6.0 with the paper's
+  22 prompt templates*.
+
 - **Full-shot anchors.** A full-shot method (the PatchCore anchor) builds a per-category memory
   bank from that category's defect-free `train` split before scoring its test images. It declares
   `zero_shot = False`; the runner calls `fit(train_images, category)` once per category. This is the
@@ -573,3 +586,16 @@ pre-processing that produced them.
   for Fp**, deliberately: the scale has never been measured on this pipeline. No metric definition
   changed and no existing number moves.
   Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (eighth pass + addendum)
+- 2026-10-03 — v0.2.18. §3 fixes WinCLIP's prompt templates to the paper's 22. Colab phase A read
+  anomalib 2.6.0's ensemble (source and runtime agree): state words identical to the paper, but 21
+  templates, two of the paper's missing and one duplicated — 147/84 prompts, not 154/88. Running it
+  as shipped would have put a non-published ensemble under the name WinCLIP, against §3's
+  verbatim-prompt rule; patching it is a correction toward the source, not prompt engineering.
+  Decided by the author before any WinCLIP score existed, over two alternatives recorded in
+  docs/next-steps.md (run as shipped; run both). The predicted effect is small (2 of 22
+  near-synonymous templates), and was written down beforehand: a gate miss of more than ~1 point
+  is not explained by this difference alone. Weights `laion400m_e31` are unchanged (consistent
+  with the paper's "LAION-400M", which names no epoch). No metric definition changed and no
+  existing number moves.
+  Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (Fig. 6 template list,
+  2026-10-03); docs/next-steps.md, "WinCLIP Phase A.2–A.3".
