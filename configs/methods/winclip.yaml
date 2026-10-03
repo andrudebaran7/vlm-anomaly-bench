@@ -2,18 +2,32 @@ name: winclip
 zero_shot: true
 # WinCLIP zero-shot (Jeong et al., CVPR 2023). Provenance: anomalib implementation (protocol §3
 # priority 2 — the official code's prompt ensemble is reproduced by anomalib; the §2 VisA
-# reproduction gate is the check). Record the resolved anomalib version on first Colab run.
+# reproduction gate is the check). Versions resolved on the 2026-10-03 Colab run, below.
 source: anomalib
-anomalib_version: ">=1.1"        # exact pin resolved at integration; record the resolved version
+anomalib_version: "2.6.0"        # resolved 2026-10-03 (Colab, notebook cell 0.3); same pin as patchcore_ref
+open_clip_version: "2.24.0"     # anomalib[clip] asks for a RANGE (<2.26.1,>=2.23.0); this is what it resolved to
+torch_build: "2.11.0+cu130"     # Colab 2026-10-03; PatchCore's numbers are cu128 (docs/next-steps.md)
+# Input transform, read from WinClip.configure_pre_processor() 2026-10-02 and again 2026-10-03:
+# Resize([240, 240], BICUBIC, antialias) + CLIP Normalize. NOT PatchCore's 256 BILINEAR; the
+# backend must hand forward() a raw [0,1] tensor, since forward() applies this itself.
+input_transform: resize_240_bicubic_clip_normalize
 backbone: ViT-B-16-plus-240      # WinCLIP's CLIP backbone (paper §5: ViT-B/16+, 240^2 input)
 # The paper's weights, read from the PDF 2026-09-18: "we use the LAION-400M based CLIP with
 # ViT-B/16+ unless otherwise noted" (arXiv:2303.14814 §5). anomalib's WinClip picks its own
-# pre-trained tag and OURS HAS NEVER BEEN OBSERVED -- VERIFY it in Colab phase A and record what
-# it resolves to. Different pre-training on the same architecture is a different model, and
+# pre-trained tag; it was read from the installed source on 2026-10-03 and is recorded below.
+# Different pre-training on the same architecture is a different model, and
 # WinCLIP is entirely a function of its frozen CLIP features.
 pretrained_paper: laion400m
-pretrained_resolved: unverified_until_first_colab_run
+pretrained_resolved: laion400m_e31   # anomalib 2.6.0 torch_model.py PRETRAINED, read 2026-10-03.
+# Consistent with the paper's "LAION-400M" but the paper names no epoch, and open_clip also ships
+# laion400m_e32 for this architecture -- so consistent with, not shown to be, the paper's checkpoint.
 k_shot: 0                        # zero-shot; WinCLIP+ (few-shot) is a separate plan
 scales: [2, 3]                   # multi-scale window sizes
 class_name: per_category         # the object noun in the prompt ensemble = the MVTec AD 2 category
-prompts: paper_verbatim          # protocol §3: no prompt tuning; anomalib encodes the paper ensemble
+prompts: paper_verbatim          # protocol §3: no prompt tuning
+# ⚠️ anomalib does NOT encode the paper ensemble exactly (read 2026-10-03, docs/next-steps.md):
+# state words identical (7 + 4), but 21 templates against the paper's 22 -- "a cropped photo of
+# a [c]." and "a jpeg corrupted photo of a [c]." are missing, and "a jpeg corrupted photo of the
+# [c]." is listed twice. 147/84 prompts, not 154/88. Run-as-shipped vs. patch is UNDECIDED.
+prompt_counts_anomalib: {normal: 147, anomaly: 84, templates: 21, templates_distinct: 20}
+prompt_counts_paper: {normal: 154, anomaly: 88, templates: 22}

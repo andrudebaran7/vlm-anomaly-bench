@@ -1585,6 +1585,63 @@ not, across categories: the two metrics move together.** The dissociation this s
 for is between **lighting conditions within a category**, not between the metrics as such. Both
 reports stand as written; the generalisation does not, and is corrected here and in §6.2.
 
+## WinCLIP Phase A.2–A.3 — anomalib's ensemble is NOT the paper's: 21 templates, one duplicated (2026-10-03)
+
+**Environment of this session** (notebook cell 0.3, Colab, 2026-10-03): `anomalib 2.6.0`,
+`open-clip-torch 2.24.0` (anomalib's `[clip]` extra asks for the range `<2.26.1,>=2.23.0`),
+`torch 2.11.0+cu130`, Python 3.13. Cell 1.1 reproduced the 2026-10-02 A.1 reading exactly
+(signature and `Resize 240 BICUBIC` + CLIP `Normalize`), on a second VM.
+
+**How these were read.** Cell 1.2's `dir()` loop crashed on `WinClipModel.patch_embeddings`, a
+property that raises `RuntimeError` when empty (`getattr`'s default only catches
+`AttributeError`). Instead of iterating, the installed source was read directly: the
+`anomalib-2.6.0-py3-none-any.whl` from PyPI, files `anomalib/models/image/winclip/prompting.py`
+and `torch_model.py`. The paper side is a direct read of arXiv:2303.14814v1, Figure 6, p.12.
+
+### 1. The prompt ensemble: state words match, templates do not
+
+| | paper (Fig. 6) | anomalib 2.6.0 (`prompting.py`) |
+|---|---|---|
+| normal state words | 7 | 7 — identical strings |
+| anomaly state words | 4 | 4 — identical strings |
+| templates | 22 | **21 entries, 20 distinct** |
+| normal prompts | 154 | **147** (140 distinct) |
+| anomaly prompts | 88 | **84** (80 distinct) |
+
+The two paper templates anomalib does not have: **`"a cropped photo of a [c]."`** and **`"a jpeg
+corrupted photo of a [c]."`**. The second appears to have been typed as `"... of the {}."`, so
+`"a jpeg corrupted photo of the {}."` is in the list **twice** and carries double weight in the
+mean (`_collect_text_embeddings` averages all prompt embeddings per class into one vector, so
+`text_embeddings` is `(2, D)`; a duplicate is not harmless).
+
+**This is the plan's pre-registered priority-2 risk #1, now a measured fact, found before any
+score exists.** It is small — 2 of 22 templates, both near-synonyms of templates that are present
+— so it predicts a small shift, not a gate failure. That prediction is written here so it can be
+held to: **if a gate misses by more than ~1 point, the template difference is not a sufficient
+explanation on its own.** Whether to run anomalib as shipped or patch `TEMPLATES` to the paper's
+22 is a protocol decision (§3: priority-2 implementation vs. verbatim paper prompts), NOT taken
+here.
+
+### 2. The weights: `laion400m_e31`
+
+`torch_model.py:54-55`: `BACKBONE = "ViT-B-16-plus-240"`, `PRETRAINED = "laion400m_e31"`,
+loaded by `open_clip.create_model_and_transforms(BACKBONE, pretrained=PRETRAINED)` (834 MB
+download observed in cell 1.2). The paper says "LAION-400M based CLIP with ViT-B/16+" without an
+epoch; open_clip ships both `laion400m_e31` and `laion400m_e32` for this architecture. So
+anomalib's choice is **consistent with** the paper but not shown to be **the** paper's checkpoint.
+`TEMPERATURE = 0.07`.
+
+### 3. ⚠️ Phase B trap: `WinClip(class_name=...)` does NOT build the text embeddings
+
+The Lightning `WinClip.__init__` stores `class_name` but constructs `WinClipModel()` without it,
+so after construction `m.model.class_name is None` (observed in cell 1.2) and `text_embeddings`
+raises. The embeddings are built only by `WinClip.setup(stage)` (the Lightning hook, which calls
+`self.model.setup(self.class_name, ref_images)`) or by calling `m.model.setup(class_name)`
+directly. **`winclip_backend.py` must do one of the two, per category**, because the class name
+is the prompt noun — and a backend that forgot would not fail silently only because
+`text_embeddings` raises. Note also that `_get_class_name` falls back to `"object"` when no name
+is given.
+
 ## WinCLIP Phase A.1 — VERIFIED 2026-10-02, and the "256x256" claim is PatchCore's alone
 
 Read off the installed anomalib 2.6.0 (`inspect.signature` + `WinClip.configure_pre_processor()`),
