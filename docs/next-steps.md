@@ -1657,6 +1657,11 @@ path (same scoring path as PatchCore, away from the paper); measure both on a re
 **PatchCore is untouched and its H1/H2 remain open** — the next PatchCore-side step is check (b)
 below, on a non-square image larger than 256.
 
+**Observed 2026-10-03 on the v0.2.20 backend (`6f18419`, cell 2.3):** `resize_antialias: True`,
+`export_transform` now prints `antialias=True`, and `forward(raw)` = `model(transform(raw))` =
+0.38136384 — the antialiased value cell 2.2 measured. Notebook Phase 2 is closed (2.1: 154/88,
+22 templates, `post_processor None`, category noun reaches the prompts).
+
 **How it gets measured, pre-registered now.** (a) WinCLIP notebook cell 2.2 prints both
 transforms and scores one 480x640 image three ways: `forward`, `model.model(transform(x))`,
 `model.model(export_transform(x))`. Prediction from source: forward == export path, and the
