@@ -1598,6 +1598,14 @@ property that raises `RuntimeError` when empty (`getattr`'s default only catches
 `anomalib-2.6.0-py3-none-any.whl` from PyPI, files `anomalib/models/image/winclip/prompting.py`
 and `torch_model.py`. The paper side is a direct read of arXiv:2303.14814v1, Figure 6, p.12.
 
+**All three findings below were then OBSERVED on the Colab runtime** (same session, rewritten
+cells 1.2–1.4): 1.2 printed `templates 21 | distinct 20`, `prompts normal 147 (distinct 140) |
+anomaly 84 (distinct 80)`, the duplicate and both missing templates as listed below; 1.3 printed
+`inner.class_name = None` after construction and `text_embeddings (2, 640)` after
+`inner.setup('vial')` — D = 640, ViT-B/16+'s embedding width; 1.4 printed `PRETRAINED =
+'laion400m_e31'`, `TEMPERATURE = 0.07`, and open_clip's tags for the architecture as
+`['laion400m_e31', 'laion400m_e32']`. **Phase 1 of the notebook is closed.**
+
 ### 1. The prompt ensemble: state words match, templates do not
 
 | | paper (Fig. 6) | anomalib 2.6.0 (`prompting.py`) |
