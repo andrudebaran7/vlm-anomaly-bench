@@ -1594,6 +1594,54 @@ not, across categories: the two metrics move together.** The dissociation this s
 for is between **lighting conditions within a category**, not between the metrics as such. Both
 reports stand as written; the generalisation does not, and is corrected here and in §6.2.
 
+## ⚠️ HYPOTHESIS, UNMEASURED: `forward()` resizes WITHOUT antialiasing — recorded 2026-10-03 before any test
+
+Found while writing the WinCLIP backend, by reading the anomalib 2.6.0 wheel's source. **Nothing
+below has been run.** It is written down first so that whatever the measurement says, it cannot
+be reinterpreted afterwards.
+
+**What the source says.** `PreProcessor.forward(batch)` — the path `AnomalibModule.forward` takes,
+and therefore the path both backends' `score()` take — is
+`return self.export_transform(batch) if self.export_transform else batch`, NOT `self.transform`.
+`export_transform` is built ONCE, in `PreProcessor.__init__`, as
+`get_exportable_transform(self.transform)`, which deep-copies the transform and calls
+`disable_antialiasing` on every `Resize` (an ONNX-export accommodation). The Lightning loops —
+`on_train_batch_start` and the val/test/predict hooks — apply `self.transform`, antialias intact.
+Files: `anomalib/pre_processing/pre_processor.py:72-144`,
+`anomalib/pre_processing/utils/transform.py:17-80`.
+
+**Why nothing caught it.** Probe stage 11 compares `model(raw)` against
+`model.model(transform(raw))` at a 1e-5 tolerance and passed — but the probe's synthetic images
+are **256x256** (`probe_patchcore.py:74`), so `Resize([256, 256])` is the identity and
+antialiasing has nothing to act on. No probe ever scored an image that needed downscaling.
+
+**H1 — PatchCore's train/test pre-processing differ.** `fit` goes through `engine.train`
+(antialiased resize); `score` goes through `forward` (non-antialiased). If true, every PatchCore
+number in this repo — the classic gate that passed by 0.02, VisA, and all eight MVTec AD 2
+categories — was produced by a memory bank of antialiased features queried with aliased ones.
+Downscaling 1400x1900 or 2448x2048 to 256 without antialiasing aliases fine texture. **This is
+NOT offered as the explanation of the five unusable anchors**; it is a confound none of them was
+run without, and nothing more is claimed until it is measured.
+
+**H2 — the 2026-09-17 CenterCrop refutation may be confounded.** `preprocess="classic"` replaces
+`pre.transform` AFTER construction, so `export_transform` would still be the original
+`Resize([256, 256])`, no crop. If so, the classic run fitted a 28x28-patch bank from centre-crops
+and scored 32x32-patch queries of the whole squashed frame. Probe stage 13 measured only the fit
+side (coreset rows), so it could not see this. "Classic is 4.5 points worse" would then describe
+a mismatched pipeline, not classic PatchCore.
+
+**For WinCLIP** there is no fit, so no train/test mismatch — but `score()` via `forward` resizes
+1400x1900 -> 240 without antialiasing, while the paper's pipeline (PIL bicubic) and anomalib's
+own test loop both antialias.
+
+**How it gets measured, pre-registered now.** (a) WinCLIP notebook cell 2.2 prints both
+transforms and scores one 480x640 image three ways: `forward`, `model.model(transform(x))`,
+`model.model(export_transform(x))`. Prediction from source: forward == export path, and the
+transform path differs. (b) For PatchCore, a probe on a NON-square, larger-than-256 image: print
+`export_transform`, and for a `classic` backend print whether it contains `CenterCrop`. No PatchCore
+number is re-run or re-interpreted before (b) exists, and §7 governs any re-run: it would be a
+separate, dated configuration, never a replacement for the committed numbers.
+
 ## WinCLIP Phase A.2–A.3 — anomalib's ensemble is NOT the paper's: 21 templates, one duplicated (2026-10-03)
 
 **Environment of this session** (notebook cell 0.3, Colab, 2026-10-03): `anomalib 2.6.0`,

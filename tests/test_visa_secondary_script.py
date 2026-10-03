@@ -306,12 +306,16 @@ def test_a_method_without_a_gpu_backend_exits_2(monkeypatch, tmp_path, capsys):
     assert built == [], "it must refuse before building anything"
 
 
-def test_a_method_whose_backend_does_not_exist_is_refused_up_front(tmp_path, capsys):
+def test_a_method_whose_backend_does_not_exist_is_refused_up_front(tmp_path, capsys, monkeypatch):
     """Found in review: registration is not viability, and VisA is a 1.9 GB download."""
+    # WinCLIP's backend exists since 2026-10-03, so a backendless method is simulated: the
+    # real factory, with winclip's backend module pointed at one that does not exist.
+    import vlmab.methods.gpu as gpu
+    monkeypatch.setitem(gpu._BACKEND_MODULES, "winclip", "vlmab.methods.not_built_yet")
     mod = _module()
     rc = mod.main(["--skip-fetch", "--method", "winclip", "--root", str(tmp_path / "nope")])
     assert rc == 2
-    assert "winclip_backend" in capsys.readouterr().err
+    assert "not_built_yet" in capsys.readouterr().err
 
 
 def test_the_hashed_config_carries_the_methods_real_preprocess(monkeypatch, tmp_path):

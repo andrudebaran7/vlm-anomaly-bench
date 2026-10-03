@@ -48,10 +48,16 @@ def test_every_builder_name_is_a_registered_method():
 # --- Final review fix (2026-10-02): registration is not viability ---------------------------
 
 
-def test_a_registered_builder_whose_backend_module_is_absent_is_reported():
-    """Found in review: `winclip` is in gpu_builders(), so the runners' up-front check passed
-    and the run died inside the lazy import — after fetching and extracting up to 10 GB."""
-    assert gpu.missing_backend("winclip") == "vlmab.methods.winclip_backend"
+def test_a_registered_builder_whose_backend_module_is_absent_is_reported(monkeypatch):
+    """Found in review: `winclip` was in gpu_builders() before its backend existed, so the
+    runners' up-front check passed and the run died inside the lazy import — after fetching and
+    extracting up to 10 GB. Its backend now exists, so the absent module is simulated."""
+    monkeypatch.setitem(gpu._BACKEND_MODULES, "winclip", "vlmab.methods.not_built_yet")
+    assert gpu.missing_backend("winclip") == "vlmab.methods.not_built_yet"
+
+
+def test_winclips_backend_now_exists():
+    assert gpu.missing_backend("winclip") is None
 
 
 def test_a_method_whose_backend_exists_reports_nothing_missing():
