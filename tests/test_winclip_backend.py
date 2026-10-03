@@ -149,3 +149,62 @@ def test_the_config_records_the_template_decision_the_backend_implements():
     assert cfg["prompt_counts_paper"] == {"normal": 154, "anomaly": 88, "templates": 22}
     assert cfg["pretrained_resolved"] == "laion400m_e31"
     assert cfg["anomalib_version"] == "2.6.0"
+
+
+# --- protocol §3 v0.2.20: forward() uses the antialiased transform -------------------------------
+
+
+class Resize:   # named like torchvision's, which is what the helper inspects
+    def __init__(self, antialias):
+        self.antialias = antialias
+
+
+class Normalize:
+    pass
+
+
+class Compose:
+    def __init__(self, transforms):
+        self.transforms = transforms
+
+
+def _fake_pre(antialias_in_transform=True):
+    pre = SimpleNamespace(
+        transform=Compose([Resize(antialias_in_transform), Normalize()]),
+        export_transform=Compose([Resize(False), Normalize()]),
+    )
+    return pre
+
+
+def test_forward_is_routed_to_the_antialiased_transform():
+    """Measured 2026-10-03 (cell 2.2): PreProcessor.forward applies `export_transform`, a copy of
+    `transform` with antialiasing disabled. The helper makes forward apply `transform` itself."""
+    from vlmab.methods.winclip_backend import use_antialiased_forward
+
+    pre = _fake_pre()
+    use_antialiased_forward(pre)
+    assert pre.export_transform is pre.transform
+
+
+def test_routing_refuses_a_transform_whose_resize_does_not_antialias():
+    """If anomalib's own `transform` ever stops antialiasing, routing forward to it would not do
+    what v0.2.20 records, so it must fail loudly rather than report a configuration it lacks."""
+    from vlmab.methods.winclip_backend import use_antialiased_forward
+
+    with pytest.raises(RuntimeError, match="antialias"):
+        use_antialiased_forward(_fake_pre(antialias_in_transform=False))
+
+
+def test_routing_refuses_a_transform_with_no_resize():
+    from vlmab.methods.winclip_backend import use_antialiased_forward
+
+    pre = SimpleNamespace(transform=Compose([Normalize()]), export_transform=None)
+    with pytest.raises(RuntimeError, match="Resize"):
+        use_antialiased_forward(pre)
+
+
+def test_the_config_records_the_antialiased_resize():
+    import yaml
+
+    cfg = yaml.safe_load((ROOT / "configs" / "methods" / "winclip.yaml").read_text())
+    assert cfg["resize_antialias"] is True

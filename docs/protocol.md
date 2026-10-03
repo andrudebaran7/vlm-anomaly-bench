@@ -184,6 +184,17 @@ to substitute.
   number exists. Every WinCLIP table carries the provenance line *anomalib 2.6.0 with the paper's
   22 prompt templates*.
 
+- **WinCLIP resizes with antialiasing (v0.2.20).** anomalib's `PreProcessor.forward` — the path a
+  direct model call takes — applies `export_transform`, a copy of the model's transform with
+  antialiasing disabled on every `Resize` (an ONNX-export accommodation), while anomalib's own
+  Lightning test loop applies the transform itself, antialias on. The paper's pipeline (PIL bicubic)
+  antialiases too. Measured 2026-10-03 on Colab: the direct call equals the export path to eight
+  decimals and differs from the antialiased one. WinCLIP's backend therefore routes `forward` to
+  the antialiased transform, and refuses to run if that transform has no antialiasing `Resize`.
+  **This is a WinCLIP decision only.** PatchCore's committed numbers were scored through the
+  export path; whether its fit path differs, and by how much, is unmeasured and recorded as a
+  hypothesis in docs/next-steps.md. No PatchCore number is re-run or re-read under this bullet.
+
 - **Full-shot anchors.** A full-shot method (the PatchCore anchor) builds a per-category memory
   bank from that category's defect-free `train` split before scoring its test images. It declares
   `zero_shot = False`; the runner calls `fit(train_images, category)` once per category. This is the
@@ -625,3 +636,15 @@ pre-processing that produced them.
   existing number moves.
   Provenance: ../vlm-anomaly-paper/docs/verified-literature-facts.md (Fig. 6 template list,
   2026-10-03); docs/next-steps.md, "WinCLIP Phase A.2–A.3".
+- 2026-10-03 — v0.2.20. §3: WinCLIP's `forward` resizes with antialiasing. Found reading the
+  anomalib 2.6.0 source while writing WinCLIP's backend, recorded as a hypothesis before any
+  measurement, then measured on Colab (notebook cell 2.2): `forward(raw)` = 0.36831278 =
+  `model(export_transform(raw))`; `model(transform(raw))` = 0.38136384. Probe stage 11 could not
+  see it because its images were 256x256 and its Resize the identity. Decided by the author before
+  any WinCLIP score on real data, over two alternatives (keep the export path, matching
+  PatchCore's scoring path; measure both on a real category first). The consequence for
+  PatchCore — a possible train/test pre-processing mismatch in every committed number, and a
+  possibly confounded CenterCrop refutation — is NOT resolved by this entry. No metric definition
+  changed and no existing number moves.
+  Provenance: docs/next-steps.md, "HYPOTHESIS, UNMEASURED: forward() resizes WITHOUT
+  antialiasing" and its 2026-10-03 measurement.

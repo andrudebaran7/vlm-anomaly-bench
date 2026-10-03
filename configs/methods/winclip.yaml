@@ -11,6 +11,10 @@ torch_build: "2.11.0+cu130"     # Colab 2026-10-03; PatchCore's numbers are cu12
 # Resize([240, 240], BICUBIC, antialias) + CLIP Normalize. NOT PatchCore's 256 BILINEAR; the
 # backend must hand forward() a raw [0,1] tensor, since forward() applies this itself.
 input_transform: resize_240_bicubic_clip_normalize
+# forward() would apply anomalib's EXPORT transform (antialias=False; measured 2026-10-03, cell 2.2).
+# Protocol §3 v0.2.20: the backend routes forward to the antialiased transform, as the paper and
+# anomalib's own test loop do. PatchCore's numbers did NOT get this (docs/next-steps.md, H1/H2).
+resize_antialias: true
 backbone: ViT-B-16-plus-240      # WinCLIP's CLIP backbone (paper §5: ViT-B/16+, 240^2 input)
 # The paper's weights, read from the PDF 2026-09-18: "we use the LAION-400M based CLIP with
 # ViT-B/16+ unless otherwise noted" (arXiv:2303.14814 §5). anomalib's WinClip picks its own
