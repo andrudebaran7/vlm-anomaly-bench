@@ -1630,6 +1630,10 @@ explanation on its own.** Whether to run anomalib as shipped or patch `TEMPLATES
 22 is a protocol decision (§3: priority-2 implementation vs. verbatim paper prompts), NOT taken
 here.
 
+**DECIDED 2026-10-03 (protocol §3 v0.2.18): patch to the paper's 22.** Alternatives considered:
+run as shipped (simpler provenance, but a non-published ensemble under WinCLIP's name), and run
+both at the gate (double the gate GPU cost). The backend replaces `TEMPLATES` before `setup()`.
+
 ### 2. The weights: `laion400m_e31`
 
 `torch_model.py:54-55`: `BACKBONE = "ViT-B-16-plus-240"`, `PRETRAINED = "laion400m_e31"`,

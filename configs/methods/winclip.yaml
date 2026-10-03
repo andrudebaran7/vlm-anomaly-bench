@@ -28,6 +28,8 @@ prompts: paper_verbatim          # protocol §3: no prompt tuning
 # ⚠️ anomalib does NOT encode the paper ensemble exactly (read 2026-10-03, docs/next-steps.md):
 # state words identical (7 + 4), but 21 templates against the paper's 22 -- "a cropped photo of
 # a [c]." and "a jpeg corrupted photo of a [c]." are missing, and "a jpeg corrupted photo of the
-# [c]." is listed twice. 147/84 prompts, not 154/88. Run-as-shipped vs. patch is UNDECIDED.
+# [c]." is listed twice. 147/84 prompts, not 154/88. DECIDED 2026-10-03 (protocol §3 v0.2.18):
+# the backend replaces the templates with the paper's 22 before setup(); the state words are untouched.
+templates: paper_22               # protocol §3 v0.2.18; held at 154/88 by a test
 prompt_counts_anomalib: {normal: 147, anomaly: 84, templates: 21, templates_distinct: 20}
 prompt_counts_paper: {normal: 154, anomaly: 88, templates: 22}
