@@ -90,4 +90,18 @@ not_the_target:
 # seeing a result. The paper's own 0-shot rows carry ±0.0 over its 5 seeds, but that is evidence
 # about ITS pipeline (its seeds vary shot sampling, which zero-shot has none of), not about ours
 # — and PatchCore is the standing reminder that a seed can be recorded without being applied.
-n_seeds: 3
+#
+# MEASURED 2026-10-03 (notebook cells 3.2-3.3, Colab T4, backend 6f18419 = protocol v0.2.20):
+# toothbrush (MVTec AD classic's smallest category), seeds 0 and 1, each through a freshly built
+# backend: 42 images, image scores BIT-IDENTICAL (max |delta| 0.000e+00). By the procedure above,
+# the adapter is deterministic, §6's condition does not apply, and ONE run is the reportable number.
+# n_seeds was 3 until this measurement; the change is the pre-registered outcome, not a choice.
+n_seeds: 1
+determinism_measured:
+  date: "2026-10-03"
+  category: toothbrush
+  seeds: [0, 1]
+  images: 42
+  bit_identical: true
+  max_abs_delta: 0.0
+  shards: results/reproduction/winclip/probe_a4/shards   # on the Colab VM; a probe, never a gate input

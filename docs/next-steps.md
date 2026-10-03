@@ -1594,6 +1594,38 @@ not, across categories: the two metrics move together.** The dissociation this s
 for is between **lighting conditions within a category**, not between the metrics as such. Both
 reports stand as written; the generalisation does not, and is corrected here and in §6.2.
 
+## WinCLIP is deterministic, and both gates fit one session (2026-10-03, notebook phase 3)
+
+`toothbrush` (MVTec AD classic, 42 test images), seeds 0 and 1, each through a freshly built
+v0.2.20 backend (`6f18419`), into `results/reproduction/winclip/probe_a4` — a probe directory, so
+it can never pool with a gate run.
+
+**A.4 — determinism: bit-identical.** 42/42 image scores equal, max |delta| 0.000e+00. By the
+procedure pre-registered in `configs/reproduction/winclip.yaml` on 2026-09-18, **one run is the
+reportable number**; `n_seeds` is now 1 there, with the measurement recorded beside it and a test
+that refuses `n_seeds: 1` without it. `run_mvtec_ad.py` and `run_mvtec_ad2.py` therefore get
+**`--seeds 0`** — their default is PatchCore's (0, 1, 2), three identical copies at triple the cost.
+`run_visa_secondary.py` already takes a single `--seed` (default 0).
+
+**Cost — a planning number only, never reported (protocol §5: no latency from Colab).**
+`latency_ms` median **1104.9**, p90 1450.9, max 2105.3 (first image, warm-up); wall time 133.9 s
+for 2 x 42 images including two model loads. The latency includes the upsample to native
+resolution and the float16 map write, so it is an end-to-end per-image cost. At ~1.1-1.5 s/image:
+
+| run | test images | estimate |
+|---|---|---|
+| MVTec AD classic gate (15 categories) | 1,725 | ~30-45 min |
+| VisA gate (12 objects; larger frames) | 2,162 | ~40-55 min + the 1.9 GB download |
+
+**Both gates fit one T4 session**, unlike PatchCore's, whose VisA alone was ~2 h of coreset
+fitting. WinCLIP builds no memory bank, which is what the spec predicted would make the cost
+model not transfer.
+
+**One runner gap, recorded not fixed:** `run_mvtec_ad2.py`'s report prints "Protocol §6 requires
+three [seeds] for any reported number" whenever fewer than three ran. For WinCLIP that sentence is
+now false — §6's condition was measured absent. It must be made method-aware before WinCLIP's
+first MVTec AD 2 report is written (descope item D).
+
 ## ⚠️ HYPOTHESIS, UNMEASURED: `forward()` resizes WITHOUT antialiasing — recorded 2026-10-03 before any test
 
 Found while writing the WinCLIP backend, by reading the anomalib 2.6.0 wheel's source. **Nothing
