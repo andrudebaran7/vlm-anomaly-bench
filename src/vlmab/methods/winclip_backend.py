@@ -1,7 +1,7 @@
 """anomalib WinCLIP backend for WinClipRef (GPU/Colab only).
 
 Bridges the seam score(image, category) -> (raw_score, raw_map) to anomalib 2.6.0's zero-shot
-WinClip. Three things here are not what anomalib does on its own, and each is deliberate:
+WinClip. Four things here are not what anomalib does on its own, and each is deliberate:
 
 1. **The prompt templates are the paper's 22, not anomalib's 21** (protocol §3 v0.2.19).
    anomalib's `prompting.TEMPLATES` lacks "a cropped photo of a {}." and "a jpeg corrupted photo
@@ -20,6 +20,12 @@ WinClip. Three things here are not what anomalib does on its own, and each is de
    validation run) its `_normalize` is a no-op, so the scores would be raw today — by accident of
    state rather than by construction. `post_processor=False` makes them raw by construction
    (protocol v0.2.6: no per-image normalisation; WinClipRef upsamples the map to native size).
+
+4. **forward() resizes WITH antialiasing** (protocol §3 v0.2.20). `PreProcessor.forward` applies
+   `export_transform`, a copy of `transform` with antialiasing disabled on every Resize (an ONNX
+   accommodation), while anomalib's own Lightning test loop and the paper's PIL bicubic both
+   antialias. Measured 2026-10-03, notebook cell 2.2: forward == the export path to 8 decimals,
+   0.013 away from the antialiased one. `use_antialiased_forward` routes forward to `transform`.
 
 The PRE-processor is kept, and that is why `score()` hands the model a raw [0,1] tensor at native
 resolution: forward applies Resize([240, 240], BICUBIC) + CLIP Normalize itself. Doing either here
@@ -90,6 +96,30 @@ def apply_paper_templates(prompting) -> dict[str, int]:
     return counts
 
 
+def use_antialiased_forward(pre) -> None:
+    """Make `pre.forward` apply `pre.transform` (antialiased) instead of `pre.export_transform`.
+
+    `pre` is the model's anomalib PreProcessor (a parameter so CPU tests can pass a stand-in).
+    `forward` reads `self.export_transform` at call time, so pointing it at `transform` is enough;
+    no anomalib code is replaced. Refuses unless `transform` really contains an antialiasing
+    Resize, so the configuration recorded in v0.2.20 cannot be claimed for a pipeline without it.
+    """
+    transform = getattr(pre, "transform", None)
+    steps = list(getattr(transform, "transforms", [transform]))
+    resizes = [t for t in steps if type(t).__name__ == "Resize"]
+    if not resizes:
+        raise RuntimeError(
+            f"the pre-processor's transform {steps!r} has no Resize; protocol §3 v0.2.20 assumed "
+            "anomalib's Resize([240, 240], BICUBIC, antialias=True)"
+        )
+    if not all(getattr(r, "antialias", False) is True for r in resizes):
+        raise RuntimeError(
+            f"the pre-processor's Resize does not antialias ({resizes!r}); routing forward to it "
+            "would not give the antialiased resize protocol §3 v0.2.20 records"
+        )
+    pre.export_transform = transform
+
+
 class WinClipBackend:
     def __init__(
         self,
@@ -117,6 +147,9 @@ class WinClipBackend:
 
         self._device = device
         self._model = WinClip(k_shot=0, scales=tuple(scales), post_processor=False)
+        use_antialiased_forward(self._model.pre_processor)
+        # Public, like `seed`: what a report needs to state about the input pipeline.
+        self.resize_antialias = True
         self._model.eval().to(device)
         self._category: str | None = None
 
@@ -150,8 +183,8 @@ class WinClipBackend:
                 f"expected an HxWx3 RGB image, got shape {arr.shape}; grayscale is converted "
                 "to 3-channel upstream (protocol §3)"
             )
-        # Raw [0,1] at native resolution: the model's own pre-processor resizes to 240 and
-        # CLIP-normalises inside forward. See the module docstring, point 3 and below it.
+        # Raw [0,1] at native resolution: the model's own pre-processor resizes to 240 (with
+        # antialiasing, point 4) and CLIP-normalises inside forward. See the module docstring.
         tensor = torch.from_numpy(arr).permute(2, 0, 1).float().div_(255.0)
         tensor = tensor.unsqueeze(0).to(self._device)   # 1x3xHxW
 

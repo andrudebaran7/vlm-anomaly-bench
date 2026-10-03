@@ -1651,6 +1651,12 @@ measurement:** it is the same `PreProcessor` class, so its `score()` path is all
 non-antialiased too, but neither the fit-side behaviour on real images nor the size of the effect
 on any PatchCore number has been measured, and H2 (the classic run) is untested.
 
+**DECIDED 2026-10-03 (protocol §3 v0.2.20), for WinCLIP only:** its backend routes `forward` to
+the antialiased `transform` (`use_antialiased_forward`). Alternatives considered: keep the export
+path (same scoring path as PatchCore, away from the paper); measure both on a real category first.
+**PatchCore is untouched and its H1/H2 remain open** — the next PatchCore-side step is check (b)
+below, on a non-square image larger than 256.
+
 **How it gets measured, pre-registered now.** (a) WinCLIP notebook cell 2.2 prints both
 transforms and scores one 480x640 image three ways: `forward`, `model.model(transform(x))`,
 `model.model(export_transform(x))`. Prediction from source: forward == export path, and the
