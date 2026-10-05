@@ -51,6 +51,9 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 > G (figures). Read `docs/superpowers/specs/2026-10-01-short-paper-descope-design.md` for each.
 > This list was not updated when the spec was approved, which is how a 2026-10-03 session nearly
 > missed it.
+>
+> **▶ CURRENT STATE (2026-10-05): WinCLIP's MVTec AD classic gate FAILED (90.37 vs 91.8).** Go to
+> "Where to pick up (session handoff, 2026-10-05)" — the decisions owed are listed there.
 
 1. **PatchCore — finish the Colab session** (plan:
    `docs/superpowers/plans/2026-07-24-patchcore-anomalib-backend-colab.md`; driver:
