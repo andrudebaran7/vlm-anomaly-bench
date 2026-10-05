@@ -1594,6 +1594,56 @@ not, across categories: the two metrics move together.** The dissociation this s
 for is between **lighting conditions within a category**, not between the metrics as such. Both
 reports stand as written; the generalisation does not, and is corrected here and in §6.2.
 
+## Where to pick up (session handoff, 2026-10-05) — WinCLIP's MVTec AD gate FAILED; a decision is owed
+
+**Read this first.** Everything up to the gate is committed and pushed (`ba331ee`). The scope is
+the short paper (protocol v0.2.18: PatchCore + WinCLIP only). Protocol is at **v0.2.20**.
+
+### The result (2026-10-03, ~13:00 UTC, Colab T4, backend `6f18419`, one seed per A.4)
+
+    Verdict: FAIL — measured mean I-AUROC 90.37 against published 91.8 (delta -1.43, tolerance ±1.0)
+    7 of 15 categories outside ±1.0 on their own:
+      cable -1.55 | capsule -4.61 | hazelnut -1.15 | pill +2.11 | screw -11.13 | toothbrush -1.94 | wood -1.77
+    Source: arXiv:2303.14814 Table 1, 0-shot, WinCLIP (ours), MVTec-AD AUROC
+
+Recorded from the verdict block `scripts/reproduction_gate.py` printed, as pasted by the author.
+**The per-category table was NOT captured**: cell 4.4 (print the report, copy it and the shards
+to `MyDrive/reproduction/winclip/`) was added but never run, and the VM has very likely been
+recycled since. Nothing is lost that cannot be regenerated: WinCLIP is **bit-identical across
+runs** (A.4), so re-running notebook 4.1 → 4.2 → 4.3 → 4.4 (~40 min) reproduces the same shards
+exactly — and doing so is a reproducibility check, not a second draw, since no configuration
+changes.
+
+**One arithmetic observation, explicitly NOT a conclusion:** screw's -11.13 is ~-0.74 of the
+-1.43 mean shortfall, the same shape as PatchCore's toothbrush in its first gate run. "Without
+screw it would pass" is a post-hoc reading §7 forbids acting on.
+
+### What was pre-registered for exactly this case
+
+1. **Protocol §2:** a method that does not reproduce has its frontier results flagged as such in
+   every table.
+2. **Protocol v0.2.18 (descope spec, 2026-10-01):** if WinCLIP misses either gate by more than
+   1.0, the paper falls back to the anchor and the methodology alone (C1 + C3), no zero-shot
+   numbers, §1–§3 rewritten accordingly.
+3. **Protocol v0.2.19:** a miss of more than ~1 point is not explained by the template difference
+   alone — and the templates were already the paper's 22 in this run.
+
+### The decisions owed, in order (none taken)
+
+1. **Capture the evidence**: re-run 4.1–4.4 (deterministic, so the same shards), commit the full
+   report as `results/reproduction/winclip_mvtec_ad.md` and the shards to Drive.
+2. **Apply the v0.2.18 contingency** (C1 + C3), or argue it does not apply. It reads as applying.
+3. **Run the VisA gate anyway?** It cannot rescue WinCLIP under (2), but a second reproduction
+   datum is evidence for C3 ("reproduction criteria do not survive practice"). ~1 h.
+4. **Investigate anything?** Only what was recorded as uncertain BEFORE the run may be examined:
+   the weights are `laion400m_e31`, recorded 2026-10-03 as "consistent with, not shown to be, the
+   paper's checkpoint" (open_clip also ships `e32`). Trying `e32` because the gate failed and
+   keeping whichever scores better is §7's "best of N" — admissible only if the choice is settled
+   on grounds independent of the score (e.g. a source stating which epoch the paper used), and
+   recorded before the run.
+5. **PatchCore's open hypotheses H1/H2** (forward resizes without antialiasing; the CenterCrop
+   refutation possibly confounded) are independent of this and still owed check (b), below.
+
 ## WinCLIP is deterministic, and both gates fit one session (2026-10-03, notebook phase 3)
 
 `toothbrush` (MVTec AD classic, 42 test images), seeds 0 and 1, each through a freshly built
