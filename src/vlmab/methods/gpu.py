@@ -19,6 +19,19 @@ from vlmab.methods.base import AnomalyMethod
 #: the anomalib transform. The factory does not expose it as a parameter — the probe does.
 PREPROCESS = "anomalib"
 
+#: Where a method's results live, when that differs from its name. A label changes ONLY with a
+#: new protocol version that changes the method's scoring path (PatchCore, v0.2.21: the forward
+#: resizes with antialiasing). The reason is mechanical: the runner restores shards from Drive and
+#: skips any (method, category, seed) whose shard exists, so a corrected run that shared the old
+#: directory would restore the old shards and silently skip every new seed. The method name
+#: inside the shards does not change -- only where they are filed.
+_RESULTS_LABELS: dict[str, str] = {"patchcore_ref": "patchcore_ref_v0.2.21"}
+
+
+def results_label(method: str) -> str:
+    """The directory name for a method's results: its own name unless a protocol version moved it."""
+    return _RESULTS_LABELS.get(method, method)
+
 
 def _patchcore(seed: int | None) -> AnomalyMethod:
     from vlmab.methods.patchcore_backend import PatchCoreBackend

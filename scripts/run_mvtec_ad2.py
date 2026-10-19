@@ -40,6 +40,8 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from vlmab.methods.gpu import results_label  # light: every heavy import in it is function-local
+
 #: Protocol §6: three seeds wherever stochasticity exists, and PatchCore's coreset sampling is
 #: stochastic — measured 2026-08-26, and the reason the whole seed-provenance apparatus exists.
 DEFAULT_SEEDS = (0, 1, 2)
@@ -59,12 +61,17 @@ def default_results(method: str, category: str) -> Path:
     PatchCore's pre-2026-10-01 shards at the un-scoped location are not migrated: M3 is closed
     and its numbers live in committed reports, so a re-run for figures re-fits rather than
     restoring, which is what figure regeneration wants anyway.
+
+    PatchCore's v0.2.21 shards get their own label (`results_label`) for a sharper reason: the
+    runner restores from Drive and then skips whatever `is_done` finds, so corrected runs filed
+    under the old directory would restore the old-protocol shards and skip every new seed without
+    a word. A new label makes the old tree unreachable from a new run by construction.
     """
-    return Path("results/mvtec_ad2") / method / category
+    return Path("results/mvtec_ad2") / results_label(method) / category
 
 
 def default_drive_results(method: str, category: str) -> Path:
-    return DRIVE_RESULTS / method / category
+    return DRIVE_RESULTS / results_label(method) / category
 
 
 class DriveNotMounted(RuntimeError):

@@ -94,3 +94,11 @@ def test_importing_the_factory_and_checking_viability_imports_no_torch():
 def test_an_unknown_name_has_no_backend_to_miss():
     with pytest.raises(KeyError):
         gpu.missing_backend("not_a_method")
+
+
+def test_patchcore_results_go_under_the_v0221_label():
+    assert gpu.results_label("patchcore_ref") == "patchcore_ref_v0.2.21"
+
+
+def test_winclip_keeps_its_method_name_as_label():
+    assert gpu.results_label("winclip") == "winclip"

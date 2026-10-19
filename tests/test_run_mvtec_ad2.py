@@ -499,7 +499,7 @@ def test_two_methods_do_not_share_a_shard_directory(harness):
     a = mod.default_results("patchcore_ref", "vial")
     b = mod.default_results("winclip", "vial")
     assert a != b
-    assert a.parts[-2:] == ("patchcore_ref", "vial")
+    assert a.parts[-2:] == ("patchcore_ref_v0.2.21", "vial")
     assert b.parts[-2:] == ("winclip", "vial")
 
 
@@ -698,3 +698,30 @@ def test_a_method_whose_backend_does_not_exist_is_refused_before_any_download(tm
     assert "not_built_yet" in err, (
         "the refusal must name the module that is missing, not look like a missing archive"
     )
+
+
+def test_default_results_never_point_at_the_pre_v0221_patchcore_tree():
+    mod = _module()
+    assert mod.default_results("patchcore_ref", "vial") != Path("results/mvtec_ad2/patchcore_ref/vial")
+    assert mod.default_drive_results("patchcore_ref", "vial") != mod.DRIVE_RESULTS / "patchcore_ref" / "vial"
+    assert mod.default_results("patchcore_ref", "vial") == Path(
+        "results/mvtec_ad2/patchcore_ref_v0.2.21/vial")
+    # WinCLIP's protocol did not change, so its tree and its resumable shards stay where they are.
+    assert mod.default_results("winclip", "vial") == Path("results/mvtec_ad2/winclip/vial")
+
+
+def test_a_new_run_restores_nothing_from_the_old_drive_tree(tmp_path):
+    """An old-protocol shard on Drive must not be restored into a v0.2.21 run: `is_done` would
+    then skip every seed and the corrected PatchCore would silently never run."""
+    mod = _module()
+    old_shards = tmp_path / "drive" / "patchcore_ref" / "vial" / "shards"
+    old_shards.mkdir(parents=True)
+    (old_shards / "mvtec_ad2__patchcore_ref__vial__seed0.parquet").write_bytes(b"old")
+
+    results = tmp_path / mod.default_results("patchcore_ref", "vial")
+    drive = tmp_path / "drive" / mod.default_drive_results("patchcore_ref", "vial").relative_to(
+        mod.DRIVE_RESULTS)
+    mod.restore_from_drive(results, drive)
+
+    shards = results / "shards"
+    assert not shards.exists() or not list(shards.iterdir())

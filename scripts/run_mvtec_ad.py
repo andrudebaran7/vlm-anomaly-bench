@@ -28,6 +28,8 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from vlmab.methods.gpu import results_label  # light: every heavy import in it is function-local
+
 #: Protocol §6: three seeds wherever stochasticity exists. Nothing here decides that a method is
 #: deterministic -- that is a measurement, and WinCLIP's targets file pre-registers how to make
 #: it. Fewer than three warns and continues, the same as the AD 2 runner.
@@ -40,7 +42,7 @@ N_CATEGORIES = 15
 def default_results(method: str) -> Path:
     """Method-scoped, for the reason `run_mvtec_ad2.default_results` documents: the gate reads
     every shard in the directory, and two methods there would be scored as one."""
-    return Path("results/reproduction") / method / "mvtec_ad"
+    return Path("results/reproduction") / results_label(method) / "mvtec_ad"
 
 
 def run_one_seed(root: Path, results: Path, seed: int, device: str, method_name: str,

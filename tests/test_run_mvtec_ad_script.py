@@ -172,3 +172,10 @@ def test_the_store_is_rooted_at_the_shards_subdirectory(harness, tmp_path):
     harness["main"](["--method", "winclip", "--seeds", "0"])
     store = harness["stores"][0]
     assert Path(store.root) == tmp_path / "out" / "shards"
+
+
+def test_default_results_uses_the_v0221_label_for_patchcore():
+    mod = _module()
+    assert mod.default_results("patchcore_ref") == Path(
+        "results/reproduction/patchcore_ref_v0.2.21/mvtec_ad")
+    assert mod.default_results("winclip") == Path("results/reproduction/winclip/mvtec_ad")
