@@ -586,11 +586,17 @@ def _classic_preprocessing(ctx):
     Grounding: the 2026-09-16 reproduction run printed exactly 102.4 coreset points per training
     image across all 15 categories, i.e. 1024 patches at ratio 0.1. Classic PatchCore's
     Resize(256) -> CenterCrop(224) should give 784.
+
+    Superseded 2026-10-19 by protocol v0.2.21: `classic` is refused, so this stage now returns
+    early after building its images; the measurement code below is the historical record.
     """
     from vlmab.methods.patchcore_backend import PatchCoreBackend, preprocess_spec
 
     # Cell 3b.0 runs this stage alone, so stage 2 has not run. Build the corpus here.
     images = synthetic_images(ctx)
+    print("  skipped — superseded by protocol v0.2.21 (classic refused)")
+    return "skipped — superseded by protocol v0.2.21 (classic refused)"
+    # Historical record below: unreachable under v0.2.21, kept untouched.
 
     def coreset_rows(backend):
         bank = backend._model.model.memory_bank
@@ -660,13 +666,16 @@ def _resize_path(ctx):
     this; a re-run would be a separate, dated configuration under protocol §7.
 
     Superseded 2026-10-19 by stage 15; it builds a `classic` backend, which v0.2.21 refuses, so it
-    no longer runs.
+    now returns early after building its images; the measurement code below is the historical record.
     """
     import numpy as np
     from vlmab.methods.patchcore_backend import PatchCoreBackend
 
     # Before torch is imported, so the stage gets this far on CPU (tests/test_probe_stage14.py).
     images = synthetic_images(ctx)
+    print("  skipped — superseded by protocol v0.2.21 (classic refused)")
+    return "skipped — superseded by protocol v0.2.21 (classic refused)"
+    # Historical record below: unreachable under v0.2.21, kept untouched.
     import torch
 
     query = np.random.default_rng(1).integers(0, 256, (480, 640, 3), dtype=np.uint8)
@@ -729,7 +738,9 @@ def _resize_path(ctx):
     return f"H1 {'confirmed' if h1 else 'refuted'}, H2 {'confirmed' if h2 else 'refuted'}"
 
 
-@stage("15. score() resizes with antialiasing (v0.2.21 guard)", "forward == train path")
+@stage("15. score() resizes with antialiasing (v0.2.21 guard)",
+       "forward == train path: stage 14 measured forward == the non-antialiased export path on a "
+       "480x640 image; v0.2.21 routes forward through `transform`, so the two must now agree")
 def _antialiased_guard(ctx):
     """The standing guard for protocol v0.2.21: stage 14 measured forward == export path (50.480389)
     != train path (32.635822); the backend now routes forward through `transform`, so on the real
