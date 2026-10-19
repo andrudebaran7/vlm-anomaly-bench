@@ -658,6 +658,9 @@ def _resize_path(ctx):
     has to be re-derived from the source. A confirmed hypothesis is a PASS -- the stage measures,
     it does not decide anything. Per next-steps, no PatchCore number is re-run or re-read from
     this; a re-run would be a separate, dated configuration under protocol §7.
+
+    Superseded 2026-10-19 by stage 15; it builds a `classic` backend, which v0.2.21 refuses, so it
+    no longer runs.
     """
     import numpy as np
     from vlmab.methods.patchcore_backend import PatchCoreBackend
@@ -724,3 +727,57 @@ def _resize_path(ctx):
     print(f"  H2 (classic score path has no CenterCrop): {'CONFIRMED' if h2 else 'REFUTED'}"
           f"  forward map {c['forward_map']} vs train map {c['train_map']}")
     return f"H1 {'confirmed' if h1 else 'refuted'}, H2 {'confirmed' if h2 else 'refuted'}"
+
+
+@stage("15. score() resizes with antialiasing (v0.2.21 guard)", "forward == train path")
+def _antialiased_guard(ctx):
+    """The standing guard for protocol v0.2.21: stage 14 measured forward == export path (50.480389)
+    != train path (32.635822); the backend now routes forward through `transform`, so on the real
+    runtime forward, score() and the train path must agree, and the backend must say so and refuse
+    the `classic` pre-processor.
+    """
+    import numpy as np
+    from vlmab.methods.patchcore_backend import PatchCoreBackend
+
+    # Before torch is imported, so the stage gets this far on CPU (tests/test_probe_stage15.py).
+    images = synthetic_images(ctx)
+    import torch
+
+    query = np.random.default_rng(1).integers(0, 256, (480, 640, 3), dtype=np.uint8)
+    raw = _model_input(ctx, query)
+
+    def run(module, x):
+        with torch.no_grad():
+            out = module(x)
+        return float(out.pred_score.reshape(-1)[0].item())
+
+    def same(a, b):
+        return abs(a - b) / max(abs(a), 1e-6) < 1e-5
+
+    b = PatchCoreBackend(seed=0, num_workers=2)
+    b.fit(iter(images))
+    model = b._model
+    transform, export = model.pre_processor.transform, model.pre_processor.export_transform
+
+    fwd = run(model, raw)
+    exp = run(model.model, export(raw.squeeze(0)).unsqueeze(0))
+    trn = run(model.model, transform(raw.squeeze(0)).unsqueeze(0))
+    shipped = b.score(query)[0]
+    print(f"  forward     : {fwd:.6f}")
+    print(f"  export path : {exp:.6f}")
+    print(f"  train path  : {trn:.6f}")
+    print(f"  score()     : {shipped:.6f}")
+
+    assert same(fwd, trn), (
+        f"forward {fwd:.6f} != train path {trn:.6f}: the non-antialiased export path is back "
+        f"(export path {exp:.6f}). v0.2.21 is broken on this runtime."
+    )
+    assert same(shipped, fwd), f"score() {shipped:.6f} != forward {fwd:.6f}"
+    assert b.resize_antialias is True, f"resize_antialias is {b.resize_antialias!r}, expected True"
+    try:
+        PatchCoreBackend(preprocess="classic")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("PatchCoreBackend(preprocess='classic') did not raise ValueError")
+    return f"forward == train path (delta {fwd - trn:+.2e})"
