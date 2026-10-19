@@ -149,3 +149,29 @@ def test_visa_defaults_follow_the_v0221_label_for_patchcore_only():
     assert mod.REPORT == runner.default_out("patchcore_ref")
     assert mod.default_shards("winclip") == runner.default_results("winclip") / "shards"
     assert mod.default_report("winclip") == runner.default_out("winclip")
+
+
+def test_the_default_destination_is_label_scoped_so_old_drive_shards_survive(tmp_path, monkeypatch):
+    """Found in the 2026-10-19 whole-branch review: DEST was fixed and the copy is
+    `copytree(dirs_exist_ok=True)`. Shard filenames are the same before and after v0.2.21, so a
+    v0.2.21 PatchCore save would have overwritten the old-configuration shards already on Drive
+    at `MyDrive/reproduction_visa/shards` (spec anti-goal). The default is now
+    `DEST / results_label(method)`; the old shards at `DEST/shards` are never touched."""
+    mod = _module()
+    assert mod.default_dest("patchcore_ref") == mod.DEST / "patchcore_ref_v0.2.21"
+    assert mod.default_dest("winclip") == mod.DEST / "winclip"
+
+    drive = tmp_path / "drive"
+    old = drive / "shards" / "visa__patchcore_ref__candle__seed0.parquet"
+    old.parent.mkdir(parents=True)
+    old.write_bytes(b"OLD CONFIGURATION")
+    monkeypatch.setattr(mod, "DEST", drive)
+
+    shards = tmp_path / "shards"
+    _shard(shards, "visa__patchcore_ref__candle__seed0.parquet")
+    assert mod.main(["--no-mount", "--shards", str(shards),
+                     "--report", str(tmp_path / "absent.md")]) == 0
+
+    assert old.read_bytes() == b"OLD CONFIGURATION"
+    assert (drive / "patchcore_ref_v0.2.21" / "shards" /
+            "visa__patchcore_ref__candle__seed0.parquet").is_file()

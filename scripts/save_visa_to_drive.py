@@ -51,6 +51,19 @@ def default_report(method: str) -> Path:
     return Path("results/reproduction") / f"{results_label(method)}_visa.md"
 
 
+def default_dest(method: str) -> Path:
+    """`DEST / results_label(method)`: label-scoped, so a save never lands on another run's copy.
+
+    Found in the 2026-10-19 whole-branch review. DEST used to be the destination itself, and the
+    copy is `copytree(dirs_exist_ok=True)` while shard filenames are identical before and after
+    protocol v0.2.21 -- so a v0.2.21 PatchCore save would have overwritten the old-configuration
+    shards that sit at `MyDrive/reproduction_visa/shards` (spec anti-goal). Those stay where they
+    are; nothing here touches `DEST/shards`. WinCLIP is scoped too (`DEST/winclip`): it has never
+    saved VisA shards to Drive, so there is no existing location of its to preserve.
+    """
+    return DEST / results_label(method)
+
+
 SHARDS = default_shards(DEFAULT_METHOD)
 REPORT = default_report(DEFAULT_METHOD)
 
@@ -62,7 +75,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="resolves --shards and --report the way the runner writes them")
     parser.add_argument("--shards", type=Path, default=None)
     parser.add_argument("--report", type=Path, default=None)
-    parser.add_argument("--dest", type=Path, default=DEST)
+    parser.add_argument("--dest", type=Path, default=None,
+                        help="default: MyDrive/reproduction_visa/<label> (label: gpu.results_label)")
     parser.add_argument("--no-mount", action="store_true",
                         help="Drive is already mounted (or this is not Colab)")
     args = parser.parse_args(argv)
@@ -70,6 +84,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.shards = default_shards(args.method)
     if args.report is None:
         args.report = default_report(args.method)
+    if args.dest is None:
+        args.dest = default_dest(args.method)
 
     if not args.no_mount:
         try:
