@@ -1,5 +1,7 @@
 # Reproduction gate — patchcore_ref on mvtec_ad
 
+> **2026-10-19 — superseded configuration.** Scored through anomalib's non-antialiased export path against an antialiased memory bank (check (b), docs/next-steps.md). Kept as evidence. Affected and not re-run: `classic` is refused under protocol v0.2.21. It was also crop-mismatched (H2), so it does not refute CenterCrop; cite only as old-configuration evidence.
+
 Generated 2026-09-17 14:59 UTC by `scripts/reproduction_gate.py`.
 
 ## Verdict: **FAIL**

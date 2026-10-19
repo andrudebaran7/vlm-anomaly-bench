@@ -32,6 +32,12 @@ class PatchCoreRef(BackendSeeded):
         # The backend is what calls seed_everything, so it is what declares the seed.
         self._init_seed(backend, seed)
         self._init_preprocess(backend, preprocess)
+        # Same reasoning as `preprocess`, and likewise NOT on `BackendSeeded`: whether the
+        # forward Resize antialiases is anomalib's PatchCore transform specifically (v0.2.21).
+        # getattr, not attribute access: backends that predate the seam declare nothing, and
+        # None is the honest answer for them -- never a default that would make an old
+        # configuration look like the corrected one.
+        self._declared_resize_antialias = getattr(backend, "resize_antialias", None)
 
     def _init_preprocess(self, backend, preprocess: str | None) -> None:
         """Declare the pre-processing the backend actually applied.
@@ -67,6 +73,11 @@ class PatchCoreRef(BackendSeeded):
     def preprocess(self) -> str | None:
         """Which pre-processing produced this run, for the shard's provenance."""
         return self._declared_preprocess
+
+    @property
+    def resize_antialias(self) -> bool | None:
+        """Whether the backend's Resize antialiased, for the shard's provenance."""
+        return self._declared_resize_antialias
 
     def prepare(self, device: str = "cuda") -> None:
         """With an injected backend there is nothing to load. Otherwise the real anomalib backend

@@ -40,6 +40,7 @@ def harness(monkeypatch, tmp_path):
             self.zero_shot = name != "patchcore_ref"
             if name == "patchcore_ref":
                 self.preprocess = "anomalib"
+                self.resize_antialias = True
 
     def _build(name, seed=None):
         if name not in ("patchcore_ref", "winclip"):
@@ -129,6 +130,29 @@ def test_preprocess_is_stamped_only_when_the_method_has_one(harness):
     assert harness["calls"][0]["meta"]["preprocess"] is None
 
 
+def test_the_shard_records_antialiasing_and_runtime_versions(harness, monkeypatch):
+    import importlib.metadata as md
+    monkeypatch.setattr(md, "version", lambda name: {"anomalib": "2.6.0",
+                                                     "torch": "2.11.0+cu128"}[name])
+    harness["main"](["--seeds", "0"])
+    meta = harness["calls"][0]["meta"]
+    assert meta["preprocess"] == "anomalib"
+    assert meta["resize_antialias"] is True
+    assert meta["anomalib_version"] == "2.6.0" and meta["torch_version"] == "2.11.0+cu128"
+
+
+def test_runtime_versions_are_none_for_a_missing_package(harness, monkeypatch):
+    import importlib.metadata as md
+
+    def _missing(name):
+        raise md.PackageNotFoundError(name)
+    monkeypatch.setattr(md, "version", _missing)
+    harness["main"](["--method", "winclip", "--seeds", "0"])
+    meta = harness["calls"][0]["meta"]
+    assert meta["resize_antialias"] is None
+    assert meta["anomalib_version"] is None and meta["torch_version"] is None
+
+
 def test_a_method_whose_backend_does_not_exist_is_refused_up_front(tmp_path, capsys, monkeypatch):
     """Found in review: registration is not viability."""
     # WinCLIP's backend exists since 2026-10-03, so a backendless method is simulated: the
@@ -149,3 +173,10 @@ def test_the_store_is_rooted_at_the_shards_subdirectory(harness, tmp_path):
     harness["main"](["--method", "winclip", "--seeds", "0"])
     store = harness["stores"][0]
     assert Path(store.root) == tmp_path / "out" / "shards"
+
+
+def test_default_results_uses_the_v0221_label_for_patchcore():
+    mod = _module()
+    assert mod.default_results("patchcore_ref") == Path(
+        "results/reproduction/patchcore_ref_v0.2.21/mvtec_ad")
+    assert mod.default_results("winclip") == Path("results/reproduction/winclip/mvtec_ad")

@@ -53,6 +53,64 @@ def test_an_invalid_preprocess_is_refused_before_anomalib_is_imported():
         PatchCoreBackend(preprocess="clasic")
 
 
+def test_classic_is_refused_before_anomalib_is_imported():
+    """Protocol v0.2.21: the cropped transform makes the map cover only the central 224 px, and
+    it is then stretched over the frame. An old notebook cell (3b.x, 3c) that still passes
+    preprocess='classic' must fail at once, naming the version, not after the install."""
+    from vlmab.methods.patchcore_backend import PatchCoreBackend
+
+    with pytest.raises(ValueError, match="v0.2.21"):
+        PatchCoreBackend(preprocess="classic")
+
+
+def test_the_backend_routes_forward_to_the_antialiased_transform(monkeypatch):
+    """anomalib and torch are absent here, so fake the three modules the constructor imports.
+    What is checked is the wiring: forward() (which score() calls) must use the antialiased
+    training transform, not the antialias-off export transform."""
+    import sys
+    import types
+    from types import SimpleNamespace
+
+    class Resize:
+        def __init__(self, antialias):
+            self.antialias = antialias
+
+    class Normalize:
+        pass
+
+    class Compose:
+        def __init__(self, transforms):
+            self.transforms = transforms
+
+    class Patchcore:
+        def __init__(self, **kwargs):
+            self.pre_processor = SimpleNamespace(
+                transform=Compose([Resize(True), Normalize()]),
+                export_transform=Compose([Resize(False), Normalize()]),
+            )
+
+    class Engine:
+        def __init__(self, **kwargs):
+            pass
+
+    anomalib = types.ModuleType("anomalib")
+    models = types.ModuleType("anomalib.models")
+    models.Patchcore = Patchcore
+    engine = types.ModuleType("anomalib.engine")
+    engine.Engine = Engine
+    anomalib.models, anomalib.engine = models, engine
+    monkeypatch.setitem(sys.modules, "anomalib", anomalib)
+    monkeypatch.setitem(sys.modules, "anomalib.models", models)
+    monkeypatch.setitem(sys.modules, "anomalib.engine", engine)
+
+    from vlmab.methods.patchcore_backend import PatchCoreBackend
+
+    b = PatchCoreBackend(device="cpu")
+    pre = b._model.pre_processor
+    assert pre.export_transform is pre.transform
+    assert b.resize_antialias is True
+
+
 def test_the_config_records_the_preprocessing_the_backend_defaults_to():
     """Two places state the pre-processing — the YAML a reader consults and the default a Colab
     cell gets — and nothing else would notice them drifting apart. The 2026-09-16 numbers came
@@ -80,3 +138,14 @@ def test_the_anomalib_version_is_a_resolved_pin_not_a_range():
     with open(cfg_path) as fh:
         cfg = yaml.safe_load(fh)
     assert cfg["anomalib_version"] == "2.6.0"
+
+
+def test_the_config_records_the_antialiased_resize():
+    """Protocol §3 v0.2.21: the corrected configuration is hard-wired, and the config says so."""
+    import yaml
+    from pathlib import Path
+
+    cfg_path = Path(__file__).resolve().parents[1] / "configs" / "methods" / "patchcore_ref.yaml"
+    with open(cfg_path) as fh:
+        cfg = yaml.safe_load(fh)
+    assert cfg["resize_antialias"] is True

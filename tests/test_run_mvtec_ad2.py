@@ -26,6 +26,7 @@ class _FakeBackend:
     def __init__(self, seed=None, preprocess="anomalib", **kw):
         self.seed = seed
         self.preprocess = preprocess
+        self.resize_antialias = True
 
 
 @pytest.fixture
@@ -81,6 +82,21 @@ def test_the_shard_records_the_preprocess_the_method_applied(harness):
     for call in calls:
         assert call["meta"]["preprocess"] == "anomalib" == call["method"].preprocess
         assert "config_hash" in call["meta"] and "commit" in call["meta"]
+
+
+def test_the_shard_records_antialiasing_and_runtime_versions(harness, monkeypatch):
+    """v0.2.21: old and new shards differ only in this flag, and the spec requires the runtime
+    versions in every new result. They are columns, not part of the cfg that config_hash covers."""
+    import importlib.metadata as md
+    monkeypatch.setattr(md, "version", lambda name: {"anomalib": "2.6.0",
+                                                     "torch": "2.11.0+cu128"}[name])
+    mod, calls, root, tmp = harness
+    _run(mod, root, tmp)
+    for call in calls:
+        assert call["meta"]["preprocess"] == "anomalib"
+        assert call["meta"]["resize_antialias"] is True
+        assert call["meta"]["anomalib_version"] == "2.6.0"
+        assert call["meta"]["torch_version"] == "2.11.0+cu128"
 
 
 def test_it_runs_the_public_test_split_and_fits_on_train(harness):
@@ -431,7 +447,7 @@ def test_summarise_only_runs_no_seed_and_loads_no_backend(harness, monkeypatch, 
     the difference between an aggregation that fits and one the kernel OOM-kills."""
     mod, calls, root, tmp = harness
     seen: list = []
-    monkeypatch.setattr(mod, "summarise", lambda results, mb=None: seen.append(mb))
+    monkeypatch.setattr(mod, "summarise", lambda results, mb=None, **k: seen.append(mb))
 
     rc = mod.main(["--category", "vial", "--root", str(root), "--no-save", "--summarise-only",
                    "--max-bytes", "8000000000", "--results", str(tmp / "results")])
@@ -439,6 +455,31 @@ def test_summarise_only_runs_no_seed_and_loads_no_backend(harness, monkeypatch, 
     assert rc == 0
     assert calls == [], "no seed may run"
     assert seen == [8000000000], "the budget must reach summarise"
+
+
+def test_summarise_only_does_not_need_the_dataset_archive(harness, monkeypatch, tmp_path):
+    """Re-summarising a category whose shards are on Drive must not demand its (deleted) archive:
+    fetch/verify_layout are for running seeds, and --summarise-only runs none."""
+    mod, calls, root, tmp = harness
+
+    def _no_archive(*a, **k):
+        raise FileNotFoundError("archive deleted from Drive")
+
+    monkeypatch.setattr(mod, "fetch", _no_archive)
+    seen: list = []
+    monkeypatch.setattr(mod, "summarise", lambda results, mb=None, **k: seen.append(results))
+
+    rc = mod.main(["--category", "vial", "--root", str(root), "--no-save", "--summarise-only",
+                   "--results", str(tmp / "results")])
+
+    assert rc == 0 and len(seen) == 1 and calls == []
+
+
+def test_a_seed_run_still_needs_the_archive(harness, monkeypatch):
+    mod, calls, root, tmp = harness
+    monkeypatch.setattr(mod, "fetch", lambda *a, **k: (_ for _ in ()).throw(
+        FileNotFoundError("no archive")))
+    assert _run(mod, root, tmp) == 2 and calls == []
 
 
 # --- Task 2 (2026-10-01): the runner works for any method with a GPU backend -----------------
@@ -484,7 +525,7 @@ def test_two_methods_do_not_share_a_shard_directory(harness):
     a = mod.default_results("patchcore_ref", "vial")
     b = mod.default_results("winclip", "vial")
     assert a != b
-    assert a.parts[-2:] == ("patchcore_ref", "vial")
+    assert a.parts[-2:] == ("patchcore_ref_v0.2.21", "vial")
     assert b.parts[-2:] == ("winclip", "vial")
 
 
@@ -537,7 +578,7 @@ def test_an_empty_category_directory_exits_2_rather_than_fitting_over_nothing(fa
 # --- Task 3 (2026-10-01): a shard directory holding two methods is refused -------------------
 
 
-def _write_shard(shards, method, seed=0, commit="a" * 40):
+def _write_shard(shards, method, seed=0, commit="a" * 40, **extra):
     import pandas as pd
     shards.mkdir(parents=True, exist_ok=True)
     frame = {
@@ -546,6 +587,7 @@ def _write_shard(shards, method, seed=0, commit="a" * 40):
     }
     if commit is not None:
         frame["commit"] = [commit] * 2
+    frame.update({k: [v] * 2 for k, v in extra.items()})
     pd.DataFrame(frame).to_parquet(
         shards / f"mvtec_ad2__{method}__vial__seed{seed}.parquet")
 
@@ -683,3 +725,100 @@ def test_a_method_whose_backend_does_not_exist_is_refused_before_any_download(tm
     assert "not_built_yet" in err, (
         "the refusal must name the module that is missing, not look like a missing archive"
     )
+
+
+def test_default_results_never_point_at_the_pre_v0221_patchcore_tree():
+    mod = _module()
+    assert mod.default_results("patchcore_ref", "vial") != Path("results/mvtec_ad2/patchcore_ref/vial")
+    assert mod.default_drive_results("patchcore_ref", "vial") != mod.DRIVE_RESULTS / "patchcore_ref" / "vial"
+    assert mod.default_results("patchcore_ref", "vial") == Path(
+        "results/mvtec_ad2/patchcore_ref_v0.2.21/vial")
+    # WinCLIP's protocol did not change, so its tree and its resumable shards stay where they are.
+    assert mod.default_results("winclip", "vial") == Path("results/mvtec_ad2/winclip/vial")
+
+
+def test_a_new_run_restores_nothing_from_the_old_drive_tree(tmp_path):
+    """An old-protocol shard on Drive must not be restored into a v0.2.21 run: `is_done` would
+    then skip every seed and the corrected PatchCore would silently never run."""
+    mod = _module()
+    old_shards = tmp_path / "drive" / "patchcore_ref" / "vial" / "shards"
+    old_shards.mkdir(parents=True)
+    (old_shards / "mvtec_ad2__patchcore_ref__vial__seed0.parquet").write_bytes(b"old")
+
+    results = tmp_path / mod.default_results("patchcore_ref", "vial")
+    drive = tmp_path / "drive" / mod.default_drive_results("patchcore_ref", "vial").relative_to(
+        mod.DRIVE_RESULTS)
+    mod.restore_from_drive(results, drive)
+
+    shards = results / "shards"
+    assert not shards.exists() or not list(shards.iterdir())
+
+
+# --- Task 5 (2026-10-19): the report states the configuration and the gate verdict -----------
+
+V0221 = dict(resize_antialias=True, anomalib_version="2.6.0", torch_version="2.5.1")
+
+
+def _gate(tmp_path, verdict=None):
+    path = tmp_path / "gate" / "patchcore_mvtec_ad_v0.2.21.md"
+    if verdict:
+        path.parent.mkdir(parents=True)
+        path.write_text(f"# gate\n\n## Verdict: **{verdict}**\n\nMeasured ...\n")
+    return path
+
+
+def _report_for(tmp_path, verdict=None, **extra):
+    root = tmp_path / "vial"
+    _write_shard(root / "shards", "patchcore_ref", **extra)
+    _module().summarise(root, gate_report=_gate(tmp_path, verdict))
+    return (tmp_path / "vial.md").read_text()
+
+
+def test_gate_verdict_reads_pass_fail_and_absent(tmp_path):
+    mod = _module()
+    assert mod.gate_verdict(_gate(tmp_path / "a", "PASS")) == "PASS"
+    assert mod.gate_verdict(_gate(tmp_path / "b", "FAIL")) == "FAIL"
+    assert mod.gate_verdict(tmp_path / "missing.md") is None
+
+
+def test_summary_refuses_mixed_antialiasing(tmp_path):
+    """Old shards have no column, so a pooled root holds True and absent. One mean over both
+    would describe neither configuration."""
+    _write_shard(tmp_path / "shards", "patchcore_ref", seed=0, resize_antialias=True)
+    _write_shard(tmp_path / "shards", "patchcore_ref", seed=1)
+    with pytest.raises(ValueError, match="resize_antialias"):
+        _module().summarise(tmp_path)
+
+
+def test_report_flags_a_non_reproducing_anchor(tmp_path):
+    report = _report_for(tmp_path, "FAIL", **V0221)
+    assert "NON-REPRODUCING ANCHOR" in report
+    assert "Gate verdict pending" not in report
+
+
+def test_report_says_pending_without_a_gate_report(tmp_path):
+    report = _report_for(tmp_path, None, **V0221)
+    assert "Gate verdict pending" in report
+    assert "NON-REPRODUCING" not in report and "passed its MVTec AD classic gate" not in report
+
+
+def test_report_says_the_anchor_passed_when_it_did(tmp_path):
+    report = _report_for(tmp_path, "PASS", **V0221)
+    assert "passed its MVTec AD classic gate" in report
+    assert "NON-REPRODUCING" not in report and "pending" not in report
+
+
+def test_report_states_the_v0221_configuration(tmp_path):
+    assert "Protocol v0.2.21 configuration" in _report_for(tmp_path, "PASS", **V0221)
+
+
+def test_an_old_configuration_report_gets_none_of_the_v0221_caveats(tmp_path):
+    report = _report_for(tmp_path, "FAIL")
+    for text in ("Protocol v0.2.21 configuration", "NON-REPRODUCING", "Gate verdict pending",
+                 "passed its MVTec AD classic gate"):
+        assert text not in report
+
+
+def test_report_provenance_lists_runtime_versions(tmp_path):
+    report = _report_for(tmp_path, "PASS", **V0221)
+    assert "anomalib_version: `2.6.0`" in report and "torch_version: `2.5.1`" in report

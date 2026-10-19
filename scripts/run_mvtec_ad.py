@@ -28,6 +28,8 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from vlmab.methods.gpu import results_label  # light: every heavy import in it is function-local
+
 #: Protocol §6: three seeds wherever stochasticity exists. Nothing here decides that a method is
 #: deterministic -- that is a measurement, and WinCLIP's targets file pre-registers how to make
 #: it. Fewer than three warns and continues, the same as the AD 2 runner.
@@ -39,15 +41,16 @@ N_CATEGORIES = 15
 
 def default_results(method: str) -> Path:
     """Method-scoped, for the reason `run_mvtec_ad2.default_results` documents: the gate reads
-    every shard in the directory, and two methods there would be scored as one."""
-    return Path("results/reproduction") / method / "mvtec_ad"
+    every shard in the directory, and two methods there would be scored as one. The directory is
+    the method's `results_label`, so v0.2.21 PatchCore is filed apart from the old shards."""
+    return Path("results/reproduction") / results_label(method) / "mvtec_ad"
 
 
 def run_one_seed(root: Path, results: Path, seed: int, device: str, method_name: str,
                  categories: Sequence[str]) -> None:
     """Score every category at one seed. Needs anomalib and a GPU; imported here for that."""
     from vlmab.datasets.mvtec_ad import MVTecAD
-    from vlmab.eval.provenance import run_meta
+    from vlmab.eval.provenance import method_meta
     from vlmab.eval.runner import run_evaluation
     from vlmab.eval.store import ResultStore
     from vlmab.methods.gpu import build_runnable
@@ -56,11 +59,10 @@ def run_one_seed(root: Path, results: Path, seed: int, device: str, method_name:
     # previous seed's state into the next seed's scores while the shard claims otherwise.
     method = build_runnable(method_name, seed=seed)
     store = ResultStore(results / "shards")
-    # `preprocess` decides a run's identity for PatchCore and does not exist for a zero-shot
-    # method. None records that; a fabricated value would claim a property the method lacks.
+    # `preprocess` and `resize_antialias` (v0.2.21) are read off the method and both hashed and
+    # stamped; the runtime versions are stamped only. See provenance.method_meta.
     preprocess = getattr(method, "preprocess", None)
-    meta = run_meta({"method": method_name, "split": "test", "preprocess": preprocess})
-    meta = {**meta, "preprocess": preprocess}
+    meta = method_meta(method, {"method": method_name, "split": "test"})
 
     run_evaluation(
         MVTecAD(root), method, store, meta,
@@ -77,7 +79,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="a method with a GPU backend; see vlmab.methods.gpu")
     parser.add_argument("--root", type=Path, default=Path("data/mvtec_ad"))
     parser.add_argument("--results", type=Path, default=None,
-                        help="default: results/reproduction/<method>/mvtec_ad")
+                        help="default: results/reproduction/<label>/mvtec_ad (label: gpu.results_label)")
     parser.add_argument("--categories", nargs="+", default=None,
                         help="a subset makes this a probe, not a gate run")
     parser.add_argument("--seeds", type=int, nargs="+", default=list(DEFAULT_SEEDS))

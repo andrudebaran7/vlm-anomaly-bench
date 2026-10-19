@@ -1,5 +1,7 @@
 # Reproduction secondary check — patchcore_ref on visa
 
+> **2026-10-19 — superseded configuration.** Scored through anomalib's non-antialiased export path against an antialiased memory bank (check (b), docs/next-steps.md). Kept as evidence. Affected and not re-run (author's scope, 2026-10-19); cite only as old-configuration evidence, never as an anchor number.
+
 Generated 2026-09-20 00:01 UTC by `scripts/reproduction_gate.py`.
 
 ## Secondary check — reported only, **does not gate**

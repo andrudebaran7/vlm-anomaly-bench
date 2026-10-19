@@ -80,3 +80,11 @@ def test_the_reproduction_reports_themselves_stay_committable():
     for probe in ROOT.glob("results/reproduction/*.md"):
         assert not _ignored(probe), f"{probe.name} is ignored; the gate commits it (§2)"
     assert any(ROOT.glob("results/reproduction/*.md")), "there are four of these"
+
+
+def test_a_report_under_the_v0221_label_is_tracked():
+    """The corrected PatchCore's reports live under new paths; the negations must cover them, or
+    `git add -A` skips the first corrected result without a word."""
+    for probe in ("results/mvtec_ad2/patchcore_ref_v0.2.21/vial.md",
+                  "results/reproduction/patchcore_mvtec_ad_v0.2.21.md"):
+        assert not _ignored(ROOT / probe), f"{probe} would be ignored; it must be committable"

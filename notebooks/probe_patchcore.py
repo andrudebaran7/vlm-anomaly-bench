@@ -586,11 +586,17 @@ def _classic_preprocessing(ctx):
     Grounding: the 2026-09-16 reproduction run printed exactly 102.4 coreset points per training
     image across all 15 categories, i.e. 1024 patches at ratio 0.1. Classic PatchCore's
     Resize(256) -> CenterCrop(224) should give 784.
+
+    Superseded 2026-10-19 by protocol v0.2.21: `classic` is refused, so this stage now returns
+    early after building its images; the measurement code below is the historical record.
     """
     from vlmab.methods.patchcore_backend import PatchCoreBackend, preprocess_spec
 
     # Cell 3b.0 runs this stage alone, so stage 2 has not run. Build the corpus here.
     images = synthetic_images(ctx)
+    print("  skipped — superseded by protocol v0.2.21 (classic refused)")
+    return "skipped — superseded by protocol v0.2.21 (classic refused)"
+    # Historical record below: unreachable under v0.2.21, kept untouched.
 
     def coreset_rows(backend):
         bank = backend._model.model.memory_bank
@@ -658,12 +664,18 @@ def _resize_path(ctx):
     has to be re-derived from the source. A confirmed hypothesis is a PASS -- the stage measures,
     it does not decide anything. Per next-steps, no PatchCore number is re-run or re-read from
     this; a re-run would be a separate, dated configuration under protocol §7.
+
+    Superseded 2026-10-19 by stage 15; it builds a `classic` backend, which v0.2.21 refuses, so it
+    now returns early after building its images; the measurement code below is the historical record.
     """
     import numpy as np
     from vlmab.methods.patchcore_backend import PatchCoreBackend
 
     # Before torch is imported, so the stage gets this far on CPU (tests/test_probe_stage14.py).
     images = synthetic_images(ctx)
+    print("  skipped — superseded by protocol v0.2.21 (classic refused)")
+    return "skipped — superseded by protocol v0.2.21 (classic refused)"
+    # Historical record below: unreachable under v0.2.21, kept untouched.
     import torch
 
     query = np.random.default_rng(1).integers(0, 256, (480, 640, 3), dtype=np.uint8)
@@ -724,3 +736,96 @@ def _resize_path(ctx):
     print(f"  H2 (classic score path has no CenterCrop): {'CONFIRMED' if h2 else 'REFUTED'}"
           f"  forward map {c['forward_map']} vs train map {c['train_map']}")
     return f"H1 {'confirmed' if h1 else 'refuted'}, H2 {'confirmed' if h2 else 'refuted'}"
+
+
+def _antialias_off_copy(transform, Compose, Resize):
+    """A copy of `transform` with its Resize's antialiasing switched OFF, for stage 15.
+
+    Same Resize size and interpolation, antialias=False, followed by the transform's OWN Normalize
+    (carried over the way `PatchCoreBackend._apply_classic_preprocessing` does, so no ImageNet
+    constants are re-stated here). The model's transform is not mutated. `Compose` and `Resize`
+    are passed in so this is testable without torchvision; stage 15 passes torchvision's v2 ones.
+    """
+    steps = list(getattr(transform, "transforms", [transform]))
+    resizes = [t for t in steps if type(t).__name__ == "Resize"]
+    normalize = [t for t in steps if type(t).__name__ == "Normalize"]
+    if not resizes:
+        raise RuntimeError(f"stage 15: the model's transform {steps} contains no Resize to copy")
+    if not normalize:
+        raise RuntimeError(f"stage 15: the model's transform {steps} contains no Normalize to "
+                           "carry over")
+    r = resizes[0]
+    return Compose([Resize(r.size, interpolation=r.interpolation, antialias=False), *normalize])
+
+
+@stage("15. score() resizes with antialiasing (v0.2.21 guard)",
+       "forward == train path: stage 14 measured forward == the non-antialiased export path on a "
+       "480x640 image; v0.2.21 routes forward through `transform`, so the two must now agree")
+def _antialiased_guard(ctx):
+    """The standing guard for protocol v0.2.21: stage 14 measured forward == export path (50.480389)
+    != train path (32.635822); the backend now routes forward through `transform`, so on the real
+    runtime forward, score() and the train path must agree, and the backend must say so and refuse
+    the `classic` pre-processor.
+    """
+    import numpy as np
+    from vlmab.methods.patchcore_backend import PatchCoreBackend
+
+    # Before torch is imported, so the stage gets this far on CPU (tests/test_probe_stage15.py).
+    images = synthetic_images(ctx)
+    import torch
+
+    query = np.random.default_rng(1).integers(0, 256, (480, 640, 3), dtype=np.uint8)
+    raw = _model_input(ctx, query)
+
+    def run(module, x):
+        with torch.no_grad():
+            out = module(x)
+        return float(out.pred_score.reshape(-1)[0].item())
+
+    def same(a, b):
+        return abs(a - b) / max(abs(a), 1e-6) < 1e-5
+
+    b = PatchCoreBackend(seed=0, num_workers=2)
+    b.fit(iter(images))
+    model = b._model
+    transform, export = model.pre_processor.transform, model.pre_processor.export_transform
+
+    # After v0.2.21 the backend routes export_transform to transform, so this "export path"
+    # equals the train path by construction; it is printed for continuity with stage 14 only.
+    # What makes the guard able to FAIL is the antialias-off copy below: if antialiasing had no
+    # effect on this runtime/image, forward == train would PASS without proving anything.
+    from torchvision.transforms.v2 import Compose, Resize
+
+    antialias_off = _antialias_off_copy(transform, Compose, Resize)
+
+    fwd = run(model, raw)
+    exp = run(model.model, export(raw.squeeze(0)).unsqueeze(0))
+    trn = run(model.model, transform(raw.squeeze(0)).unsqueeze(0))
+    off = run(model.model, antialias_off(raw.squeeze(0)).unsqueeze(0))
+    shipped = b.score(query)[0]
+    print(f"  forward                                      : {fwd:.6f}")
+    print(f"  export_transform (now routed to transform)   : {exp:.6f}")
+    print(f"  train path                                   : {trn:.6f}")
+    print(f"  antialias-off copy of transform              : {off:.6f}")
+    print(f"  score()                                      : {shipped:.6f}")
+
+    assert not same(off, trn), (
+        f"antialias-off path {off:.6f} == train path {trn:.6f}: antialiasing has no effect on "
+        "this runtime/image, so forward == train cannot discriminate and the guard proves nothing."
+    )
+    assert same(fwd, trn), (
+        f"forward {fwd:.6f} != train path {trn:.6f}: score() is not on the antialiased train path "
+        f"(export_transform (now routed to transform) {exp:.6f}, antialias-off {off:.6f}). "
+        "v0.2.21 is broken on this runtime."
+    )
+    assert same(shipped, fwd), f"score() {shipped:.6f} != forward {fwd:.6f}"
+    assert b.resize_antialias is True, f"resize_antialias is {b.resize_antialias!r}, expected True"
+    try:
+        PatchCoreBackend(preprocess="classic")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("PatchCoreBackend(preprocess='classic') did not raise ValueError")
+    ctx["v0221_guard"] = True  # notebook cell 6.0 asserts on this, not on a proxy
+    return (f"forward == train path (delta {fwd - trn:+.2e}); "
+            f"antialias-off differs (delta {off - trn:+.2e})")

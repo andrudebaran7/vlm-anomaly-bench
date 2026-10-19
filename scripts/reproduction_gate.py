@@ -81,24 +81,32 @@ def _select_seed(df, want: str, results: Path):
     return selected
 
 
-def _check_single_preprocess(df, results: Path) -> None:
-    """Refuse a root whose shards were produced by more than one pre-processing.
+def _check_single_config(df, results: Path) -> None:
+    """Refuse a root whose shards were produced by more than one configuration.
 
     Nothing upstream stops this. The shard filename carries dataset/method/category/seed and
-    no more, and `run_id` keys map directories on `config_hash`, so two pre-processings reach
+    no more, and `run_id` keys map directories on `config_hash`, so two configurations reach
     one root as soon as shards are copied between folders to be re-scored -- which is exactly
     how the 2026-09-16 run's shards were kept. Averaging them compares an adapter against a
     differently-configured version of itself and prints a verdict either way.
+
+    Two columns decide a PatchCore run's identity: `preprocess`, and `resize_antialias`
+    (protocol v0.2.21). Shards written before v0.2.21 have no `resize_antialias` column, so a
+    pooled root has it as NaN for them. That absence is a value in its own right ("absent"):
+    skipping NaNs, as `preprocess` always did, would let the old and the corrected PatchCore
+    pass as one. A column missing from every shard is skipped -- there is nothing to compare.
     """
-    if "preprocess" not in df.columns:
-        return
-    found = sorted({str(v) for v in df["preprocess"].unique() if not pd.isna(v)})
-    if len(found) > 1:
-        raise ValueError(
-            f"the shards under {results} carry {len(found)} different values of preprocess "
-            f"({found}). Those are different configurations of the method, not repeats of one, "
-            "so their mean is not a reproduction of anything. Score each from its own root."
-        )
+    for column in ("preprocess", "resize_antialias"):
+        if column not in df.columns:
+            continue
+        found = sorted({"absent" if pd.isna(v) else str(v) for v in df[column]})
+        if len(found) > 1:
+            raise ValueError(
+                f"the shards under {results} carry {len(found)} different values of {column} "
+                f"({found}). Those are different configurations of the method, not repeats of "
+                "one, so their mean is not a reproduction of anything. Score each from its own "
+                "root."
+            )
 
 
 #: Legacy layout: PatchCore's file keeps its per-category map and category counts at the top
@@ -385,7 +393,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "the right file."
             )
 
-    _check_single_preprocess(df, args.results)
+    _check_single_config(df, args.results)
 
     if args.all_seeds:
         per_seed = _per_seed_scores(df, target, args.results)
@@ -397,7 +405,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     provenance = {"results_root": args.results, "targets": args.targets,
                   "n_categories": len(scored)}
-    for column in ("commit", "seed", "gpu", "preprocess"):
+    for column in ("commit", "seed", "gpu", "preprocess", "resize_antialias",
+                   "anomalib_version", "torch_version"):
         if column in df.columns:
             values = sorted({str(v) for v in df[column].unique()})
             provenance[column] = values[0] if len(values) == 1 else values

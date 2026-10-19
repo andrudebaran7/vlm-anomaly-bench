@@ -1,5 +1,7 @@
 # MVTec AD 2 — patchcore_ref on wallplugs
 
+> **2026-10-19 — superseded configuration.** Scored through anomalib's non-antialiased export path against an antialiased memory bank (check (b), docs/next-steps.md). Kept as evidence; the protocol v0.2.21 re-run is `results/mvtec_ad2/patchcore_ref_v0.2.21/wallplugs.md`.
+
 Run 2026-09-29, Colab Tesla T4, anomalib 2.6.0, `preprocess=anomalib`, seeds 0/1/2, `test_public`
 (150 images over **6** lighting conditions, **25** each). Commit `2db64c2`.
 

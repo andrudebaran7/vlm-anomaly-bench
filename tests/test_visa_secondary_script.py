@@ -255,7 +255,7 @@ def test_results_and_report_paths_are_method_scoped():
     mod = _module()
     assert mod.default_results("winclip").parts[-2:] == ("winclip", "visa")
     assert mod.default_out("winclip").name == "winclip_visa.md"
-    assert mod.default_results("patchcore_ref").parts[-2:] == ("patchcore_ref", "visa")
+    assert mod.default_results("patchcore_ref").parts[-2:] == ("patchcore_ref_v0.2.21", "visa")
 
 
 def test_the_method_is_selectable_and_comes_from_the_factory(monkeypatch, tmp_path):
@@ -345,3 +345,29 @@ def test_the_hashed_config_carries_the_methods_real_preprocess(monkeypatch, tmp_
     assert hashed[0]["preprocess"] is None, (
         "config_hash must not encode a pre-processor the method does not apply"
     )
+
+
+def test_run_stamps_antialiasing_and_runtime_versions_on_every_shard(monkeypatch, tmp_path):
+    """Protocol §3 v0.2.21: resize_antialias and the runtime versions are recorded per shard.
+    The VisA runner stamped neither until the 2026-10-19 whole-branch review."""
+    import importlib.metadata as md
+    import vlmab.methods.patchcore_backend as backend_mod
+
+    calls: list[dict] = []
+    _install_fakes(monkeypatch, calls)
+
+    class _Antialiased(_FakeBackend):
+        resize_antialias = True
+
+    monkeypatch.setattr(backend_mod, "PatchCoreBackend", _Antialiased)
+    monkeypatch.setattr(md, "version", lambda name: {"anomalib": "2.6.0",
+                                                     "torch": "2.11.0+cu128"}[name])
+    mod = _module()
+    mod.run(tmp_path / "data", tmp_path / "results", seed=0, device="cuda")
+
+    assert calls
+    for call in calls:
+        meta = call["meta"]
+        assert meta["preprocess"] == "anomalib"
+        assert meta["resize_antialias"] is True
+        assert meta["anomalib_version"] == "2.6.0" and meta["torch_version"] == "2.11.0+cu128"

@@ -126,3 +126,18 @@ def test_without_a_backend_the_requested_preprocessing_is_kept_for_later_checkin
     """Mirrors the seed: nothing has been constructed that could apply anything, and prepare()
     refuses before this method scores — so keep what was asked for."""
     assert PatchCoreRef(preprocess="classic").preprocess == "classic"
+
+
+class _AntialiasingBackend(_FakeBackend):
+    """A backend that declares the antialiasing it applied, as the real one does (v0.2.21)."""
+
+    resize_antialias = True
+
+
+def test_the_adapter_declares_the_antialiasing_its_backend_applied():
+    """Same reasoning as `preprocess`: the backend builds the transform, so it declares it.
+    A backend that declares nothing leaves None, not a default that would make an old
+    configuration look like the corrected one."""
+    assert PatchCoreRef(backend=_AntialiasingBackend()).resize_antialias is True
+    assert PatchCoreRef(backend=_FakeBackend()).resize_antialias is None
+    assert PatchCoreRef().resize_antialias is None

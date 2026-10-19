@@ -109,3 +109,16 @@ def test_run_eval_reports_a_seed_a_deterministic_method_cannot_apply(tmp_path, c
                  "--split", "test_public", "--results", str(tmp_path / "r"), "--seed", "0"])
     assert code == 1
     assert "deterministic" in capsys.readouterr().out
+
+
+def test_run_eval_stamps_the_v0221_provenance_columns(tmp_path):
+    """Protocol §3 v0.2.21: resize_antialias and the runtime versions are recorded per shard,
+    from every runner -- run_eval included -- via provenance.method_meta."""
+    build_category(tmp_path, "vial")
+    results = tmp_path / "results"
+    assert main(["--method", "intensity_baseline", "--root", str(tmp_path),
+                 "--split", "test_public", "--results", str(results)]) == 0
+    df = ResultStore(results).load_all()
+    for column in ("preprocess", "resize_antialias", "anomalib_version", "torch_version"):
+        assert column in df.columns, column
+    assert df["resize_antialias"].isna().all() and df["preprocess"].isna().all()

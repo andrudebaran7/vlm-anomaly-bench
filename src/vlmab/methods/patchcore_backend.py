@@ -4,7 +4,8 @@ Bridges the repo's injectable seam - fit(train_images) / score(image) -> (float,
 anomalib, which is directory-and-datamodule oriented. `fit` materialises the streamed normal
 images to a temp directory and runs anomalib's PatchCore training to fill the coreset memory bank;
 `score` hands one native-resolution image to the model as a raw [0,1] tensor and lets the model's
-own PreProcessor resize and normalise it - the same single pre-processing `fit` gets - then returns
+own PreProcessor resize and normalise it - the same single, antialiased pre-processing `fit`
+gets (protocol v0.2.21 routes forward() to the training transform) - then returns
 anomalib's RAW pred_score and anomaly_map (protocol v0.2.6 - no per-image normalisation;
 PatchCoreRef upsamples the map to native resolution).
 
@@ -17,6 +18,8 @@ from typing import Iterable
 
 import numpy as np
 
+from vlmab.methods.anomalib_preprocess import use_antialiased_forward
+
 #: The backbone's effective stride over the layer2/layer3 features PatchCore concatenates.
 #: MEASURED, not assumed: the 2026-09-16 reproduction run printed 102.4 coreset points per
 #: training image at `coreset_sampling_ratio: 0.1`, i.e. 1024 patches from a 256x256 input,
@@ -27,6 +30,10 @@ _FEATURE_STRIDE = 8
 #: own (`Resize([256, 256]) + Normalize`, recorded in the 2026-08-21 Colab session) and is the
 #: default because it is what every number measured so far came from. `classic` is what
 #: PatchCore's paper describes and what the 2026-09-16 gate failure pre-registered as suspect.
+#:
+#: Under protocol v0.2.21 `classic` is REFUSED by the backend: with the cropped transform the
+#: anomaly map covers only the central 224 px and is then stretched over the whole frame. The
+#: name stays here because `preprocess_spec` and the probe still describe it.
 PREPROCESS_CHOICES = ("anomalib", "classic")
 
 
@@ -73,6 +80,14 @@ class PatchCoreBackend:
         # BEFORE the lazy import, so a typo fails in a millisecond rather than after the
         # install, the weights and a 40-minute fit.
         spec = preprocess_spec(preprocess)
+        if spec["center_crop"] is not None:
+            raise ValueError(
+                "preprocess='classic' is refused under protocol v0.2.21: with the centre-cropped "
+                "transform the anomaly map covers only the central 224 px of the frame, and "
+                "PatchCoreRef then stretches it over the whole native image, so every "
+                "pixel-level number would be spatially wrong. Use preprocess='anomalib'. "
+                "Refused before anomalib is imported so an old notebook cell fails at once."
+            )
 
         from anomalib.models import Patchcore  # lazy: GPU-only
         from anomalib.engine import Engine
@@ -98,6 +113,11 @@ class PatchCoreBackend:
             coreset_sampling_ratio=coreset_sampling_ratio,
             num_neighbors=num_neighbors,
         )
+        # anomalib 2.6.0's forward() runs `export_transform`, an antialias-off Resize built for
+        # ONNX export, while fit goes through `transform` (antialiased). That mismatch built the
+        # memory bank on one image statistic and queried it with another. Route forward to the
+        # training transform; the helper refuses if that transform has no antialiasing Resize.
+        use_antialiased_forward(self._model.pre_processor, "protocol §3 v0.2.21")
         # The Engine configuration below is EXACTLY the one verified to work on
         # anomalib 2.6.0 / Colab T4 (2026-08-21), reached by testing four candidates and
         # measuring which filled the coreset. Nothing is added on top of it: three separate
@@ -135,12 +155,16 @@ class PatchCoreBackend:
         # Public, like `seed`, and for the same reason: PatchCoreRef reads it to declare in
         # every shard's provenance which pre-processing actually ran.
         self.preprocess = spec["name"]
-        if spec["center_crop"] is not None:
-            self._apply_classic_preprocessing(spec)
+        # Public for the same reason: shards declare it, and the gate refuses to mix it.
+        # Always True; there is deliberately no antialias-off code path.
+        self.resize_antialias = True
         self._fitted = False
 
     def _apply_classic_preprocessing(self, spec: dict) -> None:
         """Replace the model's own transform with classic PatchCore's Resize -> CenterCrop.
+
+        UNREACHABLE since protocol v0.2.21 (the constructor refuses `classic`); kept, not
+        deleted, for a later decision on whether a corrected classic run is worth building.
 
         It goes through the PreProcessor anomalib itself built on the model, and reuses that
         object's own Normalize, rather than importing a PreProcessor class by a path taken
@@ -274,8 +298,10 @@ class PatchCoreBackend:
         # to the last digit, while model.model(pre_processed) equals model(raw).
         #
         # Only the conversion HWC uint8 -> CHW float in [0,1] is ours; the pre-processor's
-        # Resize([256,256]) does the rest, exactly as it does for every image during fit. The
-        # image goes in at native resolution for that reason.
+        # Resize([256,256]) does the rest, exactly as it does for every image during fit --
+        # and that is true BECAUSE __init__ routes forward() to the antialiased `transform` fit
+        # uses (v0.2.21); anomalib's default would have used its antialias-off export transform.
+        # The image goes in at native resolution for that reason.
         arr = np.asarray(image, dtype=np.uint8)
         if arr.ndim != 3 or arr.shape[2] != 3:
             raise ValueError(

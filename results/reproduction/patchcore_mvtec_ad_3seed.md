@@ -1,5 +1,7 @@
 # Reproduction gate — patchcore_ref on mvtec_ad
 
+> **2026-10-19 — superseded configuration.** Scored through anomalib's non-antialiased export path against an antialiased memory bank (check (b), docs/next-steps.md). Kept as evidence; the protocol v0.2.21 re-run is `results/reproduction/patchcore_mvtec_ad_v0.2.21.md`.
+
 Generated 2026-09-18 16:51 UTC by `scripts/reproduction_gate.py`.
 
 ## Verdict: **PASS**

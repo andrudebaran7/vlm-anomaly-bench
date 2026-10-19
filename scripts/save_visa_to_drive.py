@@ -28,6 +28,8 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from vlmab.methods.gpu import results_label  # light: every heavy import in it is function-local
+
 #: Deliberately not `reproduction/` or `reproduction_3seed/`, which hold MVTec AD shards under
 #: filenames that carry no dataset name. The gate refuses a root whose shards disagree, but only
 #: after someone has already merged two runs into one folder.
@@ -39,8 +41,31 @@ DEST = Path("/content/drive/MyDrive/reproduction_visa")
 #: copied the previous month's report to Drive as if it were the new one.
 #: `test_its_defaults_are_the_paths_the_visa_runner_actually_writes` is what stops it recurring.
 DEFAULT_METHOD = "patchcore_ref"
-SHARDS = Path("results/reproduction") / DEFAULT_METHOD / "visa" / "shards"
-REPORT = Path("results/reproduction") / f"{DEFAULT_METHOD}_visa.md"
+#: Both go through `results_label`, as the runner's do: PatchCore's v0.2.21 results are filed
+#: apart from the old-configuration ones.
+def default_shards(method: str) -> Path:
+    return Path("results/reproduction") / results_label(method) / "visa" / "shards"
+
+
+def default_report(method: str) -> Path:
+    return Path("results/reproduction") / f"{results_label(method)}_visa.md"
+
+
+def default_dest(method: str) -> Path:
+    """`DEST / results_label(method)`: label-scoped, so a save never lands on another run's copy.
+
+    Found in the 2026-10-19 whole-branch review. DEST used to be the destination itself, and the
+    copy is `copytree(dirs_exist_ok=True)` while shard filenames are identical before and after
+    protocol v0.2.21 -- so a v0.2.21 PatchCore save would have overwritten the old-configuration
+    shards that sit at `MyDrive/reproduction_visa/shards` (spec anti-goal). Those stay where they
+    are; nothing here touches `DEST/shards`. WinCLIP is scoped too (`DEST/winclip`): it has never
+    saved VisA shards to Drive, so there is no existing location of its to preserve.
+    """
+    return DEST / results_label(method)
+
+
+SHARDS = default_shards(DEFAULT_METHOD)
+REPORT = default_report(DEFAULT_METHOD)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -50,14 +75,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="resolves --shards and --report the way the runner writes them")
     parser.add_argument("--shards", type=Path, default=None)
     parser.add_argument("--report", type=Path, default=None)
-    parser.add_argument("--dest", type=Path, default=DEST)
+    parser.add_argument("--dest", type=Path, default=None,
+                        help="default: MyDrive/reproduction_visa/<label> (label: gpu.results_label)")
     parser.add_argument("--no-mount", action="store_true",
                         help="Drive is already mounted (or this is not Colab)")
     args = parser.parse_args(argv)
     if args.shards is None:
-        args.shards = Path("results/reproduction") / args.method / "visa" / "shards"
+        args.shards = default_shards(args.method)
     if args.report is None:
-        args.report = Path("results/reproduction") / f"{args.method}_visa.md"
+        args.report = default_report(args.method)
+    if args.dest is None:
+        args.dest = default_dest(args.method)
 
     if not args.no_mount:
         try:

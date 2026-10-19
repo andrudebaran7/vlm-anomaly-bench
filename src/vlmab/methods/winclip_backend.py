@@ -35,6 +35,8 @@ anomalib, torch and CLIP are imported lazily so this module imports in CI (never
 """
 import numpy as np
 
+from vlmab.methods.anomalib_preprocess import use_antialiased_forward as _use_antialiased_forward
+
 #: The paper's 22 templates, verbatim from Figure 6 (c) of arXiv:2303.14814v1 (read from the PDF
 #: 2026-10-03; full list in ../vlm-anomaly-paper/docs/verified-literature-facts.md), in the
 #: paper's order, with anomalib's "{}" in place of the paper's "[c]".
@@ -97,27 +99,8 @@ def apply_paper_templates(prompting) -> dict[str, int]:
 
 
 def use_antialiased_forward(pre) -> None:
-    """Make `pre.forward` apply `pre.transform` (antialiased) instead of `pre.export_transform`.
-
-    `pre` is the model's anomalib PreProcessor (a parameter so CPU tests can pass a stand-in).
-    `forward` reads `self.export_transform` at call time, so pointing it at `transform` is enough;
-    no anomalib code is replaced. Refuses unless `transform` really contains an antialiasing
-    Resize, so the configuration recorded in v0.2.20 cannot be claimed for a pipeline without it.
-    """
-    transform = getattr(pre, "transform", None)
-    steps = list(getattr(transform, "transforms", [transform]))
-    resizes = [t for t in steps if type(t).__name__ == "Resize"]
-    if not resizes:
-        raise RuntimeError(
-            f"the pre-processor's transform {steps!r} has no Resize; protocol §3 v0.2.20 assumed "
-            "anomalib's Resize([240, 240], BICUBIC, antialias=True)"
-        )
-    if not all(getattr(r, "antialias", False) is True for r in resizes):
-        raise RuntimeError(
-            f"the pre-processor's Resize does not antialias ({resizes!r}); routing forward to it "
-            "would not give the antialiased resize protocol §3 v0.2.20 records"
-        )
-    pre.export_transform = transform
+    """WinCLIP's call of the shared helper, naming protocol §3 v0.2.20 in its refusals."""
+    _use_antialiased_forward(pre, protocol_ref="protocol §3 v0.2.20")
 
 
 class WinClipBackend:
