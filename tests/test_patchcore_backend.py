@@ -80,3 +80,14 @@ def test_the_anomalib_version_is_a_resolved_pin_not_a_range():
     with open(cfg_path) as fh:
         cfg = yaml.safe_load(fh)
     assert cfg["anomalib_version"] == "2.6.0"
+
+
+def test_the_config_records_the_antialiased_resize():
+    """Protocol §3 v0.2.21: the corrected configuration is hard-wired, and the config says so."""
+    import yaml
+    from pathlib import Path
+
+    cfg_path = Path(__file__).resolve().parents[1] / "configs" / "methods" / "patchcore_ref.yaml"
+    with open(cfg_path) as fh:
+        cfg = yaml.safe_load(fh)
+    assert cfg["resize_antialias"] is True

@@ -20,3 +20,10 @@ fit_split: train                  # memory bank from the defect-free train split
 # the gate missed. Recorded per shard, because the two are different configurations of the
 # method and their numbers must never be averaged together.
 preprocess: anomalib
+
+# Protocol §3 v0.2.21: score() resizes with antialiasing, as the fit path always did. Before
+# v0.2.21 it ran anomalib's `forward`, which applies an export transform with antialiasing OFF
+# while the memory bank was built from antialiased features (measured 2026-10-19, check (b):
+# forward 50.480389 = export path, train path 32.635822). Hard-wired, not a switch; recorded per
+# shard so old shards (no key) are never averaged with new ones. `preprocess: classic` is refused.
+resize_antialias: true

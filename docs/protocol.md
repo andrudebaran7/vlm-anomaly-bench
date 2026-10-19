@@ -194,6 +194,19 @@ to substitute.
   **This is a WinCLIP decision only.** PatchCore's committed numbers were scored through the
   export path; whether its fit path differs, and by how much, is unmeasured and recorded as a
   hypothesis in docs/next-steps.md. No PatchCore number is re-run or re-read under this bullet.
+  (Last two sentences superseded for PatchCore by v0.2.21, below: the difference was measured.)
+
+- **PatchCore resizes with antialiasing (v0.2.21).** The same mechanism as v0.2.20, now measured
+  for PatchCore (2026-10-19, check (b), Colab T4): `score()` is the export path, bit-identical
+  (forward 50.480389 = export path 50.480389), and it resizes without antialiasing, while the
+  memory bank is built from antialiased features (train path 32.635822). Under `classic` the
+  forward map is 256x256 against a 224x224 train map. PatchCore's backend therefore routes
+  `forward` to the antialiased transform, through the same shared helper as WinCLIP, and refuses to
+  run if that transform has no antialiasing `Resize`. The corrected configuration is hard-wired
+  (no `resize_antialias: false` path), recorded per shard as `resize_antialias`, and reported under
+  the label `patchcore_ref_v0.2.21`. `preprocess="classic"` is refused: its pipeline cannot be
+  routed to a matching transform here, and its 2026-09-17 result measured a mismatched pipeline.
+  Hyperparameters are unchanged. Old numbers are kept as evidence, never overwritten.
 
 - **Full-shot anchors.** A full-shot method (the PatchCore anchor) builds a per-category memory
   bank from that category's defect-free `train` split before scoring its test images. It declares
@@ -648,3 +661,14 @@ pre-processing that produced them.
   changed and no existing number moves.
   Provenance: docs/next-steps.md, "HYPOTHESIS, UNMEASURED: forward() resizes WITHOUT
   antialiasing" and its 2026-10-03 measurement.
+- 2026-10-19 — v0.2.21. §3: PatchCore's `score()` resizes with antialiasing. Check (b) (notebook
+  phase 3c, probe stage 14, Colab T4) measured, on one synthetic 480x640 image fitted on 20
+  synthetic images: forward 50.480389 = export path 50.480389, train path 32.635822; under
+  `classic` the forward map is 256x256 against a train map of 224x224. So every committed PatchCore
+  number queried an antialiased memory bank with aliased features. Decided by the author on
+  2026-10-19, before any corrected number existed. The commitment: the corrected configuration is
+  an unconditional anchor. If it fails its reproduction gate it is flagged non-reproducing per §2
+  and the eight MVTec AD 2 categories still run; the old numbers are kept as evidence, not
+  overwritten. `preprocess="classic"` is refused. The size of the effect on real categories is NOT
+  measured by this entry. No metric definition changed; no existing number moves.
+  Provenance: docs/next-steps.md, "MEASURED 2026-10-19 — check (b)".
