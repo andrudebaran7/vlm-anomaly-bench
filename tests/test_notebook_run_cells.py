@@ -33,9 +33,15 @@ def _code_cells():
 
 
 def _strip_magics(source: str) -> str:
-    """Drop IPython's `!shell` and `%magic` lines, which are not Python."""
-    return "\n".join(line for line in source.splitlines()
-                     if not line.lstrip().startswith(("!", "%")))
+    """Drop IPython's `!shell` and `%magic` lines, which are not Python, along with any
+    backslash-continued lines that belong to them."""
+    kept, continuing = [], False
+    for line in source.splitlines():
+        if continuing or line.lstrip().startswith(("!", "%")):
+            continuing = line.rstrip().endswith("\\")
+            continue
+        kept.append(line)
+    return "\n".join(kept)
 
 
 def _free_names(source: str) -> set[str]:
@@ -123,8 +129,23 @@ def test_the_visa_result_is_copied_off_the_runtime_before_anything_can_delete_it
 M3_CELLS = [(i, src) for i, src in _code_cells() if "run_mvtec_ad2" in src]
 
 
+def _phase6_start() -> int:
+    nb = json.loads(NOTEBOOK.read_text())
+    for i, c in enumerate(nb["cells"]):
+        if c["cell_type"] == "markdown" and "".join(c["source"]).startswith("## Phase 6"):
+            return i
+    raise AssertionError("the notebook has no '## Phase 6' markdown cell")
+
+
+# Phase 6 (v0.2.21) is its own session path: phase 0 -> 1.1 -> 6.0, so it inherits nothing, not
+# even MVTEC_AD_CATEGORIES.
+PHASE6_CELLS = [(i, src) for i, src in _code_cells() if i > _phase6_start()]
+# Cell 52 (phase 5) is the original grid cell; phase 6 re-uses it in 6.4 and 6.5.
+M3_PHASE5 = [(i, src) for i, src in M3_CELLS if i < _phase6_start()]
+
+
 def test_the_m3_grid_cell_exists():
-    assert len(M3_CELLS) == 1, f"expected one M3 cell, found {[i for i, _ in M3_CELLS]}"
+    assert len(M3_PHASE5) == 1, f"expected one phase-5 M3 cell, found {[i for i, _ in M3_PHASE5]}"
 
 
 @pytest.mark.parametrize("index, source", M3_CELLS, ids=lambda v: v if isinstance(v, int) else "")
@@ -140,6 +161,35 @@ def test_the_m3_cell_names_the_category_rather_than_hardcoding_it_in_the_shell_l
     """Eight categories go through this one cell. A category spelled into the `!python` line
     directly is one that has to be edited inside a shell string, which is where a typo stops
     looking like a typo."""
-    source = M3_CELLS[0][1]
+    source = M3_PHASE5[0][1]
     assert "CATEGORY =" in source
     assert "--category {CATEGORY}" in source
+
+
+# --- Phase 6: the v0.2.21 corrected-anchor session ---------------------------------------------
+
+def test_the_v0221_session_cells_exist():
+    joined = "\n".join(src for _, src in PHASE6_CELLS)
+    assert "15. score() resizes with antialiasing" in joined
+    assert "patchcore_mvtec_ad_v0.2.21.md" in joined
+    assert "--summarise-only" in joined
+
+
+def test_the_v0221_gate_cell_writes_to_the_new_report_not_the_old():
+    for i, src in PHASE6_CELLS:
+        assert "--out results/reproduction/patchcore_mvtec_ad.md" not in src, f"cell {i}"
+
+
+@pytest.mark.parametrize("index, source", PHASE6_CELLS, ids=lambda v: v if isinstance(v, int) else "")
+def test_a_phase6_cell_imports_everything_it_uses(index, source):
+    orphans = _free_names(source)
+    assert not orphans, (
+        f"notebook cell {index} is in phase 6 and reads {sorted(orphans)} without defining them. "
+        "Its session path is phase 0 -> 1.1 -> 6.0 and skips every other phase."
+    )
+
+
+def test_the_v0221_gate_scores_all_three_seeds_from_the_labelled_root():
+    src = "\n".join(s for _, s in PHASE6_CELLS)
+    assert "--all-seeds" in src
+    assert "patchcore_ref_v0.2.21/mvtec_ad/shards" in src
