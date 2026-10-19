@@ -512,3 +512,49 @@ def test_a_block_that_states_no_category_count_is_refused(tmp_path):
     body = TWO_GATES.replace("  n_categories: 2\n  per_category: {candle: 78.1, pcb1: 78.1}\n", "")
     with pytest.raises(ValueError, match="no legacy top-level count"):
         _load_targets(_targets_file(tmp_path, body), "gate_b")
+
+
+def test_the_gate_refuses_shards_mixing_antialiased_and_old(tmp_path):
+    """Old shards have no `resize_antialias` column at all. Once pooled with new ones the
+    column exists but is NaN for them, and that absence must count as a value of its own --
+    otherwise the corrected and the uncorrected PatchCore average into one verdict."""
+    results = tmp_path / "shards"
+    store = ResultStore(results)
+    _run(store, _all_at(1.0), preprocess="anomalib")
+    for cat in CATEGORIES:
+        other = pd.read_parquet(store.path_for("mvtec_ad", "patchcore_ref", cat, 0))
+        other["resize_antialias"] = True
+        other.to_parquet(results / f"copied__{cat}.parquet", index=False)
+    with pytest.raises(ValueError, match="resize_antialias"):
+        main(["--results", str(results), "--targets", str(TARGETS),
+              "--out", str(tmp_path / "r.md")])
+
+
+def test_the_gate_still_refuses_mixed_preprocess_with_the_new_check(tmp_path):
+    results = tmp_path / "shards"
+    store = ResultStore(results)
+    _run(store, _all_at(1.0), preprocess="anomalib")
+    for cat in CATEGORIES:
+        other = pd.read_parquet(store.path_for("mvtec_ad", "patchcore_ref", cat, 0))
+        other["preprocess"] = "classic"
+        other.to_parquet(results / f"copied__{cat}.parquet", index=False)
+    with pytest.raises(ValueError, match="preprocess"):
+        main(["--results", str(results), "--targets", str(TARGETS),
+              "--out", str(tmp_path / "r.md")])
+
+
+def test_the_gate_report_lists_runtime_versions(tmp_path):
+    results = tmp_path / "shards"
+    store = ResultStore(results)
+    _run(store, _all_at(1.0), preprocess="anomalib")
+    for cat in CATEGORIES:
+        p = store.path_for("mvtec_ad", "patchcore_ref", cat, 0)
+        df = pd.read_parquet(p)
+        df["torch_version"] = "2.11.0+cu128"
+        df["anomalib_version"] = "2.6.0"
+        df["resize_antialias"] = True
+        df.to_parquet(p, index=False)
+    out = tmp_path / "r.md"
+    main(["--results", str(results), "--targets", str(TARGETS), "--out", str(out)])
+    text = out.read_text()
+    assert "2.11.0+cu128" in text and "2.6.0" in text and "resize_antialias" in text

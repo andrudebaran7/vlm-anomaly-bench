@@ -40,6 +40,7 @@ def harness(monkeypatch, tmp_path):
             self.zero_shot = name != "patchcore_ref"
             if name == "patchcore_ref":
                 self.preprocess = "anomalib"
+                self.resize_antialias = True
 
     def _build(name, seed=None):
         if name not in ("patchcore_ref", "winclip"):
@@ -127,6 +128,28 @@ def test_shards_are_written_under_a_method_scoped_reproduction_path(harness):
 def test_preprocess_is_stamped_only_when_the_method_has_one(harness):
     harness["main"](["--method", "winclip", "--seeds", "0"])
     assert harness["calls"][0]["meta"]["preprocess"] is None
+
+
+def test_the_shard_records_antialiasing_and_runtime_versions(harness, monkeypatch):
+    import importlib.metadata as md
+    monkeypatch.setattr(md, "version", lambda name: {"anomalib": "2.6.0",
+                                                     "torch": "2.11.0+cu128"}[name])
+    harness["main"](["--seeds", "0"])
+    meta = harness["calls"][0]["meta"]
+    assert meta["resize_antialias"] is True
+    assert meta["anomalib_version"] == "2.6.0" and meta["torch_version"] == "2.11.0+cu128"
+
+
+def test_runtime_versions_are_none_for_a_missing_package(harness, monkeypatch):
+    import importlib.metadata as md
+
+    def _missing(name):
+        raise md.PackageNotFoundError(name)
+    monkeypatch.setattr(md, "version", _missing)
+    harness["main"](["--method", "winclip", "--seeds", "0"])
+    meta = harness["calls"][0]["meta"]
+    assert meta["resize_antialias"] is None
+    assert meta["anomalib_version"] is None and meta["torch_version"] is None
 
 
 def test_a_method_whose_backend_does_not_exist_is_refused_up_front(tmp_path, capsys, monkeypatch):

@@ -26,6 +26,7 @@ class _FakeBackend:
     def __init__(self, seed=None, preprocess="anomalib", **kw):
         self.seed = seed
         self.preprocess = preprocess
+        self.resize_antialias = True
 
 
 @pytest.fixture
@@ -81,6 +82,20 @@ def test_the_shard_records_the_preprocess_the_method_applied(harness):
     for call in calls:
         assert call["meta"]["preprocess"] == "anomalib" == call["method"].preprocess
         assert "config_hash" in call["meta"] and "commit" in call["meta"]
+
+
+def test_the_shard_records_antialiasing_and_runtime_versions(harness, monkeypatch):
+    """v0.2.21: old and new shards differ only in this flag, and the spec requires the runtime
+    versions in every new result. They are columns, not part of the cfg that config_hash covers."""
+    import importlib.metadata as md
+    monkeypatch.setattr(md, "version", lambda name: {"anomalib": "2.6.0",
+                                                     "torch": "2.11.0+cu128"}[name])
+    mod, calls, root, tmp = harness
+    _run(mod, root, tmp)
+    for call in calls:
+        assert call["meta"]["resize_antialias"] is True
+        assert call["meta"]["anomalib_version"] == "2.6.0"
+        assert call["meta"]["torch_version"] == "2.11.0+cu128"
 
 
 def test_it_runs_the_public_test_split_and_fits_on_train(harness):

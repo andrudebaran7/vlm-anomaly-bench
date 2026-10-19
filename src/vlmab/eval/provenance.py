@@ -4,6 +4,7 @@ Colab assigns a different GPU per session, so the device name is part of every r
 (protocol §5): accuracy stays auditable even though the hardware varies.
 """
 import hashlib
+import importlib.metadata
 import json
 import subprocess
 from pathlib import Path
@@ -61,6 +62,24 @@ def gpu_name() -> str:
     if not torch.cuda.is_available():
         return "cpu"
     return str(torch.cuda.get_device_name(0))
+
+
+def runtime_versions() -> dict[str, str | None]:
+    """Installed anomalib and torch versions, for the GPU runners to stamp onto their shards.
+
+    Protocol v0.2.21: the antialiased Resize is a torch/anomalib behaviour, so a number that
+    does not say which runtime produced it cannot be told apart from the one a different
+    release would give. Read from package metadata rather than by importing, so this costs
+    nothing where neither is installed (CI) and None records that honestly instead of a
+    fabricated version. Stamped as columns only, never part of the cfg `config_hash` covers.
+    """
+    out: dict[str, str | None] = {}
+    for package in ("anomalib", "torch"):
+        try:
+            out[f"{package}_version"] = importlib.metadata.version(package)
+        except importlib.metadata.PackageNotFoundError:
+            out[f"{package}_version"] = None
+    return out
 
 
 def run_meta(cfg: Mapping[str, Any]) -> dict[str, Any]:

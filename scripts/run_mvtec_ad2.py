@@ -127,7 +127,7 @@ def run_one_seed(category: str, root: Path, results: Path, seed: int, device: st
                  method_name: str = "patchcore_ref") -> None:
     """Fit and score one category at one seed. Needs anomalib and a GPU; imported here for that."""
     from vlmab.datasets.mvtec_ad2 import MVTecAD2
-    from vlmab.eval.provenance import run_meta
+    from vlmab.eval.provenance import run_meta, runtime_versions
     from vlmab.eval.runner import run_evaluation
     from vlmab.eval.store import ResultStore
     from vlmab.methods.gpu import build_runnable
@@ -145,9 +145,15 @@ def run_one_seed(category: str, root: Path, results: Path, seed: int, device: st
     # `preprocess` decides a run's identity for PatchCore and does not exist for WinCLIP. None
     # records that honestly; a fabricated "anomalib" would claim a property the method lacks.
     preprocess = getattr(method, "preprocess", None)
+    # `resize_antialias` (v0.2.21) is the same kind of identity: it separates the corrected
+    # PatchCore from the old one. It goes into the hashed cfg AND onto the shard as a column.
+    # The runtime versions are columns only -- they are provenance, not configuration, and
+    # hashing them would split one configuration across torch releases.
+    resize_antialias = getattr(method, "resize_antialias", None)
     meta = run_meta({"method": method_name, "split": "test_public",
-                     "preprocess": preprocess})
-    meta = {**meta, "preprocess": preprocess}
+                     "preprocess": preprocess, "resize_antialias": resize_antialias})
+    meta = {**meta, "preprocess": preprocess, "resize_antialias": resize_antialias,
+            **runtime_versions()}
 
     run_evaluation(
         MVTecAD2(root), method, store, meta,
