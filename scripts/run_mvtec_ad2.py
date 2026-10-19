@@ -137,7 +137,7 @@ def run_one_seed(category: str, root: Path, results: Path, seed: int, device: st
                  method_name: str = "patchcore_ref") -> None:
     """Fit and score one category at one seed. Needs anomalib and a GPU; imported here for that."""
     from vlmab.datasets.mvtec_ad2 import MVTecAD2
-    from vlmab.eval.provenance import run_meta, runtime_versions
+    from vlmab.eval.provenance import method_meta
     from vlmab.eval.runner import run_evaluation
     from vlmab.eval.store import ResultStore
     from vlmab.methods.gpu import build_runnable
@@ -148,22 +148,11 @@ def run_one_seed(category: str, root: Path, results: Path, seed: int, device: st
     method = build_runnable(method_name, seed=seed)
     store = ResultStore(results / "shards")
     # run_meta HASHES its cfg into config_hash; it does not pass the keys through as columns.
-    # So `preprocess` is added on top, as a real column, exactly as the VisA runner does --
-    # otherwise the value that decides a run's identity would be recoverable only by recomputing
-    # a hash. Stamped from the method, not from the constant above: what is recorded has to be
-    # what was applied.
-    # `preprocess` decides a run's identity for PatchCore and does not exist for WinCLIP. None
-    # records that honestly; a fabricated "anomalib" would claim a property the method lacks.
+    # provenance.method_meta adds `preprocess` and `resize_antialias` (v0.2.21) on top, as real
+    # columns read off the method -- what is recorded has to be what was applied -- plus the
+    # runtime versions, which are columns only (not configuration, so never hashed).
     preprocess = getattr(method, "preprocess", None)
-    # `resize_antialias` (v0.2.21) is the same kind of identity: it separates the corrected
-    # PatchCore from the old one. It goes into the hashed cfg AND onto the shard as a column.
-    # The runtime versions are columns only -- they are provenance, not configuration, and
-    # hashing them would split one configuration across torch releases.
-    resize_antialias = getattr(method, "resize_antialias", None)
-    meta = run_meta({"method": method_name, "split": "test_public",
-                     "preprocess": preprocess, "resize_antialias": resize_antialias})
-    meta = {**meta, "preprocess": preprocess, "resize_antialias": resize_antialias,
-            **runtime_versions()}
+    meta = method_meta(method, {"method": method_name, "split": "test_public"})
 
     run_evaluation(
         MVTecAD2(root), method, store, meta,
@@ -490,7 +479,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="default: results/mvtec_ad2/<label>/<category> (label: gpu.results_label)")
     parser.add_argument("--archives", type=Path, default=DRIVE_ARCHIVES)
     parser.add_argument("--drive-results", type=Path, default=None,
-                        help="default: <DRIVE_RESULTS>/<method>/<category>")
+                        help="default: <DRIVE_RESULTS>/<label>/<category> (label: gpu.results_label)")
     parser.add_argument("--device", default="cuda")
     parser.add_argument("--summarise-only", action="store_true",
                         help="skip the seed loop entirely and only re-read the shards. This "

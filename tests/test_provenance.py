@@ -159,3 +159,47 @@ def test_run_meta_reads_this_repo_even_when_cwd_is_elsewhere(monkeypatch, tmp_pa
     commit = run_meta({"a": 1})["commit"]
     assert commit == "unknown" or re.fullmatch(r"[0-9a-f]{40}", commit)
     assert commit == git_commit(Path(__file__).resolve().parents[1])
+
+
+# --- method_meta: one helper for every runner's shard provenance (protocol §3 v0.2.21) --------
+
+class _Method:
+    def __init__(self, **attrs):
+        self.__dict__.update(attrs)
+
+
+def _versions(monkeypatch, mapping):
+    import importlib.metadata as md
+    monkeypatch.setattr(md, "version", lambda name: mapping[name])
+
+
+def test_method_meta_stamps_the_four_columns_from_the_method(monkeypatch):
+    _versions(monkeypatch, {"anomalib": "2.6.0", "torch": "2.11.0+cu128"})
+    meta = provenance.method_meta(_Method(preprocess="anomalib", resize_antialias=True),
+                                  {"method": "patchcore_ref", "split": "test"})
+    assert meta["preprocess"] == "anomalib"
+    assert meta["resize_antialias"] is True
+    assert meta["anomalib_version"] == "2.6.0" and meta["torch_version"] == "2.11.0+cu128"
+    assert {"config_hash", "commit", "gpu"} <= set(meta)
+
+
+def test_method_meta_records_none_for_what_a_method_lacks(monkeypatch):
+    _versions(monkeypatch, {"anomalib": "2.6.0", "torch": "2.5.1"})
+    meta = provenance.method_meta(_Method(), {"method": "winclip", "split": "test"})
+    assert meta["preprocess"] is None and meta["resize_antialias"] is None
+
+
+def test_method_meta_hashes_resize_antialias_but_not_the_versions(monkeypatch):
+    """resize_antialias is configuration (it separates the corrected PatchCore from the old one);
+    the runtime versions are provenance -- hashing them would split one configuration across
+    torch releases."""
+    cfg = {"method": "patchcore_ref", "split": "test"}
+    _versions(monkeypatch, {"anomalib": "2.6.0", "torch": "2.5.1"})
+    on = provenance.method_meta(_Method(preprocess="anomalib", resize_antialias=True), cfg)
+    off = provenance.method_meta(_Method(preprocess="anomalib", resize_antialias=None), cfg)
+    assert on["config_hash"] != off["config_hash"]
+    assert on["config_hash"] == config_hash({**cfg, "preprocess": "anomalib",
+                                             "resize_antialias": True})
+    _versions(monkeypatch, {"anomalib": "9.9.9", "torch": "9.9.9"})
+    again = provenance.method_meta(_Method(preprocess="anomalib", resize_antialias=True), cfg)
+    assert again["config_hash"] == on["config_hash"]

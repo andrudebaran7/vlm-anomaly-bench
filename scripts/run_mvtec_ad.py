@@ -50,7 +50,7 @@ def run_one_seed(root: Path, results: Path, seed: int, device: str, method_name:
                  categories: Sequence[str]) -> None:
     """Score every category at one seed. Needs anomalib and a GPU; imported here for that."""
     from vlmab.datasets.mvtec_ad import MVTecAD
-    from vlmab.eval.provenance import run_meta, runtime_versions
+    from vlmab.eval.provenance import method_meta
     from vlmab.eval.runner import run_evaluation
     from vlmab.eval.store import ResultStore
     from vlmab.methods.gpu import build_runnable
@@ -59,18 +59,10 @@ def run_one_seed(root: Path, results: Path, seed: int, device: str, method_name:
     # previous seed's state into the next seed's scores while the shard claims otherwise.
     method = build_runnable(method_name, seed=seed)
     store = ResultStore(results / "shards")
-    # `preprocess` decides a run's identity for PatchCore and does not exist for a zero-shot
-    # method. None records that; a fabricated value would claim a property the method lacks.
+    # `preprocess` and `resize_antialias` (v0.2.21) are read off the method and both hashed and
+    # stamped; the runtime versions are stamped only. See provenance.method_meta.
     preprocess = getattr(method, "preprocess", None)
-    # `resize_antialias` (v0.2.21) is the same kind of identity: it separates the corrected
-    # PatchCore from the old one. It goes into the hashed cfg AND onto the shard as a column.
-    # The runtime versions are columns only -- they are provenance, not configuration, and
-    # hashing them would split one configuration across torch releases.
-    resize_antialias = getattr(method, "resize_antialias", None)
-    meta = run_meta({"method": method_name, "split": "test", "preprocess": preprocess,
-                     "resize_antialias": resize_antialias})
-    meta = {**meta, "preprocess": preprocess, "resize_antialias": resize_antialias,
-            **runtime_versions()}
+    meta = method_meta(method, {"method": method_name, "split": "test"})
 
     run_evaluation(
         MVTecAD(root), method, store, meta,

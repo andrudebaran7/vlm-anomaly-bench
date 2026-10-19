@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Sequence
 
 from vlmab.datasets.registry import available as available_datasets, build_dataset
-from vlmab.eval.provenance import run_meta
+from vlmab.eval.provenance import method_meta
 from vlmab.eval.runner import run_evaluation
 from vlmab.eval.store import ResultStore
 from vlmab.methods.base import MethodNotRunnable
@@ -66,7 +66,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     # output directory as a bogus category and fail scanning it.
     categories = [args.category] if args.category else dataset.categories()
     store = ResultStore(args.results)
-    meta = run_meta({"method": args.method, "split": args.split})
+    # Protocol §3 v0.2.21: preprocess, resize_antialias and the runtime versions on every shard.
+    meta = method_meta(method, {"method": args.method, "split": args.split})
 
     # method.prepare() is NOT called here: run_evaluation() owns that decision, calling it
     # only if there is genuinely work left (see its docstring) so a fully-resumed run never

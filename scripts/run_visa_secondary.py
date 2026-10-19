@@ -98,7 +98,7 @@ def run(root: Path, results: Path, seed: int | None, device: str,
         method_name: str = "patchcore_ref") -> None:
     """Fit and score one object at a time. Needs anomalib and a GPU; imported here for that."""
     from vlmab.datasets.visa import VisA
-    from vlmab.eval.provenance import run_meta
+    from vlmab.eval.provenance import method_meta
     from vlmab.eval.runner import run_evaluation
     from vlmab.eval.store import ResultStore
     from vlmab.methods.gpu import build_runnable
@@ -120,11 +120,13 @@ def run(root: Path, results: Path, seed: int | None, device: str,
         # `preprocess` is stamped from the method, never from a constant: the value recorded has
         # to be the one that was applied. A zero-shot method has none, and None records that
         # rather than claiming a property it lacks.
+        # provenance.method_meta also stamps `resize_antialias` and the runtime versions, which
+        # protocol §3 v0.2.21 requires on every shard.
         preprocess = getattr(method, "preprocess", None)
         if meta is None:
-            meta = run_meta({"method": method_name, "split": "test", "preprocess": preprocess})
+            meta = method_meta(method, {"method": method_name, "split": "test"})
         run_evaluation(
-            visa, method, store, {**meta, "preprocess": preprocess},
+            visa, method, store, meta,
             categories=[cat], split="test", fit_split="train",
             maps_dir=results / "maps", device=device,
         )

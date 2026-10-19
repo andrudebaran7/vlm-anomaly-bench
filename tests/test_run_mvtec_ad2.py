@@ -93,6 +93,7 @@ def test_the_shard_records_antialiasing_and_runtime_versions(harness, monkeypatc
     mod, calls, root, tmp = harness
     _run(mod, root, tmp)
     for call in calls:
+        assert call["meta"]["preprocess"] == "anomalib"
         assert call["meta"]["resize_antialias"] is True
         assert call["meta"]["anomalib_version"] == "2.6.0"
         assert call["meta"]["torch_version"] == "2.11.0+cu128"

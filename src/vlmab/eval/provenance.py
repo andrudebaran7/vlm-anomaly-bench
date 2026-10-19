@@ -100,3 +100,25 @@ def run_meta(cfg: Mapping[str, Any]) -> dict[str, Any]:
         "commit": package_commit(),
         "gpu": gpu_name(),
     }
+
+
+def method_meta(method: Any, cfg: Mapping[str, Any]) -> dict[str, Any]:
+    """`run_meta` plus the per-shard columns protocol §3 v0.2.21 requires of every runner.
+
+    One helper so the four runners (run_mvtec_ad, run_mvtec_ad2, run_visa_secondary, run_eval)
+    cannot drift apart again: before the 2026-10-19 whole-branch review the VisA runner and
+    run_eval stamped neither `resize_antialias` nor the runtime versions.
+
+    `preprocess` and `resize_antialias` are read off the method -- what is recorded has to be
+    what was applied -- and None records that a method lacks the property rather than claiming
+    one. Both decide a run's identity, so both go into the hashed cfg AND onto the shard as
+    columns (`run_meta` hashes its cfg; it does not pass keys through). The runtime versions are
+    columns only: they are provenance, not configuration, and hashing them would split one
+    configuration across torch releases.
+    """
+    preprocess = getattr(method, "preprocess", None)
+    resize_antialias = getattr(method, "resize_antialias", None)
+    meta = run_meta({**dict(cfg), "preprocess": preprocess,
+                     "resize_antialias": resize_antialias})
+    return {**meta, "preprocess": preprocess, "resize_antialias": resize_antialias,
+            **runtime_versions()}
