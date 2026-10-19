@@ -631,3 +631,96 @@ def _classic_preprocessing(ctx):
     )
     return (f"classic {results['classic'][0]} rows vs anomalib {results['anomalib'][0]} -- "
             f"{100 * (results['anomalib'][0] / results['classic'][0] - 1):.0f}% fewer patches")
+
+
+@stage("14. which resize score() applies (H1/H2, check b)",
+       "pre-registered 2026-10-03 from the anomalib 2.6.0 source: forward() runs export_transform, "
+       "not transform -- so on a non-square image larger than 256 the anomalib backend's forward "
+       "equals the NON-antialiased path (H1), and the classic backend's export_transform has no "
+       "CenterCrop, so its forward map is 256x256, not 224x224 (H2)")
+def _resize_path(ctx):
+    """Check (b) of the 2026-10-03 hypothesis section in docs/next-steps.md. A measurement, not a fix.
+
+    Every probe image before this one was 256x256, where `Resize([256, 256])` is the identity
+    and antialiasing has nothing to act on -- which is why stage 11 passed with the mismatch in
+    place. This stage scores ONE non-square 480x640 noise image (close to the worst case for
+    aliasing, so the size of any difference bounds nothing about real images) three ways:
+
+        forward      model(raw)                          <- what score() does
+        export path  model.model(export_transform(raw))  <- antialias stripped, built in __init__
+        train path   model.model(transform(raw))         <- what engine.train applied to the bank
+
+    H1 holds if forward == export path != train path for the `anomalib` backend.
+    H2 holds if the `classic` backend's export_transform has no CenterCrop -- observable as
+    a 256x256 forward map where the classic crop would give 224x224.
+
+    It FAILS only if forward matches neither path: then this account of anomalib is wrong and
+    has to be re-derived from the source. A confirmed hypothesis is a PASS -- the stage measures,
+    it does not decide anything. Per next-steps, no PatchCore number is re-run or re-read from
+    this; a re-run would be a separate, dated configuration under protocol §7.
+    """
+    import numpy as np
+    from vlmab.methods.patchcore_backend import PatchCoreBackend
+
+    # Before torch is imported, so the stage gets this far on CPU (tests/test_probe_stage14.py).
+    images = synthetic_images(ctx)
+    import torch
+
+    query = np.random.default_rng(1).integers(0, 256, (480, 640, 3), dtype=np.uint8)
+    raw = _model_input(ctx, query)
+
+    def steps(t):
+        return list(getattr(t, "transforms", [t]))
+
+    def run(module, x):
+        with torch.no_grad():
+            out = module(x)
+        return float(out.pred_score.reshape(-1)[0].item()), tuple(out.anomaly_map.shape[-2:])
+
+    def same(a, b):
+        return abs(a - b) / max(abs(a), 1e-6) < 1e-5
+
+    verdicts = {}
+    for name in ("anomalib", "classic"):
+        b = PatchCoreBackend(seed=0, num_workers=2, preprocess=name)
+        b.fit(iter(images))
+        model, pre = b._model, b._model.pre_processor
+        transform, export = pre.transform, pre.export_transform
+        print(f"  [{name}] transform        : {transform}")
+        print(f"  [{name}] export_transform : {export}")
+        for label, t in (("transform", transform), ("export", export)):
+            resizes = [s for s in steps(t) if type(s).__name__ == "Resize"]
+            crops = [s for s in steps(t) if type(s).__name__ == "CenterCrop"]
+            print(f"  [{name}] {label:9s} antialias={[getattr(r, 'antialias', '?') for r in resizes]} "
+                  f"CenterCrop={bool(crops)}")
+
+        fwd, fwd_shape = run(model, raw)
+        exp, exp_shape = run(model.model, export(raw.squeeze(0)).unsqueeze(0))
+        trn, trn_shape = run(model.model, transform(raw.squeeze(0)).unsqueeze(0))
+        shipped = b.score(query)[0]
+        print(f"  [{name}] forward     : {fwd:.6f}  map {fwd_shape}")
+        print(f"  [{name}] export path : {exp:.6f}  map {exp_shape}")
+        print(f"  [{name}] train path  : {trn:.6f}  map {trn_shape}")
+        print(f"  [{name}] score()     : {shipped:.6f}")
+
+        assert same(fwd, exp) or same(fwd, trn), (
+            f"[{name}] forward {fwd:.6f} matches neither the export path ({exp:.6f}) nor the "
+            f"train path ({trn:.6f}). Re-derive this stage from the installed source."
+        )
+        has_crop = any(type(s).__name__ == "CenterCrop" for s in steps(export))
+        verdicts[name] = {
+            "forward_is_export": same(fwd, exp), "export_eq_train": same(exp, trn),
+            "export_has_crop": has_crop, "forward_map": fwd_shape, "train_map": trn_shape,
+            "delta_forward_train": fwd - trn,
+        }
+        ctx[f"check_b_{name}"] = verdicts[name]
+
+    a, c = verdicts["anomalib"], verdicts["classic"]
+    h1 = a["forward_is_export"] and not a["export_eq_train"]
+    h2 = c["forward_is_export"] and not c["export_has_crop"]
+    ctx["H1"], ctx["H2"] = h1, h2
+    print(f"\n  H1 (anomalib score path not antialiased): {'CONFIRMED' if h1 else 'REFUTED'}"
+          f"  forward-train delta {a['delta_forward_train']:+.6f}")
+    print(f"  H2 (classic score path has no CenterCrop): {'CONFIRMED' if h2 else 'REFUTED'}"
+          f"  forward map {c['forward_map']} vs train map {c['train_map']}")
+    return f"H1 {'confirmed' if h1 else 'refuted'}, H2 {'confirmed' if h2 else 'refuted'}"
