@@ -67,6 +67,16 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 > antialiased memory bank, and the classic run was also crop-mismatched. Effect size on real data is
 > unmeasured. **Owed: the author's decision on a corrected PatchCore configuration (§7).**
 >
+> **▶ 2026-10-19: protocol v0.2.21 is implemented on branch `patchcore-antialiased-anchor`** (corrected
+> PatchCore scoring path, decided by the author; `preprocess="classic"` is refused). **Next: the Colab
+> session, phase 0 → 1.1 → phase 6** (6.0 probe stage 15 guard; 6.1 MVTec AD classic data; 6.2 per-seed
+> gate run, each seed copied to Drive, then the gate with `--all-seeds`; 6.3 gate report to Drive;
+> 6.4 MVTec AD 2 one category at a time, smallest first; 6.5 re-summarise all eight with
+> `--summarise-only` once the gate report exists, so each carries the verdict). The MVTec AD 2
+> archives may need re-uploading by hand. The PatchCore VisA runner and Drive-save now route through
+> the v0.2.21 label too, but VisA is not re-run this round. The old reports carry a dated
+> superseded-configuration header line and are kept as evidence.
+>
 > **Paper side, 2026-10-19:** Abstract, §1–§3 and the §6.5 framing are redrafted for C1 + C3 on the
 > paper repo's branch `descope-c1-c3-rewrite` (**not merged — awaiting the author's review**, title
 > included). Its open tripwires: WinCLIP's gate report must be committed before the abstract may
@@ -1802,7 +1812,7 @@ What this establishes, and what it does not:
   synthetic image fitted on 20 synthetic images; like WinCLIP's 0.013 on uniform noise, it shows the
   effect is not zero and bounds nothing about real categories or about image-AUROC.
 - Per the rule above, **no PatchCore number is re-run or re-interpreted because of this.** Whether
-  to add a corrected configuration (protocol §7, a new dated version) is the author's decision, owed.
+  to add a corrected configuration (protocol §7, a new dated version) was the author's decision: decided 2026-10-19, see protocol v0.2.21.
 
 ## WinCLIP Phase A.2–A.3 — anomalib's ensemble is NOT the paper's: 21 templates, one duplicated (2026-10-03)
 

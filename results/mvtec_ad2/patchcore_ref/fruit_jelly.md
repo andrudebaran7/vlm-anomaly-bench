@@ -1,5 +1,7 @@
 # MVTec AD 2 — patchcore_ref on fruit_jelly
 
+> **2026-10-19 — superseded configuration.** Scored through anomalib's non-antialiased export path against an antialiased memory bank (check (b), docs/next-steps.md). Kept as evidence; the protocol v0.2.21 re-run is `results/mvtec_ad2/patchcore_ref_v0.2.21/fruit_jelly.md`.
+
 Run 2026-09-29, Colab Tesla T4, anomalib 2.6.0, `preprocess=anomalib`, seeds 0/1/2, `test_public`
 (80 images over **4** lighting conditions, 20 each). Commit `61704b4`.
 

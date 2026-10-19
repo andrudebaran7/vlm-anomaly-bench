@@ -1,5 +1,7 @@
 # MVTec AD 2 — patchcore_ref on vial
 
+> **2026-10-19 — superseded configuration.** Scored through anomalib's non-antialiased export path against an antialiased memory bank (check (b), docs/next-steps.md). Kept as evidence; the protocol v0.2.21 re-run is `results/mvtec_ad2/patchcore_ref_v0.2.21/vial.md`.
+
 **The first reportable MVTec AD 2 number of this study.** Protocol §2 blocked every AD 2 result
 until PatchCore reproduced its published figures; its gate passed on 2026-09-18 (MVTec AD classic,
 98.02 ± 0.07 against a published 99.0), which is what unblocked this.
