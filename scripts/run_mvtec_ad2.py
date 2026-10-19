@@ -49,6 +49,9 @@ DEFAULT_SEEDS = (0, 1, 2)
 PREPROCESS = "anomalib"
 DRIVE_ARCHIVES = Path("/content/drive/MyDrive/mvtec_ad2")
 DRIVE_RESULTS = Path("/content/drive/MyDrive/mvtec_ad2_results")
+#: Where the corrected anchor's MVTec AD classic gate writes its verdict (protocol v0.2.21). The
+#: grid may run before this exists, so a report cannot assume it: see `gate_verdict`.
+GATE_REPORT = Path("results/reproduction/patchcore_mvtec_ad_v0.2.21.md")
 
 
 def default_results(method: str, category: str) -> Path:
@@ -233,7 +236,24 @@ def _bytes_from_guard_message(message: str) -> int | None:
     return int(match.group(1).replace(",", "")) if match else None
 
 
-def summarise(results: Path, max_bytes: int | None = None) -> None:
+def gate_verdict(report: Path) -> str | None:
+    """`"PASS"` or `"FAIL"` from the line `reproduction_gate.py` writes, `None` if no report.
+
+    `None` is a state, not an error: the grid is allowed to finish before the gate has run, and
+    a report regenerated then must say the verdict is pending rather than guess. A file that
+    exists but carries no verdict line also reads as `None` (a secondary-only report has none),
+    since "no verdict" is the only honest reading of it.
+    """
+    import re
+
+    if not report.is_file():
+        return None
+    match = re.search(r"^## Verdict: \*\*(PASS|FAIL)\*\*", report.read_text(), re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def summarise(results: Path, max_bytes: int | None = None,
+              gate_report: Path = GATE_REPORT) -> None:
     """Per lighting condition, one aggregation PER SEED, combined as mean ± std (protocol §6).
 
     The first version of this pooled every seed into one `aggregate` call and died on the guard
@@ -248,6 +268,14 @@ def summarise(results: Path, max_bytes: int | None = None) -> None:
     from vlmab.eval.store import ResultStore
 
     df = ResultStore(results / "shards").load_all()
+
+    # Old and corrected PatchCore shards can reach one root by hand-copying (2026-09-16 did).
+    # The gate refuses that with the same rule; reusing it keeps "absent" distinct from True.
+    # `scripts/` is on sys.path when this runs as a script, but not under every loader.
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from reproduction_gate import _check_single_config
+
+    _check_single_config(df, results)
 
     # Shard filenames carry the method, so two methods coexist here without colliding on disk.
     # Averaging them produces a row that describes no method at all, and nothing downstream
@@ -369,6 +397,17 @@ def summarise(results: Path, max_bytes: int | None = None) -> None:
         commit_line = (f"**MIXED, {len(commits)} commits**: "
                        + ", ".join(f"`{c}`" for c in commits)
                        + " — these numbers do not come from one code state")
+    # Runtime versions come from the shards for the same reason the commit does: a resumed run
+    # mixes sessions, and the writing machine's torch says nothing about the scoring one's.
+    def versions(column: str) -> str:
+        found = (sorted({str(v) for v in df[column].dropna().unique()})
+                 if column in df.columns else [])
+        return ", ".join(f"`{v}`" for v in found) if found else "`not recorded`"
+
+    # v0.2.21 caveats belong to the corrected configuration only. `_check_single_config` has
+    # already refused a mix, so "every row True" is the whole condition; NaN (old shards) is not.
+    corrected = (method_name == "patchcore_ref" and "resize_antialias" in df.columns
+                 and bool((df["resize_antialias"] == True).all()))  # noqa: E712 -- NaN != True
     lines = [
         f"# MVTec AD 2 — {method_name} on {results.name}",
         "",
@@ -391,11 +430,33 @@ def summarise(results: Path, max_bytes: int | None = None) -> None:
             "- **PatchCore is the full-shot anchor, not a zero-shot method.** It is the ceiling "
             "the zero-shot numbers are measured against, never a comparable entry.")
     caveats.append("- **One category is not a dataset result.** MVTec AD 2 has eight.")
+    if corrected:
+        gate_path = "results/reproduction/patchcore_mvtec_ad_v0.2.21.md"
+        verdict = gate_verdict(gate_report)
+        caveats.append(
+            "- **Protocol v0.2.21 configuration:** forward resizes with antialiasing, the same "
+            "pre-processing the memory bank was built with. Numbers from before 2026-10-19 used "
+            "a non-antialiased scoring path and are a different configuration; they are not "
+            "comparable entries.")
+        if verdict == "FAIL":
+            caveats.append(
+                "- ⚠️ **NON-REPRODUCING ANCHOR.** Under this configuration PatchCore failed its "
+                f"MVTec AD classic gate (`{gate_path}`). Per protocol §2 every number here is "
+                "flagged as non-reproducing.")
+        elif verdict is None:
+            caveats.append(
+                f"- ⚠️ **Gate verdict pending.** `{gate_path}` does not exist yet. Regenerate "
+                "this report with `--summarise-only` once it does; until then these numbers are "
+                "not reportable.")
+        else:
+            caveats.append(
+                "- The anchor passed its MVTec AD classic gate under this configuration "
+                f"(`{gate_path}`).")
     if method_name == "patchcore_ref":
         caveats.append(
             "- **The pre-processor is a fixed square `Resize([256, 256])`** with no aspect-ratio "
             "preservation, and no MVTec AD 2 category is square. This is the pinned "
-            "configuration the reproduction gate was passed at (protocol §7); it is a stated "
+            "configuration the reproduction gate was run at (protocol §7); it is a stated "
             "property of the study, not an explanation produced afterwards.")
     lines += [
         "",
@@ -408,6 +469,8 @@ def summarise(results: Path, max_bytes: int | None = None) -> None:
         f"- shards: `{results / 'shards'}`",
         f"- seeds: `{', '.join(seeds)}`",
         f"- commit: {commit_line}",
+        f"- anomalib_version: {versions('anomalib_version')}",
+        f"- torch_version: {versions('torch_version')}",
         "",
     ]
     report.parent.mkdir(parents=True, exist_ok=True)
@@ -438,6 +501,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="pixel-metric memory budget, in bytes. Only set this against a "
                              "number you have actually measured on the machine (the failure "
                              "message prints it); the default is a guard, not a knob.")
+    parser.add_argument("--gate-report", type=Path, default=GATE_REPORT,
+                        help="the PatchCore MVTec AD gate report whose verdict the report "
+                             "states; absent means the verdict is pending")
     parser.add_argument("--no-save", action="store_true",
                         help="skip the per-seed copy to Drive (not on Colab, say)")
     args = parser.parse_args(argv)
@@ -490,7 +556,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.summarise_only:
         print("--summarise-only: not loading torch or anomalib, and running no seed.\n")
-        summarise(results, args.max_bytes)
+        summarise(results, args.max_bytes, gate_report=args.gate_report)
         return 0
 
     for i, seed in enumerate(args.seeds, 1):
@@ -499,7 +565,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not args.no_save:
             save_to_drive(results, drive_results)
 
-    summarise(results, args.max_bytes)
+    summarise(results, args.max_bytes, gate_report=args.gate_report)
     print(f"\n{args.category} done at seeds {args.seeds}. Shards: {results / 'shards'}")
     return 0
 

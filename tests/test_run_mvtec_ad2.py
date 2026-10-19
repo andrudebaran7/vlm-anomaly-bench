@@ -446,7 +446,7 @@ def test_summarise_only_runs_no_seed_and_loads_no_backend(harness, monkeypatch, 
     the difference between an aggregation that fits and one the kernel OOM-kills."""
     mod, calls, root, tmp = harness
     seen: list = []
-    monkeypatch.setattr(mod, "summarise", lambda results, mb=None: seen.append(mb))
+    monkeypatch.setattr(mod, "summarise", lambda results, mb=None, **k: seen.append(mb))
 
     rc = mod.main(["--category", "vial", "--root", str(root), "--no-save", "--summarise-only",
                    "--max-bytes", "8000000000", "--results", str(tmp / "results")])
@@ -552,7 +552,7 @@ def test_an_empty_category_directory_exits_2_rather_than_fitting_over_nothing(fa
 # --- Task 3 (2026-10-01): a shard directory holding two methods is refused -------------------
 
 
-def _write_shard(shards, method, seed=0, commit="a" * 40):
+def _write_shard(shards, method, seed=0, commit="a" * 40, **extra):
     import pandas as pd
     shards.mkdir(parents=True, exist_ok=True)
     frame = {
@@ -561,6 +561,7 @@ def _write_shard(shards, method, seed=0, commit="a" * 40):
     }
     if commit is not None:
         frame["commit"] = [commit] * 2
+    frame.update({k: [v] * 2 for k, v in extra.items()})
     pd.DataFrame(frame).to_parquet(
         shards / f"mvtec_ad2__{method}__vial__seed{seed}.parquet")
 
@@ -725,3 +726,73 @@ def test_a_new_run_restores_nothing_from_the_old_drive_tree(tmp_path):
 
     shards = results / "shards"
     assert not shards.exists() or not list(shards.iterdir())
+
+
+# --- Task 5 (2026-10-19): the report states the configuration and the gate verdict -----------
+
+V0221 = dict(resize_antialias=True, anomalib_version="2.6.0", torch_version="2.5.1")
+
+
+def _gate(tmp_path, verdict=None):
+    path = tmp_path / "gate" / "patchcore_mvtec_ad_v0.2.21.md"
+    if verdict:
+        path.parent.mkdir(parents=True)
+        path.write_text(f"# gate\n\n## Verdict: **{verdict}**\n\nMeasured ...\n")
+    return path
+
+
+def _report_for(tmp_path, verdict=None, **extra):
+    root = tmp_path / "vial"
+    _write_shard(root / "shards", "patchcore_ref", **extra)
+    _module().summarise(root, gate_report=_gate(tmp_path, verdict))
+    return (tmp_path / "vial.md").read_text()
+
+
+def test_gate_verdict_reads_pass_fail_and_absent(tmp_path):
+    mod = _module()
+    assert mod.gate_verdict(_gate(tmp_path / "a", "PASS")) == "PASS"
+    assert mod.gate_verdict(_gate(tmp_path / "b", "FAIL")) == "FAIL"
+    assert mod.gate_verdict(tmp_path / "missing.md") is None
+
+
+def test_summary_refuses_mixed_antialiasing(tmp_path):
+    """Old shards have no column, so a pooled root holds True and absent. One mean over both
+    would describe neither configuration."""
+    _write_shard(tmp_path / "shards", "patchcore_ref", seed=0, resize_antialias=True)
+    _write_shard(tmp_path / "shards", "patchcore_ref", seed=1)
+    with pytest.raises(ValueError, match="resize_antialias"):
+        _module().summarise(tmp_path)
+
+
+def test_report_flags_a_non_reproducing_anchor(tmp_path):
+    report = _report_for(tmp_path, "FAIL", **V0221)
+    assert "NON-REPRODUCING ANCHOR" in report
+    assert "Gate verdict pending" not in report
+
+
+def test_report_says_pending_without_a_gate_report(tmp_path):
+    report = _report_for(tmp_path, None, **V0221)
+    assert "Gate verdict pending" in report
+    assert "NON-REPRODUCING" not in report and "passed its MVTec AD classic gate" not in report
+
+
+def test_report_says_the_anchor_passed_when_it_did(tmp_path):
+    report = _report_for(tmp_path, "PASS", **V0221)
+    assert "passed its MVTec AD classic gate" in report
+    assert "NON-REPRODUCING" not in report and "pending" not in report
+
+
+def test_report_states_the_v0221_configuration(tmp_path):
+    assert "Protocol v0.2.21 configuration" in _report_for(tmp_path, "PASS", **V0221)
+
+
+def test_an_old_configuration_report_gets_none_of_the_v0221_caveats(tmp_path):
+    report = _report_for(tmp_path, "FAIL")
+    for text in ("Protocol v0.2.21 configuration", "NON-REPRODUCING", "Gate verdict pending",
+                 "passed its MVTec AD classic gate"):
+        assert text not in report
+
+
+def test_report_provenance_lists_runtime_versions(tmp_path):
+    report = _report_for(tmp_path, "PASS", **V0221)
+    assert "anomalib_version: `2.6.0`" in report and "torch_version: `2.5.1`" in report
