@@ -28,6 +28,8 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from vlmab.methods.gpu import results_label  # light: every heavy import in it is function-local
+
 #: Deliberately not `reproduction/` or `reproduction_3seed/`, which hold MVTec AD shards under
 #: filenames that carry no dataset name. The gate refuses a root whose shards disagree, but only
 #: after someone has already merged two runs into one folder.
@@ -39,8 +41,18 @@ DEST = Path("/content/drive/MyDrive/reproduction_visa")
 #: copied the previous month's report to Drive as if it were the new one.
 #: `test_its_defaults_are_the_paths_the_visa_runner_actually_writes` is what stops it recurring.
 DEFAULT_METHOD = "patchcore_ref"
-SHARDS = Path("results/reproduction") / DEFAULT_METHOD / "visa" / "shards"
-REPORT = Path("results/reproduction") / f"{DEFAULT_METHOD}_visa.md"
+#: Both go through `results_label`, as the runner's do: PatchCore's v0.2.21 results are filed
+#: apart from the old-configuration ones.
+def default_shards(method: str) -> Path:
+    return Path("results/reproduction") / results_label(method) / "visa" / "shards"
+
+
+def default_report(method: str) -> Path:
+    return Path("results/reproduction") / f"{results_label(method)}_visa.md"
+
+
+SHARDS = default_shards(DEFAULT_METHOD)
+REPORT = default_report(DEFAULT_METHOD)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -55,9 +67,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="Drive is already mounted (or this is not Colab)")
     args = parser.parse_args(argv)
     if args.shards is None:
-        args.shards = Path("results/reproduction") / args.method / "visa" / "shards"
+        args.shards = default_shards(args.method)
     if args.report is None:
-        args.report = Path("results/reproduction") / f"{args.method}_visa.md"
+        args.report = default_report(args.method)
 
     if not args.no_mount:
         try:

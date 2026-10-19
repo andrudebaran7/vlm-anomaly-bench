@@ -255,7 +255,7 @@ def test_results_and_report_paths_are_method_scoped():
     mod = _module()
     assert mod.default_results("winclip").parts[-2:] == ("winclip", "visa")
     assert mod.default_out("winclip").name == "winclip_visa.md"
-    assert mod.default_results("patchcore_ref").parts[-2:] == ("patchcore_ref", "visa")
+    assert mod.default_results("patchcore_ref").parts[-2:] == ("patchcore_ref_v0.2.21", "visa")
 
 
 def test_the_method_is_selectable_and_comes_from_the_factory(monkeypatch, tmp_path):

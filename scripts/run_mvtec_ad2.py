@@ -424,7 +424,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--seeds", type=int, nargs="+", default=list(DEFAULT_SEEDS))
     parser.add_argument("--root", type=Path, default=Path("data/mvtec_ad2"))
     parser.add_argument("--results", type=Path, default=None,
-                        help="default: results/mvtec_ad2/<method>/<category>")
+                        help="default: results/mvtec_ad2/<label>/<category> (label: gpu.results_label)")
     parser.add_argument("--archives", type=Path, default=DRIVE_ARCHIVES)
     parser.add_argument("--drive-results", type=Path, default=None,
                         help="default: <DRIVE_RESULTS>/<method>/<category>")

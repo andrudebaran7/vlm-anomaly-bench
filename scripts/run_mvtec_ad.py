@@ -41,7 +41,8 @@ N_CATEGORIES = 15
 
 def default_results(method: str) -> Path:
     """Method-scoped, for the reason `run_mvtec_ad2.default_results` documents: the gate reads
-    every shard in the directory, and two methods there would be scored as one."""
+    every shard in the directory, and two methods there would be scored as one. The directory is
+    the method's `results_label`, so v0.2.21 PatchCore is filed apart from the old shards."""
     return Path("results/reproduction") / results_label(method) / "mvtec_ad"
 
 
@@ -86,7 +87,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                         help="a method with a GPU backend; see vlmab.methods.gpu")
     parser.add_argument("--root", type=Path, default=Path("data/mvtec_ad"))
     parser.add_argument("--results", type=Path, default=None,
-                        help="default: results/reproduction/<method>/mvtec_ad")
+                        help="default: results/reproduction/<label>/mvtec_ad (label: gpu.results_label)")
     parser.add_argument("--categories", nargs="+", default=None,
                         help="a subset makes this a probe, not a gate run")
     parser.add_argument("--seeds", type=int, nargs="+", default=list(DEFAULT_SEEDS))

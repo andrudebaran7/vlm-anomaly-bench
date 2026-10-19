@@ -41,6 +41,8 @@ import sys
 from pathlib import Path
 from typing import Sequence
 
+from vlmab.methods.gpu import results_label  # light: every heavy import in it is function-local
+
 #: Byte-exact size of `VisA_20220922.tar`, measured by HTTP HEAD 2026-07-23 and confirmed on
 #: download 2026-09-16 (docs/datasets-access.md). A truncated download is the likeliest way to
 #: start a two-hour run on data that is silently incomplete, so the size is checked rather than
@@ -83,11 +85,13 @@ def fetch(root: Path) -> None:
 
 
 def default_results(method: str) -> Path:
-    return Path("results/reproduction") / method / "visa"
+    """Filed under `results_label`, so a v0.2.21 PatchCore run can neither skip on nor overwrite
+    the old-configuration tree and report (`patchcore_ref_visa.md`)."""
+    return Path("results/reproduction") / results_label(method) / "visa"
 
 
 def default_out(method: str) -> Path:
-    return Path("results/reproduction") / f"{method}_visa.md"
+    return Path("results/reproduction") / f"{results_label(method)}_visa.md"
 
 
 def run(root: Path, results: Path, seed: int | None, device: str,
