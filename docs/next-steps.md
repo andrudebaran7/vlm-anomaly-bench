@@ -61,6 +61,11 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 > the 2026-10-05 list (VisA gate, `e32`) stay open. **Next: PatchCore check (b)**, because under C1
 > every PatchCore number is load-bearing and H1/H2 threaten all of them — probe stage 14, notebook
 > phase 3c (phase 0 → 1.1 → 3c, ~2 min, no dataset). Prepared 2026-10-19, not yet run.
+>
+> **Paper side, 2026-10-19:** Abstract, §1–§3 and the §6.5 framing are redrafted for C1 + C3 on the
+> paper repo's branch `descope-c1-c3-rewrite` (**not merged — awaiting the author's review**, title
+> included). Its open tripwires: WinCLIP's gate report must be committed before the abstract may
+> state the FAIL, and check (b) can move every anchor number the abstract and C1 lean on.
 
 1. **PatchCore — finish the Colab session** (plan:
    `docs/superpowers/plans/2026-07-24-patchcore-anomalib-backend-colab.md`; driver:
