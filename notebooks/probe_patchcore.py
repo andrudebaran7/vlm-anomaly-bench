@@ -791,4 +791,5 @@ def _antialiased_guard(ctx):
         pass
     else:
         raise AssertionError("PatchCoreBackend(preprocess='classic') did not raise ValueError")
+    ctx["v0221_guard"] = True  # notebook cell 6.0 asserts on this, not on a proxy
     return f"forward == train path (delta {fwd - trn:+.2e})"

@@ -456,6 +456,31 @@ def test_summarise_only_runs_no_seed_and_loads_no_backend(harness, monkeypatch, 
     assert seen == [8000000000], "the budget must reach summarise"
 
 
+def test_summarise_only_does_not_need_the_dataset_archive(harness, monkeypatch, tmp_path):
+    """Re-summarising a category whose shards are on Drive must not demand its (deleted) archive:
+    fetch/verify_layout are for running seeds, and --summarise-only runs none."""
+    mod, calls, root, tmp = harness
+
+    def _no_archive(*a, **k):
+        raise FileNotFoundError("archive deleted from Drive")
+
+    monkeypatch.setattr(mod, "fetch", _no_archive)
+    seen: list = []
+    monkeypatch.setattr(mod, "summarise", lambda results, mb=None, **k: seen.append(results))
+
+    rc = mod.main(["--category", "vial", "--root", str(root), "--no-save", "--summarise-only",
+                   "--results", str(tmp / "results")])
+
+    assert rc == 0 and len(seen) == 1 and calls == []
+
+
+def test_a_seed_run_still_needs_the_archive(harness, monkeypatch):
+    mod, calls, root, tmp = harness
+    monkeypatch.setattr(mod, "fetch", lambda *a, **k: (_ for _ in ()).throw(
+        FileNotFoundError("no archive")))
+    assert _run(mod, root, tmp) == 2 and calls == []
+
+
 # --- Task 2 (2026-10-01): the runner works for any method with a GPU backend -----------------
 
 

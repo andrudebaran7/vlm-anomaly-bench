@@ -537,8 +537,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     drive_results = args.drive_results or default_drive_results(args.method, args.category)
 
     try:
-        fetch(args.category, args.root, args.archives)
-        verify_layout(args.category, args.root)
+        # --summarise-only reads shards and runs no seed, so it needs no dataset: the archive may
+        # have been deleted from Drive after the category's shards were safe.
+        if not args.summarise_only:
+            fetch(args.category, args.root, args.archives)
+            verify_layout(args.category, args.root)
     except (FileNotFoundError, DriveNotMounted, RuntimeError,
             subprocess.CalledProcessError) as exc:
         print(f"\ncannot start: {exc}", file=sys.stderr)

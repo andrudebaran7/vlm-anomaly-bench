@@ -175,9 +175,47 @@ def test_the_v0221_session_cells_exist():
     assert "--summarise-only" in joined
 
 
+def _cell_with(text):
+    hits = [src for _, src in PHASE6_CELLS if text in src]
+    assert len(hits) == 1, f"expected one phase-6 cell with {text!r}, found {len(hits)}"
+    return hits[0]
+
+
 def test_the_v0221_gate_cell_writes_to_the_new_report_not_the_old():
     for i, src in PHASE6_CELLS:
         assert "--out results/reproduction/patchcore_mvtec_ad.md" not in src, f"cell {i}"
+    gate = _cell_with("scripts/reproduction_gate.py")
+    assert "--out results/reproduction/patchcore_mvtec_ad_v0.2.21.md" in gate
+
+
+def test_6_0_asserts_the_marker_stage_15_sets():
+    assert 'ctx.get("v0221_guard") is True' in _cell_with("probe_patchcore.run(")
+    import sys
+    sys.path.insert(0, str(NOTEBOOK.parent))
+    import inspect
+    import probe_patchcore
+    stage = [fn for name, _, fn in probe_patchcore._STAGES if name.startswith("15.")][0]
+    assert 'ctx["v0221_guard"] = True' in inspect.getsource(stage)
+
+
+def test_6_2_runs_one_seed_at_a_time_and_copies_each_to_drive_before_the_next():
+    cell = _cell_with("scripts/run_mvtec_ad.py")
+    assert "drive.mount" in cell
+    assert "for seed in (0, 1, 2)" in cell
+    assert "--seeds" in cell and "returncode" in cell and "SystemExit" in cell, \
+        "a failed seed must stop the cell before the gate"
+    assert cell.index("for seed in") < cell.rindex("copy2") < cell.index("--all-seeds"), \
+        "the Drive copy must happen inside the seed loop, before the gate"
+    assert "patchcore_ref_v0.2.21" in cell and "mvtec_ad_results" in cell
+    assert "never overwrit" in cell.lower() or "not overwrit" in cell.lower()
+
+
+def test_6_5_resummarises_from_drive_and_survives_one_failed_category():
+    cell = _cell_with("--summarise-only")
+    assert "drive.mount" in cell
+    assert "isdir(shards)" not in cell and "no shards on this VM" not in cell
+    assert "check=False" in cell and "returncode" in cell
+    assert "failed" in cell
 
 
 @pytest.mark.parametrize("index, source", PHASE6_CELLS, ids=lambda v: v if isinstance(v, int) else "")
