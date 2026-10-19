@@ -62,6 +62,11 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 > every PatchCore number is load-bearing and H1/H2 threaten all of them — probe stage 14, notebook
 > phase 3c (phase 0 → 1.1 → 3c, ~2 min, no dataset). Prepared 2026-10-19, not yet run.
 >
+> **▶ RAN 2026-10-19: check (b) CONFIRMED BOTH H1 and H2** (see "MEASURED 2026-10-19 — check (b)"
+> below). Every committed PatchCore number was scored on the non-antialiased export path against an
+> antialiased memory bank, and the classic run was also crop-mismatched. Effect size on real data is
+> unmeasured. **Owed: the author's decision on a corrected PatchCore configuration (§7).**
+>
 > **Paper side, 2026-10-19:** Abstract, §1–§3 and the §6.5 framing are redrafted for C1 + C3 on the
 > paper repo's branch `descope-c1-c3-rewrite` (**not merged — awaiting the author's review**, title
 > included). Its open tripwires: WinCLIP's gate report must be committed before the abstract may
@@ -1766,6 +1771,38 @@ transform path differs. (b) For PatchCore, a probe on a NON-square, larger-than-
 `export_transform`, and for a `classic` backend print whether it contains `CenterCrop`. No PatchCore
 number is re-run or re-interpreted before (b) exists, and §7 governs any re-run: it would be a
 separate, dated configuration, never a replacement for the committed numbers.
+
+**MEASURED 2026-10-19 — check (b), PatchCore notebook phase 3c (probe stage 14), Colab T4. Both
+predictions held.** Session path phase 0 → 1.1 → 3c, as prepared. The output pasted back did not
+include phase 0's environment lines, so the anomalib/torch versions of this VM were **not captured**
+here; the code was `master` at `cf5c9a1` (stage 14 is unchanged since `1d0de07`) — that is read from
+the repo, not from the session. Each backend was fitted on the probe's 20 synthetic images (seed 0;
+coreset candidates 2047 for `anomalib`, 1567 for `classic`) and scored one synthetic 480x640 image:
+
+    [anomalib] transform : Resize([256, 256], BILINEAR, antialias=True)  + ImageNet Normalize
+    [anomalib] export    : Resize([256, 256], BILINEAR, antialias=False) + ImageNet Normalize
+    [anomalib] forward 50.480389 (256, 256) | export path 50.480389 (256, 256) | train path 32.635822 (256, 256) | score() 50.480389
+    [classic]  transform : Resize([256], BILINEAR, antialias=True) + CenterCrop(224, 224) + Normalize
+    [classic]  export    : Resize([256, 256], BILINEAR, antialias=False) + Normalize   <- no CenterCrop
+    [classic]  forward 50.880360 (256, 256) | export path 50.880360 (256, 256) | train path 32.135674 (224, 224) | score() 50.880360
+    H1 CONFIRMED  forward-train delta +17.844566
+    H2 CONFIRMED  forward map (256, 256) vs train map (224, 224)
+
+What this establishes, and what it does not:
+
+- **H1 is now a measurement for PatchCore, not an inference.** The shipped backend's `score()` is
+  the export path (bit-identical), resizes without antialiasing, and so queries a memory bank built
+  from antialiased features with aliased ones. This holds for every committed PatchCore number —
+  the MVTec AD classic gate (passed by 0.02), the 3-seed run, VisA, and the MVTec AD 2 categories.
+- **H2 is confirmed:** under `preprocess="classic"` the bank is built from 224x224 centre-crops and
+  queried with the uncropped, squashed 256x256 frame. The 2026-09-17 "classic is ~4.5 points worse"
+  result therefore measured a mismatched pipeline, **not** classic PatchCore; it no longer refutes
+  CenterCrop.
+- **The size of the effect on any real number is NOT measured.** The 17.8-point score gap is on one
+  synthetic image fitted on 20 synthetic images; like WinCLIP's 0.013 on uniform noise, it shows the
+  effect is not zero and bounds nothing about real categories or about image-AUROC.
+- Per the rule above, **no PatchCore number is re-run or re-interpreted because of this.** Whether
+  to add a corrected configuration (protocol §7, a new dated version) is the author's decision, owed.
 
 ## WinCLIP Phase A.2–A.3 — anomalib's ensemble is NOT the paper's: 21 templates, one duplicated (2026-10-03)
 
