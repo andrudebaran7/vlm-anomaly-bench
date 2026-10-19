@@ -54,6 +54,13 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 >
 > **▶ CURRENT STATE (2026-10-05): WinCLIP's MVTec AD classic gate FAILED (90.37 vs 91.8).** Go to
 > "Where to pick up (session handoff, 2026-10-05)" — the decisions owed are listed there.
+>
+> **▶ DECIDED 2026-10-19 by the author: the v0.2.18 contingency APPLIES — the paper is C1 + C3**
+> (the PatchCore anchor and the methodology, no zero-shot numbers; §1–§3 to be rewritten). WinCLIP's
+> failed gate becomes evidence for C3, flagged as non-reproducing per protocol §2. Decisions 3–4 of
+> the 2026-10-05 list (VisA gate, `e32`) stay open. **Next: PatchCore check (b)**, because under C1
+> every PatchCore number is load-bearing and H1/H2 threaten all of them — probe stage 14, notebook
+> phase 3c (phase 0 → 1.1 → 3c, ~2 min, no dataset). Prepared 2026-10-19, not yet run.
 
 1. **PatchCore — finish the Colab session** (plan:
    `docs/superpowers/plans/2026-07-24-patchcore-anomalib-backend-colab.md`; driver:
