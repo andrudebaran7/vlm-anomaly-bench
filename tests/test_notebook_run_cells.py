@@ -231,3 +231,66 @@ def test_the_v0221_gate_scores_all_three_seeds_from_the_labelled_root():
     src = "\n".join(s for _, s in PHASE6_CELLS)
     assert "--all-seeds" in src
     assert "patchcore_ref_v0.2.21/mvtec_ad/shards" in src
+
+
+# --- 2026-10-19 whole-branch review: old phases cannot write v0.2.21 numbers into old files ----
+# After v0.2.21 the default PatchCoreBackend IS the corrected configuration, so an old run cell
+# re-run by mistake would write corrected-config numbers into the OLD roots and overwrite the
+# annotated old reports (patchcore_mvtec_ad.md / _3seed.md / _classic.md, patchcore_ref_visa.md).
+# Every such cell now starts with a guard.
+
+GUARD = 'raise SystemExit("superseded by protocol v0.2.21 — use phase 6")'
+
+
+def _nb_cells():
+    return json.loads(NOTEBOOK.read_text())["cells"]
+
+
+def _writes_old_results(src: str) -> bool:
+    return ("reproduction_gate.py" in src or "run_visa_secondary" in src
+            or "reproduction_visa" in src
+            or ("run_evaluation(" in src and "results/reproduction" in src))
+
+
+OLD_RESULT_CELLS = [(i, src) for i, src in _code_cells()
+                    if i < _phase6_start() and _writes_old_results(src)]
+
+
+def test_the_old_result_cells_are_the_ones_the_review_named():
+    """3.2, 3.3, 3.4, 3.5, 3b.1, 3b.2, 3b.3 run and gate. A guard on the selector above."""
+    assert [i for i, _ in OLD_RESULT_CELLS] == [30, 32, 34, 36, 41, 43, 46, 47]
+
+
+@pytest.mark.parametrize("index, source", OLD_RESULT_CELLS,
+                         ids=lambda v: v if isinstance(v, int) else "")
+def test_an_old_result_cell_starts_with_the_v0221_guard(index, source):
+    assert source.splitlines()[0] == GUARD, (
+        f"notebook cell {index} writes PatchCore results or reports under old paths and must "
+        f"start with {GUARD!r}"
+    )
+
+
+def test_phase_3_and_3b_markdown_say_they_are_superseded():
+    cells = _nb_cells()
+    phase3 = "".join(cells[27]["source"])
+    assert phase3.startswith("## Phase 3 —")
+    assert "Superseded by protocol v0.2.21" in phase3 and "phase 6" in phase3
+    phase3b = "".join(cells[37]["source"])
+    assert "Nothing in 3b runs any more" not in phase3b
+    assert "SystemExit" in phase3b
+
+
+def test_6_5_restores_the_gate_report_from_drive_before_asserting():
+    cell = _cell_with("--summarise-only")
+    assert "MyDrive/mvtec_ad_results/patchcore_ref_v0.2.21" in cell
+    assert "copy2" in cell
+    assert cell.index("copy2") < cell.index("assert os.path.isfile")
+    assert '"run 6.2 first"' not in cell
+
+
+def test_6_4_and_next_steps_owe_the_by_hand_anchor_criterion():
+    cells = _nb_cells()
+    md64 = next("".join(c["source"]) for c in cells
+                if c["cell_type"] == "markdown" and "".join(c["source"]).startswith("### 6.4"))
+    for text in (md64, (NOTEBOOK.parents[1] / "docs" / "next-steps.md").read_text()):
+        assert "usable/unusable-anchor criterion (random baseline)" in " ".join(text.split())
