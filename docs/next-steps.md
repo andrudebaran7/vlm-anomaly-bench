@@ -79,6 +79,14 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 > After the session, the pre-registered usable/unusable-anchor criterion (random baseline) must be
 > re-applied by hand to the new MVTec AD 2 grid, as it was for M3.
 >
+> **▶ RAN 2026-10-20: the v0.2.21 gate came back at ~60 I-AUROC — a RUNNER DEFECT, confirmed
+> 2026-10-21: `run_mvtec_ad.py` reused one PatchCore backend across categories, so every category
+> after bottle was scored against bottle's memory bank** (see "MEASURED 2026-10-20 — v0.2.21 gate" below). Seven
+> categories score BELOW chance, tightly across seeds. Antialiasing alone cannot move PatchCore from
+> 98 to 60 (anomalib's own test loop uses the antialiased transform), so the corrected scoring path,
+> or the cu130 runtime, is suspected. **6.4 (MVTec AD 2) is on hold until the cause is found**;
+> the author decides whether the unconditional commitment covers a pipeline defect.
+>
 > **Paper side, 2026-10-19:** Abstract, §1–§3 and the §6.5 framing are redrafted for C1 + C3 on the
 > paper repo's branch `descope-c1-c3-rewrite` (**not merged — awaiting the author's review**, title
 > included). Its open tripwires: WinCLIP's gate report must be committed before the abstract may
@@ -174,6 +182,101 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    with a checkbox each.
 8. **M5 — efficiency pass** on a rented fixed instance (protocol §5: latency never from Colab).
 9. **M6 — preprint.** Paper §1–§3 are already written (see below); §4–§6 need M3.
+
+## MEASURED 2026-10-20 — v0.2.21 gate (phase 6.2), pasted from the Colab session
+
+Commit `ee7819602ee2b75793ce86b70d8da1d90646e594`, Tesla T4, `preprocess: anomalib`,
+`resize_antialias: True`, anomalib 2.6.0, torch 2.11.0+cu130. Seeds 0/1/2, 15 categories,
+`--all-seeds`. Results root `results/reproduction/patchcore_ref_v0.2.21/mvtec_ad/shards` (on Drive
+under `MyDrive/mvtec_ad_results/patchcore_ref_v0.2.21/shards`). The report's header/verdict lines
+were not in the paste; the file itself is `results/reproduction/patchcore_mvtec_ad_v0.2.21.md` on
+the VM, still to be brought back.
+
+| Seed | Mean I-AUROC |
+|---|---|
+| seed0 | 59.75 |
+| seed1 | 61.30 |
+| seed2 | 60.31 |
+
+| Category | Measured | Published | Delta |
+|---|---|---|---|
+| bottle | 100.00 ± 0.00 | 100.0 | +0.00 |
+| cable | 50.21 ± 1.42 | 99.4 | -49.19 |
+| capsule | 34.16 ± 0.68 | 97.8 | -63.64 |
+| carpet | 92.40 ± 0.69 | 98.7 | -6.30 |
+| grid | 73.57 ± 0.63 | 97.9 | -24.33 |
+| hazelnut | 74.98 ± 1.34 | 100.0 | -25.02 |
+| leather | 64.49 ± 1.92 | 100.0 | -35.51 |
+| metal_nut | 41.81 ± 2.21 | 100.0 | -58.19 |
+| pill | 45.41 ± 0.57 | 96.0 | -50.59 |
+| screw | 44.29 ± 1.96 | 97.0 | -52.71 |
+| tile | 78.17 ± 1.70 | 98.9 | -20.73 |
+| toothbrush | 33.06 ± 4.11 | 99.7 | -66.64 |
+| transistor | 50.58 ± 3.80 | 100.0 | -49.42 |
+| wood | 96.70 ± 0.18 | 99.0 | -2.30 |
+| zipper | 26.97 ± 1.83 | 99.5 | -72.53 |
+
+**Read 2026-10-20 (Claude), not yet a diagnosis.** The old configuration scored 98.02 on the same
+categories. Seven categories (capsule, metal_nut, pill, screw, toothbrush, zipper, and cable/
+transistor at chance) are at or below 50 with small seed spread — systematic, not noise. Two things
+changed against the old gate run: (1) `forward` is routed to the antialiased `transform`; (2) Colab's
+torch build is cu130, not cu128 (see "Colab's torch build has moved"). WinCLIP ran on cu130 and gave
+a plausible 90.37, so cu130 is not wholesale broken. Read in the anomalib 2.6.0 wheel: the
+Lightning loops apply `transform` in `on_*_batch_start`; `forward` applies `export_transform`, a
+deepcopy with antialiasing off; `training_step` calls `self.model(batch.image)` directly. Nothing in
+that reading explains a collapse, so the cause is OPEN. Next is a one-category diagnostic on the VM
+that separates the two changes (and compares against anomalib's own `Engine.test`), not a re-run.
+
+**Suspected root cause, from reading the code (2026-10-21, Claude) — NOT yet confirmed by a run.**
+`scripts/run_mvtec_ad.py` (written 2026-10-02, after the 2026-09-18 gate, and never run with
+PatchCore before 2026-10-20) builds ONE adapter per seed and fits all 15 categories with it. The old
+gate ran from notebook cells 3.2/3b.3, which built a fresh backend per category, with a comment
+saying why ("reusing one would carry the previous bank over"). anomalib 2.6.0 makes a second fit on
+the same objects a no-op, two ways, both read in the wheel:
+(1) `Engine._setup_trainer` builds the Lightning `Trainer` only `if self._trainer is None`, so the
+backend's reused Engine reuses a Trainer that has already reached `max_epochs=1`;
+(2) `MemoryBankMixin.on_train_epoch_end` calls `fit()` only `if not self._is_fitted`, and nothing
+resets that buffer. So categories 2–15 of every seed were scored against the FIRST category's
+memory bank — bottle, which is first alphabetically and the only category at 100.00. The v0.2.21
+change itself is not implicated by this reading. The MVTec AD 2 runner (one category per process)
+and the VisA runner (a fresh adapter per category) are not affected; `run_eval.py` over several
+categories with PatchCore would be.
+Discriminating check, cheap and on the VM: zipper alone at seed 0 (predicted ≈ 99) against bottle
+then zipper in one process (predicted ≈ 27).
+
+**CONFIRMED 2026-10-21 (the discriminating check, pasted from the same Colab VM, commit `ee78196`,
+seed 0, `run_mvtec_ad.py --categories ... --results results/diag/<name>`, scored with
+`vlmab.eval.aggregate.image_metrics`):**
+
+| run | category | I-AUROC |
+|---|---|---|
+| `zipper_alone` | zipper | 97.82 |
+| `bottle_then_zipper` | bottle | 100.0 |
+| `bottle_then_zipper` | zipper | 26.71 |
+
+The console shows the mechanism directly: in `bottle_then_zipper` the bottle fit prints
+`Selecting Coreset Indices.: 21400/21400`, and the zipper fit prints NO coreset line, only
+"`Trainer.fit` stopped: `max_epochs=1` reached" (Lightning also warns that the checkpoint directory
+already exists). Zipper alone prints its own coreset line (24575/24575). So the ~60 gate is a runner
+defect — 14 of 15 categories per seed scored against bottle's memory bank — not a measurement of
+the v0.2.21 configuration. Zipper alone under v0.2.21 (97.82, one seed) is in the range of the old
+configuration's 98.38 ± 0.13; that is one category and one seed, not a gate.
+The ~60 report and its shards are kept as evidence (renamed, never deleted). The fix and the gate
+re-run are the author's call (2026-10-21).
+
+**Fix prepared 2026-10-21 on branch `v0.2.21-gate-collapse` (not merged until the author agrees):**
+`run_mvtec_ad.py` builds a fresh method per category, as the old notebook cells did;
+`PatchCoreBackend.fit` refuses a second fit on the same backend, before any import, so `run_eval.py`
+over several categories (or any future runner) fails loudly instead; `--summarise-only` over a
+category with no shards exits 2 naming the cause (6.5 printed a bare KeyError for the seven
+categories not yet run). Notebook: new **6.1b** MOVES the defective gate's shards and report aside on
+the VM and on Drive (names ending `shared_backend_defect_2026-10-20`; never deletes, never
+overwrites); 6.2 refuses to start if shards of commit `ee78196` are in its root; 6.2 and 6.5 stream
+the scripts' output into the cell; 6.4's `CATEGORY` line says it runs ONE category.
+Session path for the re-run: phase 0 → 1.1 → 6.1b → 6.0 → 6.1 → 6.2 → 6.3, then 6.4 for the seven
+remaining MVTec AD 2 categories (vial is done and valid: its runner is one category per process),
+then 6.5. The vial report on the VM was re-summarised on 2026-10-21 against the DEFECTIVE gate
+report; it is regenerated by 6.5 once the real gate exists and must not be committed before.
 
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 

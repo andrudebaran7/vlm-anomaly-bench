@@ -214,7 +214,7 @@ def test_6_5_resummarises_from_drive_and_survives_one_failed_category():
     cell = _cell_with("--summarise-only")
     assert "drive.mount" in cell
     assert "isdir(shards)" not in cell and "no shards on this VM" not in cell
-    assert "check=False" in cell and "returncode" in cell
+    assert "returncode" in cell
     assert "failed" in cell
 
 
@@ -294,3 +294,42 @@ def test_6_4_and_next_steps_owe_the_by_hand_anchor_criterion():
                 if c["cell_type"] == "markdown" and "".join(c["source"]).startswith("### 6.4"))
     for text in (md64, (NOTEBOOK.parents[1] / "docs" / "next-steps.md").read_text()):
         assert "usable/unusable-anchor criterion (random baseline)" in " ".join(text.split())
+
+
+# --- 2026-10-21: the first v0.2.21 gate reused one backend across categories ------------------
+# Its shards (commit ee78196) sit at the very paths 6.2 restores and resumes from; a re-run would
+# skip every seed and re-gate the defective scores. 6.1b moves them aside; 6.2 refuses them.
+
+DEFECTIVE_COMMIT = "ee7819602ee2b75793ce86b70d8da1d90646e594"
+
+
+def test_6_1b_moves_the_defective_gate_aside_and_never_deletes_it():
+    cell = _cell_with("shared_backend_defect_2026-10-20")
+    assert DEFECTIVE_COMMIT in cell
+    assert "shutil.move" in cell and "drive.mount" in cell
+    for verb in ("rmtree", "os.remove", "unlink", "rmdir"):
+        assert verb not in cell, f"6.1b must move evidence, never {verb} it"
+    assert "not dest.exists()" in cell, "a second move must not overwrite the first"
+    assert "patchcore_mvtec_ad_v0.2.21.md" in cell, "the defective report is moved too"
+
+
+def test_6_1b_comes_before_the_gate():
+    idx = {text: next(i for i, src in PHASE6_CELLS if text in src)
+           for text in ("shared_backend_defect_2026-10-20", "scripts/run_mvtec_ad.py")}
+    assert idx["shared_backend_defect_2026-10-20"] < idx["scripts/run_mvtec_ad.py"]
+
+
+def test_6_2_refuses_shards_of_the_defective_gate_before_running_a_seed():
+    cell = _cell_with("scripts/run_mvtec_ad.py")
+    assert DEFECTIVE_COMMIT in cell and "6.1b" in cell
+    assert cell.index("restored") < cell.index(DEFECTIVE_COMMIT) < cell.index("for seed in"), \
+        "the check must see the shards restored from Drive, and run before any seed"
+
+
+@pytest.mark.parametrize("text", ["scripts/run_mvtec_ad.py", "--summarise-only"])
+def test_6_2_and_6_5_stream_the_script_output_into_the_cell(text):
+    """2026-10-20: `subprocess.run` without capture sends a child's output to the VM log, not
+    the cell. 6.2 sat silent for 40 minutes a seed, and 6.5 told the author to read an output
+    that was never shown."""
+    cell = _cell_with(text)
+    assert "Popen" in cell and "subprocess.run(" not in cell

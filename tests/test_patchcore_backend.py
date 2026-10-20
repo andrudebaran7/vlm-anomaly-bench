@@ -149,3 +149,16 @@ def test_the_config_records_the_antialiased_resize():
     with open(cfg_path) as fh:
         cfg = yaml.safe_load(fh)
     assert cfg["resize_antialias"] is True
+
+
+def test_a_second_fit_on_the_same_backend_is_refused():
+    """anomalib 2.6.0 turns a second fit on the same model/Engine into a silent no-op (the
+    finished Trainer is reused and `_is_fitted` is never reset), so the second category is scored
+    against the first one's memory bank. Measured 2026-10-21: zipper 26.71 after bottle, 97.82
+    alone. Refused before anything is imported, so it costs nothing to hit."""
+    from vlmab.methods.patchcore_backend import PatchCoreBackend
+
+    backend = object.__new__(PatchCoreBackend)   # the real constructor needs anomalib
+    backend._fitted = True
+    with pytest.raises(RuntimeError, match="fresh backend"):
+        backend.fit(iter([]))

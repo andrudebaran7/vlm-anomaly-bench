@@ -75,9 +75,22 @@ def harness(monkeypatch, tmp_path):
 
 def test_all_fifteen_categories_are_the_default(harness):
     harness["main"](["--method", "winclip", "--seeds", "0"])
-    assert len(harness["calls"][0]["categories"]) == 15, (
-        "the published 91.8 is a mean over fifteen; a subset is not it"
-    )
+    scored = [c for call in harness["calls"] for c in call["categories"]]
+    assert scored == FIFTEEN, "the published 91.8 is a mean over fifteen; a subset is not it"
+
+
+def test_every_category_gets_its_own_freshly_built_method(harness):
+    """MEASURED 2026-10-21 (docs/next-steps.md): one PatchCore backend reused across categories
+    fits only the first. anomalib 2.6.0 reuses the Engine's finished Trainer and skips `fit()`
+    once `_is_fitted` is set, so zipper scored 26.71 after bottle against 97.82 alone, and the
+    v0.2.21 gate came back at ~60. The old notebook cells built one backend per category; the
+    script must too, for every method, at every seed."""
+    harness["main"](["--seeds", "0", "1"])
+    calls = harness["calls"]
+    assert [call["categories"] for call in calls] == [[c] for c in FIFTEEN] * 2
+    assert len(harness["built"]) == 30
+    assert len({id(call["method"]) for call in calls}) == 30
+    assert [call["method"].seed for call in calls] == [0] * 15 + [1] * 15
 
 
 def test_it_scores_the_test_split_and_fits_on_train(harness):
@@ -111,7 +124,8 @@ def test_a_method_without_a_backend_exits_2(harness, capsys):
 
 def test_three_seeds_are_the_default_because_section_6_requires_them(harness):
     harness["main"](["--method", "winclip"])
-    assert [seed for _, seed in harness["built"]] == [0, 1, 2]
+    # One build per category per seed (see the fresh-method test), so 15 of each, in order.
+    assert [seed for _, seed in harness["built"]] == [0] * 15 + [1] * 15 + [2] * 15
 
 
 def test_a_repeated_seed_is_refused(harness):

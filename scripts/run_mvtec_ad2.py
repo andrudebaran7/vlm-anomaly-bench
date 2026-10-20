@@ -257,6 +257,13 @@ def summarise(results: Path, max_bytes: int | None = None,
     from vlmab.eval.store import ResultStore
 
     df = ResultStore(results / "shards").load_all()
+    if df.empty:
+        # 2026-10-21: phase 6.5 reached aggregate() with an empty frame for seven categories that
+        # had not run yet, and each died on a KeyError naming no column at all.
+        raise FileNotFoundError(
+            f"no shards under {results / 'shards'} (nor restored from Drive): this category "
+            "has not been run yet. Run it first (notebook 6.4), then summarise."
+        )
 
     # Old and corrected PatchCore shards can reach one root by hand-copying (2026-09-16 did).
     # The gate refuses that with the same rule; reusing it keeps "absent" distinct from True.
@@ -548,7 +555,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.summarise_only:
         print("--summarise-only: not loading torch or anomalib, and running no seed.\n")
-        summarise(results, args.max_bytes, gate_report=args.gate_report)
+        try:
+            summarise(results, args.max_bytes, gate_report=args.gate_report)
+        except FileNotFoundError as exc:
+            print(f"\ncannot summarise {args.category}: {exc}", file=sys.stderr)
+            return 2
         return 0
 
     for i, seed in enumerate(args.seeds, 1):
