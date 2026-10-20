@@ -215,6 +215,18 @@ class PatchCoreBackend:
         ])
 
     def fit(self, train_images: Iterable[np.ndarray]) -> None:
+        # One backend, one fit. anomalib 2.6.0 makes a second fit on the same model and Engine a
+        # silent no-op: the Engine reuses its Trainer, which has already reached max_epochs=1,
+        # and MemoryBankMixin calls fit() only while `_is_fitted` is False, which nothing resets.
+        # The second category is then scored against the first one's memory bank. MEASURED
+        # 2026-10-21: zipper 26.71 after bottle, 97.82 alone (docs/next-steps.md). Refused
+        # before any import so a runner that reuses a backend fails at once, not after a gate.
+        if self._fitted:
+            raise RuntimeError(
+                "PatchCoreBackend.fit called on a backend that is already fitted. anomalib "
+                "2.6.0 would silently keep the first memory bank; build a fresh backend per "
+                "category (and per seed)."
+            )
         import torch
         from anomalib.data import Folder
         from anomalib.data.utils import TestSplitMode, ValSplitMode

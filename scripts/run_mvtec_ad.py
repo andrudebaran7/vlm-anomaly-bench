@@ -55,20 +55,26 @@ def run_one_seed(root: Path, results: Path, seed: int, device: str, method_name:
     from vlmab.eval.store import ResultStore
     from vlmab.methods.gpu import build_runnable
 
-    # A fresh adapter per seed, for the reason the AD 2 runner documents: reusing one carries the
-    # previous seed's state into the next seed's scores while the shard claims otherwise.
-    method = build_runnable(method_name, seed=seed)
     store = ResultStore(results / "shards")
-    # `preprocess` and `resize_antialias` (v0.2.21) are read off the method and both hashed and
-    # stamped; the runtime versions are stamped only. See provenance.method_meta.
-    preprocess = getattr(method, "preprocess", None)
-    meta = method_meta(method, {"method": method_name, "split": "test"})
-
-    run_evaluation(
-        MVTecAD(root), method, store, meta,
-        categories=list(categories), split="test", fit_split="train",
-        maps_dir=results / "maps", device=device,
-    )
+    dataset = MVTecAD(root)
+    preprocess = None
+    for category in categories:
+        # A fresh adapter per CATEGORY, not per seed. MEASURED 2026-10-21 (docs/next-steps.md):
+        # one PatchCore backend reused across categories fits only the first -- anomalib 2.6.0
+        # reuses the Engine's finished Trainer and skips `fit()` once `_is_fitted` is set -- so
+        # every later category was scored against bottle's memory bank (zipper 26.71 after
+        # bottle, 97.82 alone) and the first v0.2.21 gate came back at ~60. The notebook cells
+        # the 2026-09-18 gate ran from built one backend per category; this script did not.
+        method = build_runnable(method_name, seed=seed)
+        # `preprocess` and `resize_antialias` (v0.2.21) are read off the method and both hashed
+        # and stamped; the runtime versions are stamped only. See provenance.method_meta.
+        preprocess = getattr(method, "preprocess", None)
+        meta = method_meta(method, {"method": method_name, "split": "test"})
+        run_evaluation(
+            dataset, method, store, meta,
+            categories=[category], split="test", fit_split="train",
+            maps_dir=results / "maps", device=device,
+        )
     print(f"  seed {seed}: done over {len(categories)} categories (preprocess {preprocess})")
 
 
