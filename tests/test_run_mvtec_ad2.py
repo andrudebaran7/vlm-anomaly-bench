@@ -822,3 +822,23 @@ def test_an_old_configuration_report_gets_none_of_the_v0221_caveats(tmp_path):
 def test_report_provenance_lists_runtime_versions(tmp_path):
     report = _report_for(tmp_path, "PASS", **V0221)
     assert "anomalib_version: `2.6.0`" in report and "torch_version: `2.5.1`" in report
+
+
+# --- 2026-10-21: --summarise-only over a category that never ran ---------------------------------
+
+
+def test_summarise_names_the_missing_shards_instead_of_a_keyerror(tmp_path):
+    """Phase 6.5 on 2026-10-21: seven categories had not run yet, and each died on
+    `KeyError: "no column 'meta_lighting' to group by; columns are []"` -- true, and no help."""
+    with pytest.raises(FileNotFoundError, match="no shards"):
+        _module().summarise(tmp_path / "results" / "sheet_metal")
+
+
+def test_summarise_only_over_no_shards_exits_2_with_the_reason(harness, monkeypatch, capsys):
+    mod, calls, root, tmp = harness
+    monkeypatch.setattr(mod, "summarise", _module().summarise)   # the harness stubs it out
+    rc = mod.main(["--category", "vial", "--root", str(root), "--no-save", "--summarise-only",
+                   "--results", str(tmp / "empty")])
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "no shards" in err and "vial" in err
