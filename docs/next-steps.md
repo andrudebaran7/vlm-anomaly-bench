@@ -79,8 +79,9 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 > After the session, the pre-registered usable/unusable-anchor criterion (random baseline) must be
 > re-applied by hand to the new MVTec AD 2 grid, as it was for M3.
 >
-> **▶ RAN 2026-10-20: the v0.2.21 gate came back at ~60 I-AUROC — not a reproduction failure,
-> a malfunction until shown otherwise** (see "MEASURED 2026-10-20 — v0.2.21 gate" below). Seven
+> **▶ RAN 2026-10-20: the v0.2.21 gate came back at ~60 I-AUROC — a RUNNER DEFECT, confirmed
+> 2026-10-21: `run_mvtec_ad.py` reused one PatchCore backend across categories, so every category
+> after bottle was scored against bottle's memory bank** (see "MEASURED 2026-10-20 — v0.2.21 gate" below). Seven
 > categories score BELOW chance, tightly across seeds. Antialiasing alone cannot move PatchCore from
 > 98 to 60 (anomalib's own test loop uses the antialiased transform), so the corrected scoring path,
 > or the cu130 runtime, is suspected. **6.4 (MVTec AD 2) is on hold until the cause is found**;
@@ -242,6 +243,26 @@ and the VisA runner (a fresh adapter per category) are not affected; `run_eval.p
 categories with PatchCore would be.
 Discriminating check, cheap and on the VM: zipper alone at seed 0 (predicted ≈ 99) against bottle
 then zipper in one process (predicted ≈ 27).
+
+**CONFIRMED 2026-10-21 (the discriminating check, pasted from the same Colab VM, commit `ee78196`,
+seed 0, `run_mvtec_ad.py --categories ... --results results/diag/<name>`, scored with
+`vlmab.eval.aggregate.image_metrics`):**
+
+| run | category | I-AUROC |
+|---|---|---|
+| `zipper_alone` | zipper | 97.82 |
+| `bottle_then_zipper` | bottle | 100.0 |
+| `bottle_then_zipper` | zipper | 26.71 |
+
+The console shows the mechanism directly: in `bottle_then_zipper` the bottle fit prints
+`Selecting Coreset Indices.: 21400/21400`, and the zipper fit prints NO coreset line, only
+"`Trainer.fit` stopped: `max_epochs=1` reached" (Lightning also warns that the checkpoint directory
+already exists). Zipper alone prints its own coreset line (24575/24575). So the ~60 gate is a runner
+defect — 14 of 15 categories per seed scored against bottle's memory bank — not a measurement of
+the v0.2.21 configuration. Zipper alone under v0.2.21 (97.82, one seed) is in the range of the old
+configuration's 98.38 ± 0.13; that is one category and one seed, not a gate.
+The ~60 report and its shards are kept as evidence (renamed, never deleted). The fix and the gate
+re-run are the author's call (2026-10-21).
 
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
