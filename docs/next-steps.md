@@ -226,6 +226,23 @@ deepcopy with antialiasing off; `training_step` calls `self.model(batch.image)` 
 that reading explains a collapse, so the cause is OPEN. Next is a one-category diagnostic on the VM
 that separates the two changes (and compares against anomalib's own `Engine.test`), not a re-run.
 
+**Suspected root cause, from reading the code (2026-10-21, Claude) — NOT yet confirmed by a run.**
+`scripts/run_mvtec_ad.py` (written 2026-10-02, after the 2026-09-18 gate, and never run with
+PatchCore before 2026-10-20) builds ONE adapter per seed and fits all 15 categories with it. The old
+gate ran from notebook cells 3.2/3b.3, which built a fresh backend per category, with a comment
+saying why ("reusing one would carry the previous bank over"). anomalib 2.6.0 makes a second fit on
+the same objects a no-op, two ways, both read in the wheel:
+(1) `Engine._setup_trainer` builds the Lightning `Trainer` only `if self._trainer is None`, so the
+backend's reused Engine reuses a Trainer that has already reached `max_epochs=1`;
+(2) `MemoryBankMixin.on_train_epoch_end` calls `fit()` only `if not self._is_fitted`, and nothing
+resets that buffer. So categories 2–15 of every seed were scored against the FIRST category's
+memory bank — bottle, which is first alphabetically and the only category at 100.00. The v0.2.21
+change itself is not implicated by this reading. The MVTec AD 2 runner (one category per process)
+and the VisA runner (a fresh adapter per category) are not affected; `run_eval.py` over several
+categories with PatchCore would be.
+Discriminating check, cheap and on the VM: zipper alone at seed 0 (predicted ≈ 99) against bottle
+then zipper in one process (predicted ≈ 27).
+
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
