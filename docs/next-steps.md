@@ -79,6 +79,13 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 > After the session, the pre-registered usable/unusable-anchor criterion (random baseline) must be
 > re-applied by hand to the new MVTec AD 2 grid, as it was for M3.
 >
+> **▶ RAN 2026-10-20: the v0.2.21 gate came back at ~60 I-AUROC — not a reproduction failure,
+> a malfunction until shown otherwise** (see "MEASURED 2026-10-20 — v0.2.21 gate" below). Seven
+> categories score BELOW chance, tightly across seeds. Antialiasing alone cannot move PatchCore from
+> 98 to 60 (anomalib's own test loop uses the antialiased transform), so the corrected scoring path,
+> or the cu130 runtime, is suspected. **6.4 (MVTec AD 2) is on hold until the cause is found**;
+> the author decides whether the unconditional commitment covers a pipeline defect.
+>
 > **Paper side, 2026-10-19:** Abstract, §1–§3 and the §6.5 framing are redrafted for C1 + C3 on the
 > paper repo's branch `descope-c1-c3-rewrite` (**not merged — awaiting the author's review**, title
 > included). Its open tripwires: WinCLIP's gate report must be committed before the abstract may
@@ -174,6 +181,50 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
    with a checkbox each.
 8. **M5 — efficiency pass** on a rented fixed instance (protocol §5: latency never from Colab).
 9. **M6 — preprint.** Paper §1–§3 are already written (see below); §4–§6 need M3.
+
+## MEASURED 2026-10-20 — v0.2.21 gate (phase 6.2), pasted from the Colab session
+
+Commit `ee7819602ee2b75793ce86b70d8da1d90646e594`, Tesla T4, `preprocess: anomalib`,
+`resize_antialias: True`, anomalib 2.6.0, torch 2.11.0+cu130. Seeds 0/1/2, 15 categories,
+`--all-seeds`. Results root `results/reproduction/patchcore_ref_v0.2.21/mvtec_ad/shards` (on Drive
+under `MyDrive/mvtec_ad_results/patchcore_ref_v0.2.21/shards`). The report's header/verdict lines
+were not in the paste; the file itself is `results/reproduction/patchcore_mvtec_ad_v0.2.21.md` on
+the VM, still to be brought back.
+
+| Seed | Mean I-AUROC |
+|---|---|
+| seed0 | 59.75 |
+| seed1 | 61.30 |
+| seed2 | 60.31 |
+
+| Category | Measured | Published | Delta |
+|---|---|---|---|
+| bottle | 100.00 ± 0.00 | 100.0 | +0.00 |
+| cable | 50.21 ± 1.42 | 99.4 | -49.19 |
+| capsule | 34.16 ± 0.68 | 97.8 | -63.64 |
+| carpet | 92.40 ± 0.69 | 98.7 | -6.30 |
+| grid | 73.57 ± 0.63 | 97.9 | -24.33 |
+| hazelnut | 74.98 ± 1.34 | 100.0 | -25.02 |
+| leather | 64.49 ± 1.92 | 100.0 | -35.51 |
+| metal_nut | 41.81 ± 2.21 | 100.0 | -58.19 |
+| pill | 45.41 ± 0.57 | 96.0 | -50.59 |
+| screw | 44.29 ± 1.96 | 97.0 | -52.71 |
+| tile | 78.17 ± 1.70 | 98.9 | -20.73 |
+| toothbrush | 33.06 ± 4.11 | 99.7 | -66.64 |
+| transistor | 50.58 ± 3.80 | 100.0 | -49.42 |
+| wood | 96.70 ± 0.18 | 99.0 | -2.30 |
+| zipper | 26.97 ± 1.83 | 99.5 | -72.53 |
+
+**Read 2026-10-20 (Claude), not yet a diagnosis.** The old configuration scored 98.02 on the same
+categories. Seven categories (capsule, metal_nut, pill, screw, toothbrush, zipper, and cable/
+transistor at chance) are at or below 50 with small seed spread — systematic, not noise. Two things
+changed against the old gate run: (1) `forward` is routed to the antialiased `transform`; (2) Colab's
+torch build is cu130, not cu128 (see "Colab's torch build has moved"). WinCLIP ran on cu130 and gave
+a plausible 90.37, so cu130 is not wholesale broken. Read in the anomalib 2.6.0 wheel: the
+Lightning loops apply `transform` in `on_*_batch_start`; `forward` applies `export_transform`, a
+deepcopy with antialiasing off; `training_step` calls `self.model(batch.image)` directly. Nothing in
+that reading explains a collapse, so the cause is OPEN. Next is a one-category diagnostic on the VM
+that separates the two changes (and compares against anomalib's own `Engine.test`), not a re-run.
 
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
