@@ -328,8 +328,8 @@ What this does and does not show:
 - The ~60 of 2026-10-20 was the runner defect, as diagnosed: the same configuration, with one
   backend per category, lands at 98.22.
 - The corrected anchor moves the mean by +0.20 and passes with more margin (−0.78 against −0.98).
-  Per category the change is mixed: nine up (largest carpet +1.15, grid +0.87, cable +0.86), three
-  down (zipper −0.69, screw −0.70, wood −0.29), three unchanged at 100. Which per-category moves are
+  Per category the change is mixed: seven up (largest carpet +1.15, grid +0.87, cable +0.86), four
+  down (screw −0.70, zipper −0.69, wood −0.29, toothbrush −0.09), four unchanged at 100. Which per-category moves are
   real and which are seed noise is not established here; nothing is claimed about them.
 - **Toothbrush is still the outlier at −8.31**, the same as the old configuration (−8.22). Whatever
   causes it, the export-path mismatch is not it. It is one of the five categories outside ±1.0
