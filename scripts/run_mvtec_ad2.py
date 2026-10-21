@@ -208,6 +208,20 @@ def save_to_drive(results: Path, dest: Path) -> None:
     print(f"  saved to {dest / 'shards'} ({n} shard(s) there now)")
 
 
+def save_report_to_drive(results: Path, dest: Path) -> None:
+    """Copy the category report off the VM too. It is the only place the pixel metrics are
+    written, since the maps never leave the VM, so a report regenerated on another VM has no
+    AU-PRO. A Colab session ended between categories on 2026-10-21 and took vial's with it.
+    Called after a full run only: `--summarise-only` on a VM without the maps must not replace
+    the copy that came from the VM that had them."""
+    report = results.parent / f"{results.name}.md"
+    if not report.is_file():
+        return
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(report, dest / report.name)
+    print(f"  report saved to {dest / report.name}")
+
+
 #: Metrics worth showing per lighting condition. MVTec AD 2 exists to measure the lighting shift,
 #: so this view is the point of the whole grid rather than a convenience.
 SUMMARY_METRICS = ("i_auroc", "au_pro_030", "au_pro_005")
@@ -569,6 +583,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             save_to_drive(results, drive_results)
 
     summarise(results, args.max_bytes, gate_report=args.gate_report)
+    if not args.no_save:
+        save_report_to_drive(results, drive_results)
     print(f"\n{args.category} done at seeds {args.seeds}. Shards: {results / 'shards'}")
     return 0
 
