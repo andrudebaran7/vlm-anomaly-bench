@@ -364,7 +364,10 @@ seed (`is_done`), and re-saved the same 3 shards; the image-level table is **ide
 decimals**. But "420 of 420 anomaly maps are not on this machine" — the maps stayed on the first VM —
 so this VM's `vial.md` has **no AU-PRO**, and so will 6.5's regenerated one. The pixel metrics above
 exist only as this console transcription unless vial's shards are moved aside and vial is re-fit on
-the VM that runs 6.5 (minutes per seed). Undecided as of 2026-10-21: the author's call.
+the VM that runs 6.5 (minutes per seed). **DECIDED 2026-10-21 by the author: re-fit.** Notebook
+cell **6.4b** moves vial's shards aside to `shards_no_maps_2026-10-20` (VM and Drive, never
+deleted) and runs vial afresh; since `e9a6f89` the script also copies each category's report to
+Drive. Run it after the seven remaining categories, on any VM.
 
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
