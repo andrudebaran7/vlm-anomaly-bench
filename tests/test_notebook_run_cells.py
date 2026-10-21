@@ -333,3 +333,23 @@ def test_6_2_and_6_5_stream_the_script_output_into_the_cell(text):
     that was never shown."""
     cell = _cell_with(text)
     assert "Popen" in cell and "subprocess.run(" not in cell
+
+
+# --- 2026-10-21: vial's v0.2.21 maps stayed on the VM that ran it ------------------------------
+# Its shards resume and skip every seed, so a report regenerated elsewhere has no AU-PRO. The
+# author chose to re-fit (2026-10-21): 6.4b moves the shards aside and runs vial afresh.
+
+def test_6_4b_moves_vials_shards_aside_and_never_deletes_them():
+    cell = _cell_with("no_maps_2026-10-20")
+    assert "shutil.move" in cell and "drive.mount" in cell
+    for verb in ("rmtree", "os.remove", "unlink", "rmdir"):
+        assert verb not in cell, f"6.4b must move evidence, never {verb} it"
+    assert "not dest.exists()" in cell, "a second run must not move the fresh shards over the old"
+    assert "patchcore_ref_v0.2.21/vial/shards" in cell
+    assert '"--category", "vial"' in cell and "Popen" in cell
+
+
+def test_6_4b_sits_between_the_grid_and_the_re_summarise():
+    idx = {text: next(i for i, src in PHASE6_CELLS if text in src)
+           for text in ('CATEGORY = "', "no_maps_2026-10-20", "--summarise-only")}
+    assert idx['CATEGORY = "'] < idx["no_maps_2026-10-20"] < idx["--summarise-only"]
