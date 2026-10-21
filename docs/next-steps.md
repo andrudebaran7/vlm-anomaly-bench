@@ -336,8 +336,10 @@ What this does and does not show:
   (capsule, pill, tile, toothbrush, zipper), which the write-up owes an explanation for.
 - Zipper alone in the 2026-10-21 check (97.82, seed 0) agrees with zipper here (97.69 ± 0.11).
 
-**Gate shards** are on Drive under `MyDrive/mvtec_ad_results/patchcore_ref_v0.2.21/` (6.3 copies the
-report there too). Next: 6.4 for sheet_metal, fruit_jelly, wallplugs, rice, fabric, can, walnuts,
+**6.3 output, as pasted:** `on Drive: ['patchcore_mvtec_ad_v0.2.21.md',
+'patchcore_mvtec_ad_v0.2.21_shared_backend_defect_2026-10-20.md', 'shards',
+'shards_shared_backend_defect_2026-10-20'] | shards: 45`. So the new report and its 45 shards are on
+Drive under `MyDrive/mvtec_ad_results/patchcore_ref_v0.2.21/`, next to the set-aside defective ones. Next: 6.4 for sheet_metal, fruit_jelly, wallplugs, rice, fabric, can, walnuts,
 then 6.5 (which also regenerates vial's report against this gate), then the usable/unusable-anchor
 criterion by hand.
 
