@@ -165,6 +165,43 @@ def test_shards_reach_drive_after_every_seed_not_only_at_the_end(monkeypatch, ha
     assert saved == [1, 2, 3], "one copy per finished seed"
 
 
+def test_the_category_report_reaches_drive_after_a_run(monkeypatch, harness):
+    """2026-10-21: a Colab session ended between categories. The shards were on Drive, but the
+    report -- the only place the pixel metrics are written, since the maps never leave the VM --
+    died with the runtime. A report regenerated elsewhere has no AU-PRO."""
+    mod, calls, root, tmp = harness
+    monkeypatch.setattr(mod, "save_to_drive", lambda results, dest: None)
+
+    def _summarise(results, *a, **k):
+        results.parent.mkdir(parents=True, exist_ok=True)
+        (results.parent / f"{results.name}.md").write_text("# vial report with AU-PRO\n")
+    monkeypatch.setattr(mod, "summarise", _summarise)
+    rc = mod.main(["--category", "vial", "--root", str(root),
+                   "--results", str(tmp / "results" / "vial"),
+                   "--drive-results", str(tmp / "drive" / "vial")])
+    assert rc == 0
+    assert (tmp / "drive" / "vial" / "vial.md").read_text() == "# vial report with AU-PRO\n"
+
+
+def test_summarise_only_never_overwrites_the_report_on_drive(monkeypatch, harness):
+    """A --summarise-only on a VM without the maps writes a report without AU-PRO. The copy on
+    Drive came from the VM that had them, so it must not be replaced by the poorer one."""
+    mod, calls, root, tmp = harness
+    drive = tmp / "drive" / "vial"
+    drive.mkdir(parents=True)
+    (drive / "vial.md").write_text("with AU-PRO")
+    monkeypatch.setattr(mod, "restore_from_drive", lambda results, dest: None)
+
+    def _summarise(results, *a, **k):
+        results.parent.mkdir(parents=True, exist_ok=True)
+        (results.parent / f"{results.name}.md").write_text("without AU-PRO")
+    monkeypatch.setattr(mod, "summarise", _summarise)
+    rc = mod.main(["--category", "vial", "--root", str(root), "--summarise-only",
+                   "--results", str(tmp / "results" / "vial"), "--drive-results", str(drive)])
+    assert rc == 0
+    assert (drive / "vial.md").read_text() == "with AU-PRO"
+
+
 # --- Mounting Drive is the notebook's job, and this is why ---------------------------------
 # Added 2026-09-21 after the first live M3 run died here. `google.colab.drive.mount` sends an
 # authentication request to the Colab frontend THROUGH the IPython kernel; a `!python`
