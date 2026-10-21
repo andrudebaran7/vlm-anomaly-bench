@@ -343,6 +343,29 @@ Drive under `MyDrive/mvtec_ad_results/patchcore_ref_v0.2.21/`, next to the set-a
 then 6.5 (which also regenerates vial's report against this gate), then the usable/unusable-anchor
 criterion by hand.
 
+## MEASURED — MVTec AD 2 vial under v0.2.21 (6.4), and why its pixel metrics need its own VM
+
+**Run 2026-10-20 (the first VM, commit `ee78196`, one category per process, so untouched by the
+shared-backend defect).** Per-lighting table as pasted, mean ± std over seeds 0/1/2:
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.8711 ± 0.0204 | 0.8763 ± 0.0034 | 0.6019 ± 0.0014 |
+| regular | 0.8800 ± 0.0353 | 0.9033 ± 0.0004 | 0.6067 ± 0.0013 |
+| shift_1 | 0.9378 ± 0.0154 | 0.9025 ± 0.0006 | 0.5992 ± 0.0013 |
+| shift_2 | 0.8800 ± 0.0231 | 0.9060 ± 0.0004 | 0.6086 ± 0.0009 |
+| shift_3 | 0.8667 ± 0.0231 | 0.9063 ± 0.0005 | 0.6102 ± 0.0015 |
+| shift_4 | 0.9289 ± 0.0077 | 0.9002 ± 0.0005 | 0.5866 ± 0.0006 |
+| underexposed | 0.8533 ± 0.0481 | 0.6479 ± 0.0077 | 0.3591 ± 0.0108 |
+
+**Re-run by accident 2026-10-21 (second VM, commit `a15d3b6`):** 6.4 was queued for sheet_metal but
+executed with `CATEGORY = "vial"`. The runner restored the 3 vial shards from Drive, skipped every
+seed (`is_done`), and re-saved the same 3 shards; the image-level table is **identical to four
+decimals**. But "420 of 420 anomaly maps are not on this machine" — the maps stayed on the first VM —
+so this VM's `vial.md` has **no AU-PRO**, and so will 6.5's regenerated one. The pixel metrics above
+exist only as this console transcription unless vial's shards are moved aside and vial is re-fit on
+the VM that runs 6.5 (minutes per seed). Undecided as of 2026-10-21: the author's call.
+
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
