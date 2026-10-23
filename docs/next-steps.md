@@ -43,6 +43,45 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## Next steps, in order
 
+## ▶ RESUME HERE — session handoff of 2026-10-21 (written at the author's request)
+
+**Where things stand (master `bc7f660`, pushed):**
+- **PatchCore v0.2.21 gate PASSED: 98.22 ± 0.03** vs 99.0 (re-run 2026-10-21 after the
+  shared-backend fix). Report: `results/reproduction/patchcore_mvtec_ad_v0.2.21.md`; detail and the
+  comparison with the old config in "MEASURED 2026-10-21 — the v0.2.21 gate re-run" below. The
+  ~60 run of 2026-10-20 is kept as evidence (`*_shared_backend_defect_2026-10-20` on Drive).
+- **MVTec AD 2 grid under v0.2.21: only vial has shards**, and its anomaly maps were lost with the
+  2026-10-20 VM (see "MEASURED — MVTec AD 2 vial under v0.2.21"). The author decided to re-fit it.
+- Since `e9a6f89`, `run_mvtec_ad2.py` copies each category's report to Drive
+  (`MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/<cat>/<cat>.md`) after a full run. That copy is
+  the one with AU-PRO; maps never leave the VM.
+
+**Colab path for the next session** (reopen `notebooks/patchcore_colab.ipynb` from GitHub first):
+1. Phase 0 → 1.1 (once per VM).
+2. **6.4** once per category, setting `CATEGORY` BEFORE pressing play (a queued cell runs the code
+   it had when queued — that is how vial re-ran by accident on 2026-10-21): sheet_metal →
+   fruit_jelly → wallplugs → rice → fabric → can → walnuts. Upload each `<cat>.tar.gz` to
+   `MyDrive/mvtec_ad2/` one at a time; delete it once its shards are on Drive.
+   `sheet_metal.tar.gz` was already on Drive on 2026-10-21.
+3. **6.4b** once: moves vial's map-less shards to `shards_no_maps_2026-10-20` and re-fits vial
+   (needs `vial.tar.gz` on Drive).
+4. **Do NOT run 6.5**: each report already carries the PASS verdict, and 6.5 on a VM without the
+   maps would rewrite reports without AU-PRO.
+
+**On each pasted output (Claude side):** record the per-lighting table verbatim in this file first
+(provenance before anything else), on a feature branch. The reports themselves come back from
+Drive (`<cat>.md`) and get committed under `results/mvtec_ad2/patchcore_ref_v0.2.21/`; do NOT
+commit any vial.md written before 6.4b (no AU-PRO, or the defective verdict).
+
+**After the grid:**
+- Re-apply the pre-registered usable/unusable-anchor criterion (random baseline) by hand, as for M3.
+- Paper repo, branch `descope-c1-c3-rewrite` (**not merged; awaiting the author's review**, title
+  included; review findings a–e delivered): update with the v0.2.21 anchor numbers and a
+  protocol-sync v0.2.21 entry; add C3 evidence (the export-path antialias mismatch; the
+  shared-backend runner defect, ~60 → 98.22); bring in WinCLIP's gate report (tripwire).
+- Open question for the write-up: toothbrush is −8.31 under both configurations, so the
+  export-path fix is not its cause; five categories sit outside ±1.0.
+
 > **⚠️ SCOPE REDUCED — protocol v0.2.18 (spec 2026-10-01, written into the protocol 2026-10-03).**
 > Only **PatchCore** and **WinCLIP** are benchmarked. Items 3–5 below (AnomalyCLIP, AdaCLIP, SAA+)
 > and item 8 (M5) are **cut**; their records stay as evidence for the paper. The live order is the
