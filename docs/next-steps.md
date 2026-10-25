@@ -479,12 +479,20 @@ it completed. Per-lighting table as pasted, mean ± std over seeds 0/1/2:
 
 Not yet interpreted. Image-level is at or below chance in every condition, as it was under the old
 configuration (`results/mvtec_ad2/patchcore_ref/wallplugs.md`: 0.3956–0.5000). The usable-anchor
-criterion is applied after the grid. The Drive copy of `wallplugs.md` was not confirmed in the paste.
+criterion is applied after the grid.
+
+**⚠️ The Drive copy of `wallplugs.md` is NOT confirmed.** The later notebook paste shows the `cp -v`
+cell failing with `cannot stat 'results/mvtec_ad2/patchcore_ref_v0.2.21/wallplugs.md'` and a
+`cat` of the same path failing with `No such file or directory`, while the summarise cell between
+them shows `wrote results/mvtec_ad2/patchcore_ref_v0.2.21/wallplugs.md`. The execution order of the
+three cells is not known from the paste. The table above is the console transcription. A report
+with AU-PRO can only be regenerated on the VM that holds wallplugs' maps.
 
 ## MEASURED 2026-10-25 — MVTec AD 2 can under v0.2.21 (6.4), pasted from the Colab session
 
-**Run 2026-10-25 (same VM as the three before, commit `6f4b2a0`).** The layout-check lines were not
-transcribed; the paste starts at `OK`. Seeds 0/1/2 each finished and were copied to Drive (3 shards;
+**Run 2026-10-25 (same VM as the three before, commit `6f4b2a0`).** Layout (pasted later): 1262
+images; train regular=412, validation regular=46, test_public 27 × 6 (overexposed, regular,
+shift_1–3, underexposed), test_private 321, test_private_mixed 321. Seeds 0/1/2 each finished and were copied to Drive (3 shards;
 coreset bar 42,187, about 4m43s of selection per seed). The memory guard did **not** trip, as
 predicted, and the script copied the report to Drive itself
 (`MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/can/can.md`). Per-lighting table as pasted,
@@ -505,11 +513,14 @@ is applied after the grid.
 
 ## MEASURED 2026-10-25 — vial re-fit under v0.2.21 (6.4b), pasted from the Colab session
 
-**Run 2026-10-25 (same VM as the four above, commit `6f4b2a0`).** Only the report was pasted
-(`cat` on the VM, generated 2026-10-25 20:02 UTC; anomalib 2.6.0, torch 2.11.0+cu130). 6.4b's own
-console output (the move to `shards_no_maps_2026-10-20`, the seed lines, and the script's Drive-copy
-line) was not transcribed. That the seeds were re-fit, not restored, is inferred from the report:
-it carries AU-PRO, and the 2026-10-20 maps exist only on that VM.
+**Run 2026-10-25 (same VM as the four above, commit `6f4b2a0`).** Report generated 2026-10-25
+20:02 UTC (anomalib 2.6.0, torch 2.11.0+cu130). 6.4b's console output, pasted afterwards: the local
+`vial/shards` was absent (fresh VM); the Drive copy was moved to
+`MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/vial/shards_no_maps_2026-10-20`. Layout OK (train
+291, validation 41, test_public 20 × 7 conditions, test_private 276, test_private_mixed 276). Seeds
+0/1/2 were **fitted afresh** (coreset bar 29,797 each, about 2m19s), each copied to Drive (3
+shards). The script copied the report itself:
+`report saved to .../patchcore_ref_v0.2.21/vial/vial.md`.
 
 | lighting | i_auroc | au_pro_030 | au_pro_005 |
 |---|---|---|---|
