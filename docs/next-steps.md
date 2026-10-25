@@ -43,7 +43,40 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## Next steps, in order
 
-## ▶ RESUME HERE — session handoff of 2026-10-21 (written at the author's request)
+## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
+
+**Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
+sheet_metal, fruit_jelly, wallplugs, can, vial (re-fit by 6.4b) and rice. The tables are recorded
+verbatim in the "MEASURED 2026-10-25" sections below. **Owed: walnuts and fabric**, which are
+2448×2048 and take about one free-Colab session each. Start each at the top of a fresh session.
+
+**Next Colab session:**
+1. Phase 0 → 1.1.
+2. **Walnuts first, setting its map-less shards aside:** `!mv .../patchcore_ref_v0.2.21/walnuts/shards
+   .../walnuts/shards_no_maps_2026-10-26`. The exact command is in "INCOMPLETE 2026-10-26" below. The
+   session ended in seed 2 and seeds 0/1 have no maps, so a plain re-run would resume them.
+3. 6.4 with `CATEGORY = "walnuts"`. When the guard trips, run
+   `--summarise-only --max-bytes 12000000000 && cp -v <report> <Drive>` in one cell on the same VM.
+4. Fabric the same way, in another session; it has no shards yet.
+5. Still do NOT run 6.5.
+
+**Branches, all local and none merged or pushed:**
+- Bench `mvtec-ad2-grid-v0.2.21`: the records of this grid.
+- Paper `descope-c1-c3-rewrite` (`c1f9ba3` on top of the 2026-10-19 rewrite): every anchor claim is
+  marked pre-v0.2.21, and protocol-sync has a v0.2.21 entry. No prose has changed. It still awaits
+  the author's review.
+
+**Already changed by v0.2.21 (provisional, 6 of 8):** Sheet Metal's detection went from chance
+(0.510) to 0.797. The paper's headline "five of eight unusable" therefore cannot carry over. See
+"PROVISIONAL 2026-10-26" below.
+
+**After the grid:**
+- Download the eight `<cat>.md` reports from Drive and compare each against its recorded table.
+  Commit them under `results/mvtec_ad2/patchcore_ref_v0.2.21/`.
+- The author applies the usable/unusable criterion.
+- Then the paper prose, plus the remaining items of the 2026-10-21 "After the grid" list below.
+
+## ▶ (superseded by the block above) session handoff of 2026-10-21 (written at the author's request)
 
 **Where things stand (master `bc7f660`, pushed):**
 - **PatchCore v0.2.21 gate PASSED: 98.22 ± 0.03** vs 99.0 (re-run 2026-10-21 after the
@@ -580,8 +613,8 @@ rice needs a re-fit like vial's 6.4b. First check in the next session:
 `ls -l /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/rice/`. If `rice.md` is there,
 compare it against the table above before trusting it.
 
-**RESOLVED 2026-10-26: the report survived.** The author pasted `rice.md` as rendered Markdown, which suggests
-it was read from Drive after the VM was gone (inferred, not stated). It was generated 2026-10-25 22:16 UTC at
+**RESOLVED 2026-10-26: the report survived.** The author pasted `rice.md` as rendered Markdown, and confirmed
+on 2026-10-26 that they read it from Drive, after the VM was gone. It was generated 2026-10-25 22:16 UTC at
 commit `6f4b2a0` (anomalib 2.6.0, torch 2.11.0+cu130), over seeds 0, 1, 2, with shards at
 `results/mvtec_ad2/patchcore_ref_v0.2.21/rice/shards`. Its caveats include the v0.2.21 antialiasing
 line and the pointer to the gate. Its table is **identical to four decimals, pixel metrics
