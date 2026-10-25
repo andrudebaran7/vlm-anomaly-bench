@@ -408,6 +408,35 @@ cell **6.4b** moves vial's shards aside to `shards_no_maps_2026-10-20` (VM and D
 deleted) and runs vial afresh; since `e9a6f89` the script also copies each category's report to
 Drive. Run it after the seven remaining categories, on any VM.
 
+## MEASURED 2026-10-25 — MVTec AD 2 sheet_metal under v0.2.21 (6.4), pasted from the Colab session
+
+**Run 2026-10-25 (commit `6f4b2a0`, one category per process).** Layout check OK: train regular=137,
+validation regular=19, test_public 19 per condition × 6 (overexposed, regular, shift_1–3,
+underexposed; sheet_metal has no shift_4), test_private 142, test_private_mixed 142. Seeds 0/1/2
+each finished and were copied to Drive (3 shards). The summary then hit the pixel-metric memory
+guard: `overexposed` pools 84,750,336 pixels, about 6.8 GB at peak, against the default
+`max_bytes=6.0 GB`, with 9.8 GB available. On the **same VM** (the maps present), the author re-ran
+`--summarise-only --max-bytes 7797030911` (the script's own 1.15× suggestion). Because
+`--summarise-only` never copies the report to Drive, it was copied by hand:
+`cp -v results/mvtec_ad2/patchcore_ref_v0.2.21/sheet_metal.md
+/content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/sheet_metal/` (confirmed by `cp -v`).
+
+Per-lighting table as pasted, mean ± std over seeds 0/1/2, each aggregated separately (protocol §6):
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.8222 ± 0.0509 | 0.2344 ± 0.0023 | 0.0811 ± 0.0010 |
+| regular | 0.8222 ± 0.0255 | 0.2433 ± 0.0069 | 0.0833 ± 0.0010 |
+| shift_1 | 0.7500 ± 0.0667 | 0.2081 ± 0.0012 | 0.0513 ± 0.0051 |
+| shift_2 | 0.7667 ± 0.0928 | 0.2057 ± 0.0022 | 0.0474 ± 0.0044 |
+| shift_3 | 0.7444 ± 0.0509 | 0.2209 ± 0.0010 | 0.0595 ± 0.0061 |
+| underexposed | 0.8778 ± 0.0481 | 0.2527 ± 0.0100 | 0.0853 ± 0.0017 |
+
+Not yet interpreted. AU-PRO is far below vial's (≈0.21–0.25 vs ≈0.90 at 0.30 FPR), and with 19
+images per condition the image-level stds are wide. Report on Drive:
+`MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/sheet_metal/sheet_metal.md`. It still has to be
+brought back and committed.
+
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
