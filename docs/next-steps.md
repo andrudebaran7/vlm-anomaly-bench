@@ -574,6 +574,34 @@ criterion is applied after the grid.
 **The Drive copy of `rice.md` is not yet confirmed.** The paste ends at the `wrote` line and has no
 `cp -v` output.
 
+## PROVISIONAL 2026-10-26 — six of eight under v0.2.21 against the M3 grid (walnuts, fabric unrun)
+
+This is arithmetic on the six tables recorded above, not a new measurement. Each figure is the
+unweighted mean over a category's lighting conditions, the way the M3 grid ("M3 IS COMPLETE",
+below) was built. Pixel metrics are also shown as multiples of the measured random baselines,
+0.1487 and 0.0249. Δ is v0.2.21 minus M3.
+
+| category | i_auroc (Δ) | per-condition i_auroc | au_pro_030 ×rnd (Δ) | au_pro_005 ×rnd (Δ) | M3 anchor |
+|---|---|---|---|---|---|
+| Vial | 0.888 (−0.022) | 0.853–0.938 | 0.8632 5.81× (+0.022) | 0.5675 22.79× (−0.004) | usable |
+| Fruit Jelly | 0.773 (−0.010) | 0.760–0.809 | 0.6338 4.26× (−0.006) | 0.3786 15.21× (−0.008) | usable |
+| **Sheet Metal** | **0.797 (+0.287)** | **0.744–0.878** | 0.2275 1.53× (−0.025) | 0.0680 2.73× (+0.000) | no |
+| Rice | 0.537 (+0.018) | 0.460–0.619 | 0.4331 2.91× (+0.080) | 0.1728 6.94× (+0.003) | no |
+| Wall Plugs | 0.485 (+0.038) | 0.342–0.558 | 0.3510 2.36× (−0.068) | 0.1138 4.57× (−0.005) | no |
+| Can | 0.452 (+0.064) | 0.370–0.515 | 0.2368 1.59× (−0.062) | 0.0153 0.62× (+0.013) | no |
+
+**Sheet Metal's detection is no longer at chance.** It is 0.74–0.88 in all six conditions, where M3
+had 0.46–0.56. Its localisation has not moved (1.53× and 2.73× random). Sheet Metal is the category
+the 2026-09-20 aspect-ratio mechanism was registered for: at 4224×1056, the square resize to 256
+downsamples it most along one axis. The antialiasing fix changes exactly that resize. **This is
+consistent with the mechanism; it does not isolate it.** The other five categories move by less
+than 0.07 I-AUROC. Can's AU-PRO@0.05 is still below random, though less so (0.62×, against 0.10×).
+
+**Nothing here applies the usable/unusable criterion.** That waits for the full grid and is the
+author's step. But Sheet Metal no longer fits the M3 description "at chance on detection AND
+localisation". The paper's headline ("five of eight unusable", abstract and §1 C1) and its
+"four distinct failure forms" therefore cannot be carried over to v0.2.21 unchanged.
+
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
