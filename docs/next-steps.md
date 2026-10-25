@@ -547,8 +547,10 @@ and the one written before 6.4b is not.
 ## MEASURED 2026-10-25 — MVTec AD 2 rice under v0.2.21 (6.4), pasted from the Colab session
 
 **Run 2026-10-25 (same VM as the five above, commit `6f4b2a0`).** Before the run: `df -h /content`
-showed 37 GB available, and `free -g` showed 10 GB available of 12 GB, with no swap. The layout-check
-lines were not transcribed; the paste starts at `OK`. Seeds 0/1/2 each finished and were copied to
+showed 37 GB available, and `free -g` showed 10 GB available of 12 GB, with no swap. Layout (pasted
+later): `rice.tar.gz` (6.30 GiB) extracted to `data/mvtec_ad2/rice`, 1034 images; train
+regular=313, validation regular=35, test_public 22 × 6 (overexposed, regular, shift_1–3,
+underexposed), test_private 277, test_private_mixed 277; `OK`. Seeds 0/1/2 each finished and were copied to
 Drive (3 shards; coreset bar 32,050, about 2m41s of selection per seed). The guard tripped:
 `overexposed` pools 110,297,088 pixels, about 8.8 GB at peak, against the default 6.0 GB, with
 **9.7 GB available**. The script printed ⚠️ and suggested `--max-bytes 10147332096`. The author re-ran
