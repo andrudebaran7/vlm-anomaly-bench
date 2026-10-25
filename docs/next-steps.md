@@ -544,6 +544,34 @@ shards). The script copied the report itself:
 fresh VM, five days and two commits later, reproduces it exactly. This is the `vial.md` to commit,
 and the one written before 6.4b is not.
 
+## MEASURED 2026-10-25 — MVTec AD 2 rice under v0.2.21 (6.4), pasted from the Colab session
+
+**Run 2026-10-25 (same VM as the five above, commit `6f4b2a0`).** Before the run: `df -h /content`
+showed 37 GB available, and `free -g` showed 10 GB available of 12 GB, with no swap. The layout-check
+lines were not transcribed; the paste starts at `OK`. Seeds 0/1/2 each finished and were copied to
+Drive (3 shards; coreset bar 32,050, about 2m41s of selection per seed). The guard tripped:
+`overexposed` pools 110,297,088 pixels, about 8.8 GB at peak, against the default 6.0 GB, with
+**9.7 GB available**. The script printed ⚠️ and suggested `--max-bytes 10147332096`. The author re-ran
+`--summarise-only --max-bytes 12000000000` on the same VM (M3 precedent), and it completed with
+`wrote results/mvtec_ad2/patchcore_ref_v0.2.21/rice.md`. Per-lighting table as pasted, mean ± std
+over seeds 0/1/2:
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.4603 ± 0.0334 | 0.3861 ± 0.0062 | 0.1391 ± 0.0136 |
+| regular | 0.5429 ± 0.0190 | 0.4038 ± 0.0073 | 0.1423 ± 0.0128 |
+| shift_1 | 0.5460 ± 0.0306 | 0.4658 ± 0.0080 | 0.1364 ± 0.0117 |
+| shift_2 | 0.5524 ± 0.0330 | 0.4640 ± 0.0064 | 0.2379 ± 0.0071 |
+| shift_3 | 0.4984 ± 0.0291 | 0.4864 ± 0.0072 | 0.2502 ± 0.0083 |
+| underexposed | 0.6190 ± 0.0756 | 0.3928 ± 0.0092 | 0.1312 ± 0.0125 |
+
+Not yet interpreted. Image-level is near chance in every condition (0.46–0.62), as it was under the
+old configuration (`results/mvtec_ad2/patchcore_ref/rice.md`: 0.4381–0.5619). The usable-anchor
+criterion is applied after the grid.
+
+**The Drive copy of `rice.md` is not yet confirmed.** The paste ends at the `wrote` line and has no
+`cp -v` output.
+
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
