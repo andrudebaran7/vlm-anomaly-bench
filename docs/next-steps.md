@@ -437,6 +437,27 @@ images per condition the image-level stds are wide. Report on Drive:
 `MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/sheet_metal/sheet_metal.md`. It still has to be
 brought back and committed.
 
+## MEASURED 2026-10-25 — MVTec AD 2 fruit_jelly under v0.2.21 (6.4), pasted from the Colab session
+
+**Run 2026-10-25 (same VM as sheet_metal, commit `6f4b2a0`, one category per process).** Seeds
+0/1/2 each finished and were copied to Drive (3 shards; the coreset selection ran over 26,930
+patches against sheet_metal's 14,027). The layout-check lines and the console summary were not
+transcribed: the paste starts at `OK`. Whether the memory guard fired, and with which
+`--max-bytes`, was not stated. The report was copied to Drive by hand (`cp -v`:
+`results/mvtec_ad2/patchcore_ref_v0.2.21/fruit_jelly.md` ->
+`/content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/fruit_jelly/fruit_jelly.md`). The
+table below is from the report itself (`cat` on the VM; generated 2026-10-25 17:06 UTC;
+anomalib 2.6.0, torch 2.11.0+cu130). Four lighting conditions only:
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.8089 ± 0.0077 | 0.6371 ± 0.0021 | 0.3840 ± 0.0039 |
+| regular | 0.7600 ± 0.0133 | 0.6325 ± 0.0026 | 0.3709 ± 0.0034 |
+| shift_1 | 0.7600 ± 0.0231 | 0.6372 ± 0.0025 | 0.3833 ± 0.0041 |
+| underexposed | 0.7644 ± 0.0204 | 0.6284 ± 0.0026 | 0.3763 ± 0.0028 |
+
+Not yet interpreted. Report on Drive, still to be brought back and committed.
+
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
