@@ -488,6 +488,13 @@ them shows `wrote results/mvtec_ad2/patchcore_ref_v0.2.21/wallplugs.md`. The exe
 three cells is not known from the paste. The table above is the console transcription. A report
 with AU-PRO can only be regenerated on the VM that holds wallplugs' maps.
 
+**RESOLVED 2026-10-25 (same VM):** the maps were still there (one directory per seed,
+`mvtec_ad2__patchcore_ref__70399e2f4175__wallplugs__seed{0,1,2}`). One cell ran
+`--summarise-only --max-bytes 11531059200 && cp -v`. The table came out **identical to four decimals**
+to the one above, and the copy was confirmed: `.../patchcore_ref_v0.2.21/wallplugs/wallplugs.md`
+(1876 bytes, 20:30). An `ls` of Drive then showed all five reports: can (19:21), fruit_jelly
+(17:11), sheet_metal (16:38), vial (20:02), wallplugs (20:30).
+
 ## MEASURED 2026-10-25 — MVTec AD 2 can under v0.2.21 (6.4), pasted from the Colab session
 
 **Run 2026-10-25 (same VM as the three before, commit `6f4b2a0`).** Layout (pasted later): 1262
