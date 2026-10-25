@@ -591,11 +591,12 @@ below) was built. Pixel metrics are also shown as multiples of the measured rand
 | Can | 0.452 (+0.064) | 0.370–0.515 | 0.2368 1.59× (−0.062) | 0.0153 0.62× (+0.013) | no |
 
 **Sheet Metal's detection is no longer at chance.** It is 0.74–0.88 in all six conditions, where M3
-had 0.46–0.56. Its localisation has not moved (1.53× and 2.73× random). Sheet Metal is the category
-the 2026-09-20 aspect-ratio mechanism was registered for: at 4224×1056, the square resize to 256
-downsamples it most along one axis. The antialiasing fix changes exactly that resize. **This is
-consistent with the mechanism; it does not isolate it.** The other five categories move by less
-than 0.07 I-AUROC. Can's AU-PRO@0.05 is still below random, though less so (0.62×, against 0.10×).
+had 0.46–0.56. Its localisation has not moved (1.53× and 2.73× random). **This is not evidence for
+the 2026-09-20 aspect-ratio mechanism.** v0.2.21 leaves the square resize as it was. What it removes
+is the train/test mismatch: the bank was antialiased and the queries were aliased. Sheet Metal does
+have the largest downsampling factor in the dataset, 4224→256, about 16.5× on its long axis. The
+2448-wide categories are at about 9.6×, and Wall Plugs among them barely moved. So downsampling
+factor alone does not order the effect. The other five categories move by less than 0.07 I-AUROC. Can's AU-PRO@0.05 is still below random, though less so (0.62×, against 0.10×).
 
 **Nothing here applies the usable/unusable criterion.** That waits for the full grid and is the
 author's step. But Sheet Metal no longer fits the M3 description "at chance on detection AND
