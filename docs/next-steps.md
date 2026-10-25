@@ -481,6 +481,28 @@ Not yet interpreted. Image-level is at or below chance in every condition, as it
 configuration (`results/mvtec_ad2/patchcore_ref/wallplugs.md`: 0.3956–0.5000). The usable-anchor
 criterion is applied after the grid. The Drive copy of `wallplugs.md` was not confirmed in the paste.
 
+## MEASURED 2026-10-25 — MVTec AD 2 can under v0.2.21 (6.4), pasted from the Colab session
+
+**Run 2026-10-25 (same VM as the three before, commit `6f4b2a0`).** The layout-check lines were not
+transcribed; the paste starts at `OK`. Seeds 0/1/2 each finished and were copied to Drive (3 shards;
+coreset bar 42,187, about 4m43s of selection per seed). The memory guard did **not** trip, as
+predicted, and the script copied the report to Drive itself
+(`MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/can/can.md`). Per-lighting table as pasted,
+mean ± std over seeds 0/1/2:
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.4519 ± 0.0370 | 0.2841 ± 0.0018 | 0.0401 ± 0.0016 |
+| regular | 0.4519 ± 0.0285 | 0.2903 ± 0.0081 | 0.0372 ± 0.0014 |
+| shift_1 | 0.3704 ± 0.0463 | 0.2478 ± 0.0099 | 0.0045 ± 0.0047 |
+| shift_2 | 0.4444 ± 0.0147 | 0.1913 ± 0.0061 | 0.0021 ± 0.0024 |
+| shift_3 | 0.4759 ± 0.0085 | 0.1868 ± 0.0050 | 0.0000 ± 0.0000 |
+| underexposed | 0.5148 ± 0.0672 | 0.2205 ± 0.0048 | 0.0082 ± 0.0017 |
+
+Not yet interpreted. Image-level is below chance in five of six conditions, as it was under the old
+configuration (`results/mvtec_ad2/patchcore_ref/can.md`: 0.3259–0.4426). The usable-anchor criterion
+is applied after the grid.
+
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
