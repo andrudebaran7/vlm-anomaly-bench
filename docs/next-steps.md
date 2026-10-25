@@ -580,6 +580,14 @@ rice needs a re-fit like vial's 6.4b. First check in the next session:
 `ls -l /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/rice/`. If `rice.md` is there,
 compare it against the table above before trusting it.
 
+**RESOLVED 2026-10-26: the report survived.** The author pasted `rice.md` as rendered Markdown, so
+it was read after the VM was gone, and from outside it. It was generated 2026-10-25 22:16 UTC at
+commit `6f4b2a0` (anomalib 2.6.0, torch 2.11.0+cu130), over seeds 0, 1, 2, with shards at
+`results/mvtec_ad2/patchcore_ref_v0.2.21/rice/shards`. Its caveats include the v0.2.21 antialiasing
+line and the pointer to the gate. Its table is **identical to four decimals, pixel metrics
+included**, to the console transcription above. This is the `rice.md` to commit. It does not
+document the `ls`/`cp` line itself, so download it from Drive when committing and compare it again.
+
 ## INCOMPLETE 2026-10-26 — MVTec AD 2 walnuts under v0.2.21 (6.4): the Colab session ended mid-run
 
 **Same VM as the six above, commit `6f4b2a0`.** Layout OK: 1086 images; train regular=432,
