@@ -503,6 +503,29 @@ Not yet interpreted. Image-level is below chance in five of six conditions, as i
 configuration (`results/mvtec_ad2/patchcore_ref/can.md`: 0.3259–0.4426). The usable-anchor criterion
 is applied after the grid.
 
+## MEASURED 2026-10-25 — vial re-fit under v0.2.21 (6.4b), pasted from the Colab session
+
+**Run 2026-10-25 (same VM as the four above, commit `6f4b2a0`).** Only the report was pasted
+(`cat` on the VM, generated 2026-10-25 20:02 UTC; anomalib 2.6.0, torch 2.11.0+cu130). 6.4b's own
+console output (the move to `shards_no_maps_2026-10-20`, the seed lines, and the script's Drive-copy
+line) was not transcribed. That the seeds were re-fit, not restored, is inferred from the report:
+it carries AU-PRO, and the 2026-10-20 maps exist only on that VM.
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.8711 ± 0.0204 | 0.8763 ± 0.0034 | 0.6019 ± 0.0014 |
+| regular | 0.8800 ± 0.0353 | 0.9033 ± 0.0004 | 0.6067 ± 0.0013 |
+| shift_1 | 0.9378 ± 0.0154 | 0.9025 ± 0.0006 | 0.5992 ± 0.0013 |
+| shift_2 | 0.8800 ± 0.0231 | 0.9060 ± 0.0004 | 0.6086 ± 0.0009 |
+| shift_3 | 0.8667 ± 0.0231 | 0.9063 ± 0.0005 | 0.6102 ± 0.0015 |
+| shift_4 | 0.9289 ± 0.0077 | 0.9002 ± 0.0005 | 0.5866 ± 0.0006 |
+| underexposed | 0.8533 ± 0.0481 | 0.6479 ± 0.0077 | 0.3591 ± 0.0108 |
+
+**Identical to four decimals, pixel metrics included, to the 2026-10-20 console transcription**
+(first VM, commit `ee78196`; see "MEASURED — MVTec AD 2 vial under v0.2.21" above). The re-fit on a
+fresh VM, five days and two commits later, reproduces it exactly. This is the `vial.md` to commit,
+and the one written before 6.4b is not.
+
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
