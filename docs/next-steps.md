@@ -574,6 +574,38 @@ criterion is applied after the grid.
 **The Drive copy of `rice.md` is not yet confirmed.** The paste ends at the `wrote` line and has no
 `cp -v` output.
 
+**⚠️ That VM is now gone** (the session ended during walnuts, below). If the `cp` was never run, the
+only report with AU-PRO for rice died with it. Drive then holds rice's 3 shards and no maps, and
+rice needs a re-fit like vial's 6.4b. First check in the next session:
+`ls -l /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/rice/`. If `rice.md` is there,
+compare it against the table above before trusting it.
+
+## INCOMPLETE 2026-10-26 — MVTec AD 2 walnuts under v0.2.21 (6.4): the Colab session ended mid-run
+
+**Same VM as the six above, commit `6f4b2a0`.** Layout OK: 1086 images; train regular=432,
+validation regular=48, test_public 25 × 6 (overexposed, regular, shift_1–3, underexposed),
+test_private 228, test_private_mixed 228. Seed 0 finished and was copied to Drive (1 shard;
+coreset bar 44,235, 5m07s of selection). Seed 1 finished the same way (2 shards; 44,235, 5m07s).
+Seed 2 had started (`[seed 3/3] walnuts at seed 2`) when **the Colab session ended**. That is the
+free tier's limit, not an error in the run. No summary and no report exist.
+
+**The two shards on Drive cannot be resumed.** Their anomaly maps stayed on the dead VM. The runner
+restores shards from Drive and skips the seeds it finds done (`restore_from_drive`,
+`scripts/run_mvtec_ad2.py`). So a plain 6.4 re-run would fit only seed 2 and produce a report whose
+seeds 0/1 have no pixel metrics. This is the same situation as vial on 2026-10-20.
+
+**Next session, before 6.4 walnuts:** set the Drive shards aside, as 6.4b did for vial. Move them;
+never delete:
+
+```
+!mv /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/walnuts/shards /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/walnuts/shards_no_maps_2026-10-26
+```
+
+Then run 6.4 with `CATEGORY = "walnuts"`, so all three seeds are fitted fresh. Expect the guard to
+trip. Summarise on the same VM with `--max-bytes 12000000000`, then `cp` the report by hand. Budget:
+about 5 min of coreset per seed, plus scoring, plus about 10 min to extract and summarise. Start
+walnuts at the beginning of a session, not after another category. Fabric is in the same position.
+
 ## PROVISIONAL 2026-10-26 — six of eight under v0.2.21 against the M3 grid (walnuts, fabric unrun)
 
 This is arithmetic on the six tables recorded above, not a new measurement. Each figure is the
