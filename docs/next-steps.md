@@ -458,6 +458,29 @@ anomalib 2.6.0, torch 2.11.0+cu130). Four lighting conditions only:
 
 Not yet interpreted. Report on Drive, still to be brought back and committed.
 
+## MEASURED 2026-10-25 — MVTec AD 2 wallplugs under v0.2.21 (6.4), pasted from the Colab session
+
+**Run 2026-10-25 (same VM as sheet_metal and fruit_jelly, commit `6f4b2a0`).** The layout-check
+lines were not transcribed; the paste starts at `OK`. Seeds 0/1/2 each finished and were copied to
+Drive (3 shards; coreset bar 30,002). The guard tripped: `overexposed` pools 125,337,600 pixels,
+about 10.0 GB at peak, against the default 6.0 GB, with **9.7 GB available**. The script printed ⚠️
+(the requirement is above free RAM). Following M3's precedent (Wall Plugs went through at 11 GB with
+~9 GB suggested), the author re-ran `--summarise-only --max-bytes 11531059200` on the same VM, and
+it completed. Per-lighting table as pasted, mean ± std over seeds 0/1/2:
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.4978 ± 0.0454 | 0.3674 ± 0.0118 | 0.1595 ± 0.0045 |
+| regular | 0.4956 ± 0.0379 | 0.3610 ± 0.0129 | 0.1577 ± 0.0031 |
+| shift_1 | 0.5578 ± 0.0582 | 0.4397 ± 0.0283 | 0.0963 ± 0.0282 |
+| shift_2 | 0.3422 ± 0.0139 | 0.2173 ± 0.0050 | 0.0243 ± 0.0019 |
+| shift_3 | 0.5267 ± 0.0371 | 0.3633 ± 0.0288 | 0.0904 ± 0.0073 |
+| underexposed | 0.4911 ± 0.0367 | 0.3573 ± 0.0132 | 0.1545 ± 0.0026 |
+
+Not yet interpreted. Image-level is at or below chance in every condition, as it was under the old
+configuration (`results/mvtec_ad2/patchcore_ref/wallplugs.md`: 0.3956–0.5000). The usable-anchor
+criterion is applied after the grid. The Drive copy of `wallplugs.md` was not confirmed in the paste.
+
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
