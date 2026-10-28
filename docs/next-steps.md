@@ -45,8 +45,8 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
-**UPDATE 2026-10-28: walnuts done (7 of 8), report on Drive confirmed; only fabric owed — same
-steps minus the `mv`.** **Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
+**UPDATE 2026-10-28: GRID COMPLETE, 8 of 8** (walnuts and fabric run 2026-10-28, both reports on
+Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 here are done. **Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
 sheet_metal, fruit_jelly, wallplugs, can, vial (re-fit by 6.4b) and rice. The tables are recorded
 verbatim in the "MEASURED 2026-10-25" sections below. **Owed: walnuts and fabric**, which are
 2448×2048 and take about one free-Colab session each. Start each at the top of a fresh session.
@@ -711,6 +711,7 @@ below) was built. Pixel metrics are also shown as multiples of the measured rand
 
 | category | i_auroc (Δ) | per-condition i_auroc | au_pro_030 ×rnd (Δ) | au_pro_005 ×rnd (Δ) | M3 anchor |
 |---|---|---|---|---|---|
+| **Fabric (added 2026-10-28)** | **0.723 (+0.161)** | 0.671–0.741 | 0.2537 1.71× (+0.108) | 0.0280 1.12× (+0.020) | no |
 | Walnuts (added 2026-10-28) | 0.861 (+0.037) | 0.820–0.936 | 0.7461 5.02× (−0.013) | 0.4222 16.96× (−0.026) | usable |
 | Vial | 0.888 (−0.022) | 0.853–0.938 | 0.8632 5.81× (+0.022) | 0.5675 22.79× (−0.004) | usable |
 | Fruit Jelly | 0.773 (−0.010) | 0.760–0.809 | 0.6338 4.26× (−0.006) | 0.3786 15.21× (−0.008) | usable |
