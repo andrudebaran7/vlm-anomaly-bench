@@ -50,7 +50,8 @@ Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 he
 **Reports committed 2026-10-28** under `results/mvtec_ad2/patchcore_ref_v0.2.21/` (downloaded from
 Drive by the author). Each was checked cell by cell against its recorded table: all 8 match
 (fruit_jelly has 4 conditions, as recorded); all carry commit `6f4b2a0` and the gate-PASS line.
-**Next: the author applies the usable/unusable criterion**, then the paper prose. **Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
+**Criterion DECIDED 2026-10-28: reading A, detection only → 5 usable of 8** (see "DECIDED
+2026-10-28" below). **Next: the paper prose** on `descope-c1-c3-rewrite`. **Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
 sheet_metal, fruit_jelly, wallplugs, can, vial (re-fit by 6.4b) and rice. The tables are recorded
 verbatim in the "MEASURED 2026-10-25" sections below. **Owed: walnuts and fabric**, which are
 2448×2048 and take about one free-Colab session each. Start each at the top of a fresh session.
@@ -737,7 +738,14 @@ author's step. But Sheet Metal no longer fits the M3 description "at chance on d
 localisation". The paper's headline ("five of eight unusable", abstract and §1 C1) and its
 "four distinct failure forms" therefore cannot be carried over to v0.2.21 unchanged.
 
-## PREPARED 2026-10-28 — the usable/unusable criterion on the v0.2.21 grid (author's decision owed)
+## DECIDED 2026-10-28 by the author: reading A (detection only) — the v0.2.21 anchor is usable on 5 of 8
+
+**Usable: Vial, Walnuts, Sheet Metal, Fruit Jelly, Fabric. Unusable: Rice, Wall Plugs, Can.** The
+author chose A on 2026-10-28, after seeing the v0.2.21 numbers; the paper must state that the
+criterion was made explicit post hoc (no numeric criterion was ever written), and report
+localisation ×random alongside as before. The preparation follows unchanged.
+
+### (as prepared, before the decision)
 
 **No written, numeric criterion was found.** `docs/protocol.md` contains no "usable", "chance" or
 "random baseline" text; the specs and handoffs call it "pre-registered" but never state it. The only
