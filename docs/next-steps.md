@@ -684,6 +684,24 @@ Seeds 0, 1, 2 each fitted fresh, coreset bar 39,627 (4m12s, 4m13s, 4m13s), each 
 pixels, estimated 10.4 GB at 80 B/px against max_bytes 6.0 GB; 9.6 GB free reported. Summarise
 next with `--max-bytes 12000000000` on the same VM (about 8.6 GB at the measured ~66 B/px).
 
+**MEASURED 2026-10-28 — fabric summary, same VM, commit `6f4b2a0`, `--summarise-only
+--max-bytes 12000000000`** (console output verbatim; it ended `wrote
+results/mvtec_ad2/patchcore_ref_v0.2.21/fabric.md`). **Drive copy confirmed by `cp -v`:**
+`'results/mvtec_ad2/patchcore_ref_v0.2.21/fabric.md' ->
+'/content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/fabric/fabric.md'`.
+
+```
+Per lighting condition — mean ± std over 3 seed(s), each aggregated separately (protocol §6):
+  overexposed    i_auroc 0.7374 ± 0.0273 | au_pro_030 0.2194 ± 0.0380 | au_pro_005 0.0074 ± 0.0012
+  regular        i_auroc 0.7394 ± 0.0219 | au_pro_030 0.2161 ± 0.0458 | au_pro_005 0.0063 ± 0.0008
+  shift_1        i_auroc 0.7313 ± 0.0229 | au_pro_030 0.2714 ± 0.0444 | au_pro_005 0.0060 ± 0.0001
+  shift_2        i_auroc 0.6707 ± 0.0394 | au_pro_030 0.2975 ± 0.0218 | au_pro_005 0.0940 ± 0.0101
+  shift_3        i_auroc 0.7152 ± 0.0061 | au_pro_030 0.3114 ± 0.0334 | au_pro_005 0.0484 ± 0.0183
+  underexposed   i_auroc 0.7414 ± 0.0286 | au_pro_030 0.2065 ± 0.0437 | au_pro_005 0.0057 ± 0.0003
+```
+
+**The v0.2.21 grid is complete, 8 of 8, each report on Drive with AU-PRO.**
+
 ## PROVISIONAL 2026-10-26 — six of eight under v0.2.21 against the M3 grid (walnuts, fabric unrun)
 
 This is arithmetic on the six tables recorded above, not a new measurement. Each figure is the
