@@ -45,7 +45,8 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
-**Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
+**UPDATE 2026-10-28: walnuts done (7 of 8), report on Drive confirmed; only fabric owed — same
+steps minus the `mv`.** **Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
 sheet_metal, fruit_jelly, wallplugs, can, vial (re-fit by 6.4b) and rice. The tables are recorded
 verbatim in the "MEASURED 2026-10-25" sections below. **Owed: walnuts and fabric**, which are
 2448×2048 and take about one free-Colab session each. Start each at the top of a fresh session.
@@ -654,8 +655,9 @@ reported. Summarise next with `--max-bytes 12000000000` on the same VM.
 
 **MEASURED 2026-10-28 — walnuts summary, same VM, commit `6f4b2a0`, `--summarise-only
 --max-bytes 12000000000`** (console output verbatim; it ended `wrote
-results/mvtec_ad2/patchcore_ref_v0.2.21/walnuts.md`). **The paste shows no `cp -v` line, so the
-Drive copy of `walnuts.md` is NOT confirmed yet.**
+results/mvtec_ad2/patchcore_ref_v0.2.21/walnuts.md`). The summary paste showed no `cp -v` line; **the Drive copy was then confirmed by a separate
+`cp -v`** (`-> .../patchcore_ref_v0.2.21/walnuts/walnuts.md`, 1872 bytes, 12:53; `ls -l` shows
+`shards/`, `shards_no_maps_2026-10-26/`, `walnuts.md`).
 
 ```
 Per lighting condition — mean ± std over 3 seed(s), each aggregated separately (protocol §6):
