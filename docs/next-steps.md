@@ -51,7 +51,9 @@ Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 he
 Drive by the author). Each was checked cell by cell against its recorded table: all 8 match
 (fruit_jelly has 4 conditions, as recorded); all carry commit `6f4b2a0` and the gate-PASS line.
 **Criterion DECIDED 2026-10-28: reading A, detection only → 5 usable of 8** (see "DECIDED
-2026-10-28" below). **Next: the paper prose** on `descope-c1-c3-rewrite`. **Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
+2026-10-28" below). **Paper prose DRAFTED 2026-10-28** on `descope-c1-c3-rewrite` (`954bf01`..`4b118ba`):
+abstract, §1, §5, §6.A–C, Threats, §7, §8 on the v0.2.21 anchor. **Next: the author reviews the
+whole branch.** Open: WinCLIP gate report (tripwire), private split / threshold rule, figures (G). **Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
 sheet_metal, fruit_jelly, wallplugs, can, vial (re-fit by 6.4b) and rice. The tables are recorded
 verbatim in the "MEASURED 2026-10-25" sections below. **Owed: walnuts and fabric**, which are
 2448×2048 and take about one free-Colab session each. Start each at the top of a fresh session.
