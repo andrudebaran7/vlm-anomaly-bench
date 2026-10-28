@@ -118,7 +118,8 @@ commit any vial.md written before 6.4b (no AU-PRO, or the defective verdict).
   included; review findings a–e delivered): update with the v0.2.21 anchor numbers and a
   protocol-sync v0.2.21 entry; add C3 evidence (the export-path antialias mismatch; the
   shared-backend runner defect, ~60 → 98.22); bring in WinCLIP's gate report (tripwire).
-- Open question for the write-up: toothbrush is −8.31 under both configurations, so the
+- Open question for the write-up: toothbrush is −8.22 (old configuration, `_3seed.md`) and −8.31
+  (v0.2.21) — corrected 2026-10-28, this line said −8.31 for both — so the
   export-path fix is not its cause; five categories sit outside ±1.0.
 
 > **⚠️ SCOPE REDUCED — protocol v0.2.18 (spec 2026-10-01, written into the protocol 2026-10-03).**
