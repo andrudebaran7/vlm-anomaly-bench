@@ -737,6 +737,34 @@ author's step. But Sheet Metal no longer fits the M3 description "at chance on d
 localisation". The paper's headline ("five of eight unusable", abstract and §1 C1) and its
 "four distinct failure forms" therefore cannot be carried over to v0.2.21 unchanged.
 
+## PREPARED 2026-10-28 — the usable/unusable criterion on the v0.2.21 grid (author's decision owed)
+
+**No written, numeric criterion was found.** `docs/protocol.md` contains no "usable", "chance" or
+"random baseline" text; the specs and handoffs call it "pre-registered" but never state it. The only
+operative wording is the paper's abstract (descope branch): the anchor gives "a usable detection
+ceiling" on three categories, and "on the other five its image-level detection is near or below
+chance". That is a **detection** reading, with localisation (×random) reported alongside, not a
+second gate. M3 needed no threshold: usable 0.783–0.910, unusable 0.388–0.562, a 0.22 gap.
+
+Under v0.2.21 that gap closes. Two readings, both arithmetic on the recorded tables:
+
+| category | i_auroc | min condition | au_pro_030 ×rnd | au_pro_005 ×rnd | A: detection only | B: detection + localisation |
+|---|---|---|---|---|---|---|
+| Vial | 0.888 | 0.853 | 5.81× | 22.79× | usable | usable |
+| Walnuts | 0.861 | 0.820 | 5.02× | 16.96× | usable | usable |
+| Sheet Metal | 0.797 | 0.744 | 1.53× | 2.73× | **usable** | no |
+| Fruit Jelly | 0.773 | 0.760 | 4.26× | 15.21× | usable | usable |
+| Fabric | 0.723 | 0.671 | 1.71× | 1.12× | **usable** | no |
+| Rice | 0.537 | 0.460 | 2.91× | 6.94× | no | no |
+| Wall Plugs | 0.485 | 0.342 | 2.36× | 4.57× | no | no |
+| Can | 0.452 | 0.370 | 1.59× | 0.62× | no | no |
+
+A gives **5–3**, B keeps **3–5**. Under A the gap is between Fabric (0.723) and Rice (0.537), as
+clean as M3's. B has no threshold that both the record supports and that orders consistently: Rice
+and Wall Plugs localise better than Sheet Metal and Fabric, so a localisation bar that excludes the
+latter two would admit nothing new and would have to be invented now, after the data. **Either way
+the reading is chosen after seeing v0.2.21, and the paper must say so.**
+
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
 The first GPU session went entirely into making one backend run. It is worth reading before the
