@@ -652,6 +652,21 @@ each saved to Drive (1, 2, 3 shards there). Then the guard tripped as expected: 
 125,337,600 pooled pixels, estimated 10.0 GB at 80 B/px against max_bytes 6.0 GB; 9.7 GB free
 reported. Summarise next with `--max-bytes 12000000000` on the same VM.
 
+**MEASURED 2026-10-28 — walnuts summary, same VM, commit `6f4b2a0`, `--summarise-only
+--max-bytes 12000000000`** (console output verbatim; it ended `wrote
+results/mvtec_ad2/patchcore_ref_v0.2.21/walnuts.md`). **The paste shows no `cp -v` line, so the
+Drive copy of `walnuts.md` is NOT confirmed yet.**
+
+```
+Per lighting condition — mean ± std over 3 seed(s), each aggregated separately (protocol §6):
+  overexposed    i_auroc 0.8533 ± 0.0200 | au_pro_030 0.7806 ± 0.0005 | au_pro_005 0.4700 ± 0.0077
+  regular        i_auroc 0.8556 ± 0.0168 | au_pro_030 0.7819 ± 0.0011 | au_pro_005 0.4695 ± 0.0086
+  shift_1        i_auroc 0.9356 ± 0.0168 | au_pro_030 0.6585 ± 0.0016 | au_pro_005 0.3302 ± 0.0046
+  shift_2        i_auroc 0.8244 ± 0.0473 | au_pro_030 0.7756 ± 0.0021 | au_pro_005 0.4492 ± 0.0108
+  shift_3        i_auroc 0.8778 ± 0.0102 | au_pro_030 0.6980 ± 0.0040 | au_pro_005 0.3478 ± 0.0045
+  underexposed   i_auroc 0.8200 ± 0.0306 | au_pro_030 0.7821 ± 0.0027 | au_pro_005 0.4667 ± 0.0077
+```
+
 Then run 6.4 with `CATEGORY = "walnuts"`, so all three seeds are fitted fresh. Expect the guard to
 trip. Summarise on the same VM with `--max-bytes 12000000000`, then `cp` the report by hand. Budget:
 about 5 min of coreset per seed, plus scoring, plus about 10 min to extract and summarise. Start
