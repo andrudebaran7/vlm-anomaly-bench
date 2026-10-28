@@ -642,6 +642,10 @@ never delete:
 !mv /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/walnuts/shards /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/walnuts/shards_no_maps_2026-10-26
 ```
 
+**DONE 2026-10-28:** the move above ran, after mounting Drive; the first attempt failed only
+because Drive was not mounted yet. `ls -R` afterwards: `walnuts/` holds only
+`shards_no_maps_2026-10-26/` with `…__walnuts__seed0.parquet` and `…__walnuts__seed1.parquet`.
+
 Then run 6.4 with `CATEGORY = "walnuts"`, so all three seeds are fitted fresh. Expect the guard to
 trip. Summarise on the same VM with `--max-bytes 12000000000`, then `cp` the report by hand. Budget:
 about 5 min of coreset per seed, plus scoring, plus about 10 min to extract and summarise. Start
