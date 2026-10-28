@@ -646,6 +646,12 @@ never delete:
 because Drive was not mounted yet. `ls -R` afterwards: `walnuts/` holds only
 `shards_no_maps_2026-10-26/` with `…__walnuts__seed0.parquet` and `…__walnuts__seed1.parquet`.
 
+**6.4 walnuts RAN 2026-10-28, commit `6f4b2a0`:** no restore message (the move worked); layout as
+above (1086 images); seeds 0, 1, 2 each fitted fresh, coreset bar 44,235 (5m09s, 5m09s, 5m10s),
+each saved to Drive (1, 2, 3 shards there). Then the guard tripped as expected: overexposed group
+125,337,600 pooled pixels, estimated 10.0 GB at 80 B/px against max_bytes 6.0 GB; 9.7 GB free
+reported. Summarise next with `--max-bytes 12000000000` on the same VM.
+
 Then run 6.4 with `CATEGORY = "walnuts"`, so all three seeds are fitted fresh. Expect the guard to
 trip. Summarise on the same VM with `--max-bytes 12000000000`, then `cp` the report by hand. Budget:
 about 5 min of coreset per seed, plus scoring, plus about 10 min to extract and summarise. Start
