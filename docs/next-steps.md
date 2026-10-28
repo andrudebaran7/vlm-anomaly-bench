@@ -760,6 +760,24 @@ localisation ×random alongside as before. The preparation follows unchanged.
 - Geometry: the four 2448×2048 categories now split 2–2 (Walnuts, Fabric usable; Rice, Wall Plugs
   not), so frame size still does not separate usable from unusable.
 
+**Derived 2026-10-28 for §6.A/§6.B (arithmetic on the eight committed v0.2.21 reports):**
+- `regular` (the only training condition) is the best condition for detection on **none** of the
+  eight categories; it is best on 1 of 24 category×metric pairs (Can, AU-PRO@0.3). Not significant
+  on its own (a uniform chance of being best gives roughly a one-in-five chance of never), so read
+  as "no training-condition advantage", not as a penalty.
+- Intensity (regular/over/under) vs direction (shift_*) at AU-PRO@0.05: intensity better on
+  Walnuts, Sheet Metal, Wall Plugs, Can; shifts better on Vial, Fruit Jelly (by 0.006), Fabric, Rice.
+  **4–4.** The M3 verdict (dead) stands.
+- Vial `underexposed`: worst on all three metrics, and its localisation collapses (AU-PRO@0.3
+  0.648 vs 0.876–0.906 in the other six; @0.05 0.359 vs 0.587–0.610) while detection is 0.853
+  against a 0.853–0.938 range.
+- Wall Plugs `shift_2`: I-AUROC 0.342, AU-PRO@0.05 0.0243 (0.98× random).
+- **Fabric AU-PRO@0.05 is below random in 4 of 6 conditions** (overexposed 0.30×, regular 0.25×,
+  shift_1 0.24×, underexposed 0.23×); shift_2 3.78×, shift_3 1.94×. Its 1.12× mean is carried by
+  two conditions. Detection meanwhile is 0.671–0.741.
+- Walnuts `shift_1`: best detection (0.936) and worst localisation (AU-PRO@0.3 0.659, @0.05 0.330),
+  as under M3.
+
 ### (as prepared, before the decision)
 
 **No written, numeric criterion was found.** `docs/protocol.md` contains no "usable", "chance" or
