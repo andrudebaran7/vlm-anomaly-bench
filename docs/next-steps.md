@@ -674,6 +674,16 @@ trip. Summarise on the same VM with `--max-bytes 12000000000`, then `cp` the rep
 about 5 min of coreset per seed, plus scoring, plus about 10 min to extract and summarise. Start
 walnuts at the beginning of a session, not after another category. Fabric is in the same position.
 
+## RAN 2026-10-28 — MVTec AD 2 fabric under v0.2.21 (6.4), fresh session
+
+**Fresh VM (`Mounted at /content/drive`), commit `6f4b2a0`.** Extracted `fabric.tar.gz` (10.09 GiB).
+Layout OK: 1214 images; train regular=387, validation regular=43, test_public 26 × 6 (overexposed,
+regular, shift_1–3, underexposed), test_private 314, test_private_mixed 314. No restore message.
+Seeds 0, 1, 2 each fitted fresh, coreset bar 39,627 (4m12s, 4m13s, 4m13s), each saved to Drive
+(1, 2, 3 shards there). The guard then tripped as expected: overexposed group 130,351,104 pooled
+pixels, estimated 10.4 GB at 80 B/px against max_bytes 6.0 GB; 9.6 GB free reported. Summarise
+next with `--max-bytes 12000000000` on the same VM (about 8.6 GB at the measured ~66 B/px).
+
 ## PROVISIONAL 2026-10-26 — six of eight under v0.2.21 against the M3 grid (walnuts, fabric unrun)
 
 This is arithmetic on the six tables recorded above, not a new measurement. Each figure is the
