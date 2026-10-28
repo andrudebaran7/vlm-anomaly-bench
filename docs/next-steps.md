@@ -46,7 +46,11 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
 **UPDATE 2026-10-28: GRID COMPLETE, 8 of 8** (walnuts and fabric run 2026-10-28, both reports on
-Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 here are done. **Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
+Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 here are done.
+**Reports committed 2026-10-28** under `results/mvtec_ad2/patchcore_ref_v0.2.21/` (downloaded from
+Drive by the author). Each was checked cell by cell against its recorded table: all 8 match
+(fruit_jelly has 4 conditions, as recorded); all carry commit `6f4b2a0` and the gate-PASS line.
+**Next: the author applies the usable/unusable criterion**, then the paper prose. **Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
 sheet_metal, fruit_jelly, wallplugs, can, vial (re-fit by 6.4b) and rice. The tables are recorded
 verbatim in the "MEASURED 2026-10-25" sections below. **Owed: walnuts and fabric**, which are
 2448×2048 and take about one free-Colab session each. Start each at the top of a fresh session.
