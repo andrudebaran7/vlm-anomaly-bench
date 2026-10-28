@@ -745,6 +745,20 @@ author chose A on 2026-10-28, after seeing the v0.2.21 numbers; the paper must s
 criterion was made explicit post hoc (no numeric criterion was ever written), and report
 localisation ×random alongside as before. The preparation follows unchanged.
 
+**Derived 2026-10-28 for the paper draft (arithmetic on the recorded means, scipy `spearmanr`):**
+- Detection–localisation rank agreement, I-AUROC vs AU-PRO@0.05 over the eight: **ρ = 0.738**
+  (M3: 0.833, re-computed the same way to confirm it was this pair; vs AU-PRO@0.30 it is 0.571,
+  M3 0.643).
+- Orderings. Detection: Vial, Walnuts, Sheet Metal, Fruit Jelly, Fabric, Rice, Wall Plugs, Can.
+  AU-PRO@0.05: Vial, Walnuts, Fruit Jelly, Rice, Wall Plugs, Sheet Metal, Fabric, Can. Top two and
+  bottom one agree; Sheet Metal is 3rd by detection and 6th by localisation, Fabric 5th and 7th;
+  Rice and Wall Plugs the reverse (6th/4th, 7th/5th). Both dissociation directions still occur.
+- The three unusable categories fail in two forms, not four: Rice and Wall Plugs at chance on
+  detection with localisation above random (2.91×/6.94×, 2.36×/4.57×); Can below chance on
+  detection (0.452) and below random on AU-PRO@0.05 (0.62×).
+- Geometry: the four 2448×2048 categories now split 2–2 (Walnuts, Fabric usable; Rice, Wall Plugs
+  not), so frame size still does not separate usable from unusable.
+
 ### (as prepared, before the decision)
 
 **No written, numeric criterion was found.** `docs/protocol.md` contains no "usable", "chance" or
