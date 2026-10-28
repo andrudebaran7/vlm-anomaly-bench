@@ -681,6 +681,7 @@ below) was built. Pixel metrics are also shown as multiples of the measured rand
 
 | category | i_auroc (Δ) | per-condition i_auroc | au_pro_030 ×rnd (Δ) | au_pro_005 ×rnd (Δ) | M3 anchor |
 |---|---|---|---|---|---|
+| Walnuts (added 2026-10-28) | 0.861 (+0.037) | 0.820–0.936 | 0.7461 5.02× (−0.013) | 0.4222 16.96× (−0.026) | usable |
 | Vial | 0.888 (−0.022) | 0.853–0.938 | 0.8632 5.81× (+0.022) | 0.5675 22.79× (−0.004) | usable |
 | Fruit Jelly | 0.773 (−0.010) | 0.760–0.809 | 0.6338 4.26× (−0.006) | 0.3786 15.21× (−0.008) | usable |
 | **Sheet Metal** | **0.797 (+0.287)** | **0.744–0.878** | 0.2275 1.53× (−0.025) | 0.0680 2.73× (+0.000) | no |
