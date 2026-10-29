@@ -129,12 +129,14 @@ def pro_thresholds(
     2_000, 50_000 and 500_000.
 
     That fixture is a worst case by construction -- a handful of pixels, so
-    adjacent normal order statistics are far apart. On real data the error is
-    bounded by the anomalous score mass lying between adjacent normal values, and
-    with tens of millions of normal pixels those gaps are around one float16 ULP,
-    so no reported number is affected. The bound to remember is therefore about the
-    density of normal pixels, not about `num_thresholds`: this approximation is
-    safe on full-resolution categories and unsafe on toy inputs.
+    adjacent normal order statistics are far apart. With many pixels the structural
+    part shrinks, and what remains is ordinary grid coarseness. Measured 2026-10-29
+    against `au_pro(..., exact=True)` on synthetic smooth float16 maps (8 x
+    1024x1224): -3.5e-4 at the default 200 thresholds, -2.9e-7 at 50,000 -- a small
+    *downward* bias that converges (`test_the_grid_error_on_float16_maps_...`). That
+    can move the third decimal of a reported AU-PRO by one at most, and it has NOT
+    been measured on a real MVTec AD 2 category: the maps never leave the Colab VM,
+    so doing so means re-scoring one there with `exact=True` alongside.
 
     Two deliberate properties are preserved:
 
@@ -166,8 +168,15 @@ def au_pro(
     amaps: Sequence[np.ndarray],
     fpr_limit: float = 0.3,
     num_thresholds: int = 200,
+    exact: bool = False,
 ) -> float:
     """Area under the per-region-overlap curve, integrated to `fpr_limit` and normalised.
+
+    `exact=True` evaluates the curve at every distinct pooled score instead of the
+    `num_thresholds` FPR-quantile grid, so it has every operating point the data has and no
+    discretisation error. Its cost scales with the number of distinct scores; on maps stored
+    as float16 (protocol, `runner`) that is at most ~63,000, which is cheap. It exists to
+    measure the grid's error (review #24, 2026-10-29), not as the reported metric.
 
     Every connected ground-truth region contributes equally to PRO regardless of its area,
     which is the whole point of the metric: it refuses to let one large defect mask the
@@ -269,7 +278,13 @@ def au_pro(
         else np.empty(0, dtype=np.float32)
     )
 
-    thresholds = pro_thresholds(normal_sorted, lo, fpr_limit, num_thresholds)
+    if exact:
+        values = np.unique(np.concatenate([a.ravel() for a in amaps]).astype(np.float64))
+        thresholds = np.union1d(
+            values[values > lo], [np.nextafter(float(normal_sorted[-1]), np.inf)]
+        )
+    else:
+        thresholds = pro_thresholds(normal_sorted, lo, fpr_limit, num_thresholds)
     if thresholds.size == 0:
         raise ValueError(
             f"au_pro found no usable threshold at fpr_limit={fpr_limit}: every candidate "
@@ -294,7 +309,9 @@ def au_pro(
 
     fpr = np.asarray(fprs, dtype=np.float64)
     pro = pros
-    order = np.argsort(fpr, kind="stable")
+    # By FPR, then PRO: two thresholds can share an FPR (one cuts only anomalous pixels), and
+    # the curve must leave that FPR from the higher PRO, or the next trapezoid starts too low.
+    order = np.lexsort((pro, fpr))
     fpr, pro = fpr[order], pro[order]
 
     keep = fpr <= fpr_limit

@@ -486,3 +486,47 @@ def test_normal_pixel_fpr_at_raises_when_every_pixel_is_anomalous():
     ones = np.ones((6, 6), dtype=np.uint8)
     with pytest.raises(ValueError, match="no normal pixels"):
         normal_pixel_fpr_at([ones], [ones.astype(np.float32)], 0.5)
+
+
+def test_exact_au_pro_reaches_operating_points_the_grid_cannot():
+    """Review #24 (2026-10-29). The grid lands only on normal-pixel values; a threshold at an
+    anomaly-only value (0.5 here, between normals 0.45 and 0.7) is an operating point it never
+    reaches. Same hand-built case as test_aggregate's pixel-metrics fixture: the weak region is
+    caught at FPR 4/59 exactly, not at 8/59."""
+    m1 = np.zeros((8, 8), dtype=np.uint8)
+    a1 = np.full((8, 8), 0.1, dtype=np.float32)
+    m1[0:2, 0:2] = 1
+    a1[0:2, 0:2] = 0.9
+    m1[7, 7] = 1
+    a1[7, 7] = 0.5
+    a1[3, 0:4] = 0.7
+    a1[5, 0:4] = 0.45
+    masks, amaps = [m1], [a1]
+    n_normal = int((m1 == 0).sum())
+    exact = au_pro(masks, amaps, 0.3, exact=True)
+    assert exact == pytest.approx((0.3 - 0.5 * 4 / n_normal) / 0.3)
+    assert exact > au_pro(masks, amaps, 0.3)
+
+
+def test_the_grid_error_on_float16_maps_is_coarseness_and_converges_to_exact():
+    """What the default grid costs on smooth float16 maps with many pixels: a small downward
+    bias that shrinks as the grid is refined (measured 2026-10-29 on 8 maps of 1024x1224: -3.5e-4
+    at 200 thresholds, -2.9e-7 at 50,000). A smaller version here, to keep the suite fast; with
+    fewer pixels the 200-point error is larger (-1.4e-3) and a ~3e-6 structural residual remains."""
+    from scipy import ndimage as ndi
+
+    rng = np.random.default_rng(0)
+    masks, amaps = [], []
+    for i in range(4):
+        a = ndi.gaussian_filter(rng.gamma(2.0, 0.5, (256, 256)).astype(np.float32), 3)
+        m = np.zeros((256, 256), dtype=bool)
+        if i % 2:
+            yy, xx = np.ogrid[:256, :256]
+            d = (yy - 100) ** 2 + (xx - 120) ** 2 <= 15 ** 2
+            m |= d
+            a[d] += 0.3
+        masks.append(m)
+        amaps.append(a.astype(np.float16))
+    exact = au_pro(masks, amaps, 0.3, exact=True)
+    assert abs(au_pro(masks, amaps, 0.3) - exact) < 2e-3
+    assert abs(au_pro(masks, amaps, 0.3, num_thresholds=50_000) - exact) < 1e-5
