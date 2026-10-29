@@ -2286,6 +2286,21 @@ changes.
 -1.43 mean shortfall, the same shape as PatchCore's toothbrush in its first gate run. "Without
 screw it would pass" is a post-hoc reading §7 forbids acting on.
 
+### CHECKED 2026-10-29: where the WinCLIP gate evidence is, and whether e9146c8 touches it
+
+- **Nothing of the run is in the repo** (`results/reproduction/winclip/` holds only `visa/`), and by
+  the record above cell 4.4 — the only cell that copies to `MyDrive/reproduction/winclip/` — never
+  ran; 4.2/4.3 write to the VM's local `results/`. Drive itself was not inspected from here (no
+  Drive access); expected empty. To be confirmed by the author.
+- **The shared-backend defect (`e9146c8`, 2026-10-21) does not reach the 90.37.** It was a no-op
+  second `fit()`; WinCLIP is zero-shot and never fits, and `WinClipBackend._use_category` rebuilds
+  the text embeddings on every change of category and raises unless `class_name` and the
+  embeddings match it. Read from the code, not measured.
+- **The backend has not changed since the run's `6f18419`** except for moving
+  `use_antialiased_forward` into a shared helper with the same checks (diff read 2026-10-29). A
+  re-run of 4.1–4.4 at HEAD is therefore the same configuration, and since WinCLIP is
+  bit-identical across runs (A.4) it must give 90.37 exactly; any other number is itself a finding.
+
 ### What was pre-registered for exactly this case
 
 1. **Protocol §2:** a method that does not reproduce has its frontier results flagged as such in
