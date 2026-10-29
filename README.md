@@ -86,8 +86,9 @@ Colab ships, and `requirements.txt` pins neither. Each report records the commit
 - Reproduction checks: `scripts/run_mvtec_ad.py --method <m>` followed by
   `scripts/reproduction_gate.py`; WinCLIP's is cells 4.1–4.4 of `notebooks/winclip_colab.ipynb`.
 
-The paper's tables are transcribed from the committed reports and checked against them cell by
-cell; `scripts/make_tables.py` is not yet implemented.
+The anchor tables are generated from the committed reports: `scripts/make_tables.py` writes
+`results/tables/anchor_rows.tex` (the table above) and `anchor_per_condition.tex` (every lighting
+condition's mean ± std over seeds).
 
 ## Repository layout
 

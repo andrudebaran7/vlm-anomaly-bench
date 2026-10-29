@@ -2286,6 +2286,17 @@ changes.
 -1.43 mean shortfall, the same shape as PatchCore's toothbrush in its first gate run. "Without
 screw it would pass" is a post-hoc reading §7 forbids acting on.
 
+### BUILT 2026-10-29: the anchor tables are generated (review item #19)
+
+`scripts/make_tables.py` (logic in `src/vlmab/viz/tables.py`, tests in `tests/test_paper_tables.py`)
+reads the eight committed v0.2.21 reports and writes `results/tables/anchor_rows.tex` and
+`anchor_per_condition.tex`. **Table 2's generated body is identical, cell for cell, to the
+hand-set table of 2026-10-28** (diffed), and the usable mean it prints is 0.808 / 0.545 / 0.293.
+The per-condition table is the seed spread protocol §6 requires and Table 2 did not carry (its
+range is over conditions): mean ± sample std over three seeds, four decimals verbatim from the
+reports. The paper pulls both with `scripts/pull_results.sh` and prints the second as Appendix A.
+The usable set is recorded in `tables.USABLE`, not computed: v0.2.22 fixes no number.
+
 ### RAN 2026-10-29: WinCLIP's MVTec AD gate re-run — FAIL 90.37 again, to the hundredth; report committed
 
 Notebook 0.1 → 0.2 → restart → 0.3 → 4.1 → 4.2 → 4.3 → 4.4, Colab T4, commit `6f4b2a0`

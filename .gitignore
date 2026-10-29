@@ -37,3 +37,8 @@ results/mvtec_ad2/*/*
 checkpoints/
 .superpowers/
 *.egg-info/
+# The paper's generated table bodies (scripts/make_tables.py): small, derived from committed
+# reports, and what the paper pulls -- tracked so the paper can be rebuilt from a clone.
+!results/tables/
+results/tables/*
+!results/tables/*.tex
