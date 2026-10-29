@@ -272,6 +272,22 @@ def threshold_metrics(
             "validation split says nothing about another's"
         )
 
+    # The artifact was fitted on one run's maps; these must come from the same configuration
+    # and seed (review #22). Compared as one value per column, NaN read as None.
+    for key, expected in artifact["binding"].items():
+        if key not in df.columns:
+            raise ValueError(
+                f"the calibration artifact is bound to {key}={expected!r}, but the maps handed "
+                f"to threshold_metrics carry no {key!r} column to check it against"
+            )
+        found = sorted({None if pd.isna(v) else v for v in df[key].unique()}, key=str)
+        if found != [expected]:
+            raise ValueError(
+                f"the calibration artifact was fitted on maps with {key}={expected!r}, but these "
+                f"maps have {key}={found}: a threshold fitted on one run's maps is not a "
+                "threshold for another's"
+            )
+
     labels = df["label"].to_numpy()
     if (labels == LABEL_UNKNOWN).any():
         raise ValueError(

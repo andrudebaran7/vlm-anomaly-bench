@@ -26,6 +26,7 @@ def _write(tmp_path, **overrides):
         alpha=1e-3,
         calibrated_on={"split": "validation", "n_images": 41, "lighting": ["regular"]},
         run_id="4880865ba2ed",
+        binding={"seed": 0},
         categories=_categories(),
         designated_for_submission="per_image_robust_z",
     )
@@ -187,4 +188,14 @@ def test_load_artifact_rejects_a_non_finite_threshold(tmp_path):
     raw["categories"]["vial"]["global_quantile"]["threshold"] = float("inf")
     path.write_text(yaml.safe_dump(raw))
     with pytest.raises(ValueError, match="not finite"):
+        load_artifact(path)
+
+
+def test_load_refuses_an_artifact_bound_to_no_configuration(tmp_path):
+    """An artifact without a binding cannot be checked against the maps it is applied to."""
+    path = _write(tmp_path)
+    raw = yaml.safe_load(path.read_text())
+    del raw["binding"]
+    path.write_text(yaml.safe_dump(raw))
+    with pytest.raises(ValueError, match="binding"):
         load_artifact(path)
