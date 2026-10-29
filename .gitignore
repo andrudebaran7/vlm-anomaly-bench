@@ -46,3 +46,5 @@ results/tables/*
 !results/figures/
 results/figures/*
 !results/figures/*.pdf
+# ...but not the image figures: they show MVTec AD 2 images, which this repo does not redistribute.
+results/figures/images/

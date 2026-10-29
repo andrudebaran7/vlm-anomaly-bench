@@ -43,3 +43,18 @@ def test_the_figure_draws(tmp_path):
     out = tmp_path / "f.pdf"
     figures.draw_per_condition(_committed(), out)
     assert out.stat().st_size > 1000
+
+
+INPUTS = REPORTS.parents[1] / "figure_inputs"
+
+
+@pytest.mark.parametrize("draw", ["draw_dataset", "draw_resize", "draw_maps"])
+def test_the_image_figures_draw_from_the_preregistered_inputs(tmp_path, draw):
+    """Only where results/figure_inputs/ exists: it holds MVTec AD 2 images, gitignored, so CI
+    and a fresh clone skip this."""
+    pytest.importorskip("matplotlib")
+    if not INPUTS.is_dir():
+        pytest.skip("no results/figure_inputs (copied from Drive after notebook 7.2/7.3)")
+    out = tmp_path / "f.pdf"
+    getattr(figures, draw)(INPUTS, out)
+    assert out.stat().st_size > 1000

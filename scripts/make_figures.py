@@ -27,6 +27,21 @@ def main() -> None:
     figures.draw_per_condition(reports, path)
     print(f"wrote {path.relative_to(ROOT)}")
 
+    # The image figures need the pre-registered selections copied from Drive (notebook 7.2/7.3).
+    # They show MVTec AD 2 images, so they are written to a gitignored folder and only ever reach
+    # the paper, never this public repository.
+    inputs = ROOT / "results" / "figure_inputs"
+    if not inputs.is_dir():
+        print(f"no {inputs.relative_to(ROOT)}: image figures skipped")
+        return
+    images = args.out / "images"
+    images.mkdir(parents=True, exist_ok=True)
+    for name, draw in (("dataset_lighting", figures.draw_dataset),
+                       ("sheet_metal_resize", figures.draw_resize),
+                       ("walnuts_vs_can", figures.draw_maps)):
+        draw(inputs, images / f"{name}.pdf")
+        print(f"wrote {(images / f'{name}.pdf').relative_to(ROOT)}")
+
 
 if __name__ == "__main__":
     main()
