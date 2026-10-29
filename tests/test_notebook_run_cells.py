@@ -353,3 +353,14 @@ def test_6_4b_sits_between_the_grid_and_the_re_summarise():
     idx = {text: next(i for i, src in PHASE6_CELLS if text in src)
            for text in ('CATEGORY = "', "no_maps_2026-10-20", "--summarise-only")}
     assert idx['CATEGORY = "'] < idx["no_maps_2026-10-20"] < idx["--summarise-only"]
+
+
+def test_7_1_measures_au_pro_on_its_own_root_and_touches_no_registered_result():
+    """Review #24's real-category check: one seed into results/au_pro_check, --no-save, then the
+    check script. It must never write into a patchcore_ref* root or to Drive."""
+    cells = [src for _, src in _code_cells() if "au_pro_exact_check.py" in src]
+    assert len(cells) == 1
+    cell = cells[0]
+    assert "results/au_pro_check/" in cell and '"--no-save"' in cell and '"--seeds", "0"' in cell
+    assert "patchcore_ref" not in cell
+    assert not _free_names(cell), _free_names(cell)
