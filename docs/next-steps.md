@@ -2286,6 +2286,25 @@ changes.
 -1.43 mean shortfall, the same shape as PatchCore's toothbrush in its first gate run. "Without
 screw it would pass" is a post-hoc reading §7 forbids acting on.
 
+### RAN 2026-10-29: the pre-registered figure selections, applied (notebook 7.2 x2, 7.3)
+
+Colab T4, commit `d76bd31`, outputs pasted by the author. No map was displayed in the session.
+Files on Drive under `MyDrive/figure_inputs/`, each folder with its `selection.json`.
+
+- **Can** (seed 0, `regular`): **legitimacy ok, 162 of 162 image scores identical** to the
+  committed v0.2.21 seed-0 shard (max |diff| 0.0). Pick: `test_public/bad/014_regular.png`,
+  image_score 37.658390, rank 8 of 15 anomalous. **Map mean inside the defect / outside: 0.881**
+  -- dimmer inside, the failure mode M3 recorded on the old configuration (0.796-0.880 on 5 of 8
+  sampled images), now on the pre-registered image under v0.2.21. Fit: coreset 42187 iterations.
+- **Walnuts** (seed 0, `regular`): **legitimacy ok, 150 of 150 identical** (max |diff| 0.0). Pick:
+  `test_public/bad/010_regular.png`, image_score 48.494808, rank 8 of 15. **Inside / outside:
+  1.475.** The runner's own summary tripped the memory guard (10.0 GB needed), as expected.
+- **Walnuts dataset figure:** `good/000_{overexposed,regular,shift_1,shift_2,shift_3,underexposed}.png`
+  and `bad/000_regular.png` with its mask. Whether the six `000` images are one scene is to be
+  checked by eye, not assumed from the shared index.
+- **Sheet Metal resize:** `good/000_regular.png`, 4224x1056, through the pre-processor's own
+  `Resize(size=[256, 256], interpolation=BILINEAR, antialias=True)` -> 256x256.
+
 ### PRE-REGISTERED 2026-10-29, before any anomaly map was regenerated or viewed: the figure selections
 
 The author chose three image figures from spec 2026-10-01 §5 (Walnuts vs Can; the dataset across
