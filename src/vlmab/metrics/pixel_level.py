@@ -133,8 +133,8 @@ def pro_thresholds(
     part shrinks, and what remains is ordinary grid coarseness. Measured 2026-10-29
     against `au_pro(..., exact=True)` on synthetic smooth float16 maps (8 x
     1024x1224): -3.5e-4 at the default 200 thresholds, -2.9e-7 at 50,000 -- a small
-    *downward* bias that converges (`test_the_grid_error_on_float16_maps_...`). That
-    can move the third decimal of a reported AU-PRO by one at most, and it has NOT
+    *downward* bias that converges (`test_the_grid_error_on_float16_maps_...`). On that
+    data it is under one unit in the third decimal of a reported AU-PRO. It has NOT
     been measured on a real MVTec AD 2 category: the maps never leave the Colab VM,
     so doing so means re-scoring one there with `exact=True` alongside.
 
@@ -311,6 +311,8 @@ def au_pro(
     pro = pros
     # By FPR, then PRO: two thresholds can share an FPR (one cuts only anomalous pixels), and
     # the curve must leave that FPR from the higher PRO, or the next trapezoid starts too low.
+    # Only the exact sweep produces such pairs; grid thresholds are distinct normal values, so
+    # their FPRs are distinct and this order equals the old one for every reported number.
     order = np.lexsort((pro, fpr))
     fpr, pro = fpr[order], pro[order]
 
