@@ -69,8 +69,10 @@ def _score_from_object(obj: dict) -> tuple[float, list[str]] | None:
     if not math.isfinite(prob):
         return None
     score = float(np.clip(prob, 0.0, 1.0))
-    raw = obj.get("cells", []) or []
-    cells = [c for c in raw if isinstance(c, str) and _CELL.match(c)]
+    # Only a list is a list of cells. A number used to raise out of the parser, and a bare
+    # string or a dict was iterated as one (review #26).
+    raw = obj.get("cells")
+    cells = [c for c in raw if isinstance(c, str) and _CELL.match(c)] if isinstance(raw, list) else []
     return score, cells
 
 
