@@ -29,6 +29,15 @@ class WinClipRef(BackendSeeded):
         self._backend = backend
         # The backend is what calls seed_everything, so it is what declares the seed.
         self._init_seed(backend, seed)
+        # Whether the forward Resize antialiases (v0.2.20) is the backend's to declare, as for
+        # PatchCoreRef; None when it declares nothing. Missing until 2026-10-29, so the gate
+        # report of that day recorded None for a run that did antialias.
+        self._declared_resize_antialias = getattr(backend, "resize_antialias", None)
+
+    @property
+    def resize_antialias(self) -> bool | None:
+        """Whether the backend's Resize antialiased, for the shard's provenance."""
+        return self._declared_resize_antialias
 
     def prepare(self, device: str = "cuda") -> None:
         """With an injected backend there is nothing to load. Otherwise the real anomalib WinCLIP

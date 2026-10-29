@@ -57,3 +57,18 @@ def test_predict_without_a_backend_is_not_runnable():
     m = WinClipRef()  # no backend, prepare() not called
     with pytest.raises(MethodNotRunnable):
         m.predict(np.zeros((8, 8, 3), dtype=np.uint8), "vial")
+
+
+def test_resize_antialias_is_declared_by_the_backend():
+    """Protocol §3 v0.2.20: WinCLIP's forward resizes with antialiasing. The 2026-10-29 gate report
+    printed `resize_antialias: None` because this adapter did not pass the backend's declaration
+    on, so a run that did antialias recorded that it had not said so."""
+    backend = _FakeBackend()
+    backend.resize_antialias = True
+    assert WinClipRef(backend=backend).resize_antialias is True
+
+
+def test_resize_antialias_is_none_when_the_backend_declares_nothing():
+    """None, never a default: a backend that predates the seam must not look corrected."""
+    assert WinClipRef(backend=_FakeBackend()).resize_antialias is None
+    assert WinClipRef().resize_antialias is None

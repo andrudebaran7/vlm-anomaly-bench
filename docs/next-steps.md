@@ -2286,6 +2286,33 @@ changes.
 -1.43 mean shortfall, the same shape as PatchCore's toothbrush in its first gate run. "Without
 screw it would pass" is a post-hoc reading §7 forbids acting on.
 
+### RAN 2026-10-29: WinCLIP's MVTec AD gate re-run — FAIL 90.37 again, to the hundredth; report committed
+
+Notebook 0.1 → 0.2 → restart → 0.3 → 4.1 → 4.2 → 4.3 → 4.4, Colab T4, commit `6f4b2a0`
+(`origin/master`), anomalib 2.6.0, torch 2.11.0+cu130, seed 0, 15 categories, 4.2 wall time 37.9
+min. Report `results/reproduction/winclip_mvtec_ad.md`, written verbatim from the 4.4 print as
+pasted by the author; Drive copy confirmed by 4.4: `copied to /content/drive/MyDrive/reproduction/
+winclip -> ['mvtec_ad_shards', 'winclip_mvtec_ad.md']`.
+
+- **Verdict: FAIL, 90.37 against 91.8 (−1.43)**, and the same seven categories outside ±1.0 with
+  the same deltas as 2026-10-03 (cable −1.55, capsule −4.61, hazelnut −1.15, pill +2.11, screw
+  −11.13, toothbrush −1.94, wood −1.77). A reproducibility check across 26 days, a fresh VM, and
+  the per-category runner of `e9146c8`.
+- **Checked against the config:** the fifteen published values equal `configs/reproduction/
+  winclip.yaml` `per_category` (Table 10, K=0); every delta is measured − published; the measured
+  mean is 90.37.
+- **Provenance defect in the report, not in the scores: `resize_antialias: None`.** `WinClipRef`
+  did not pass the backend's declaration on (PatchCoreRef does), so `method_meta` read None. The
+  run did antialias: `WinClipBackend.__init__` calls `use_antialiased_forward`, which raises unless
+  the pre-processor's Resize has `antialias=True`, and cell 1.1 of the same session printed
+  `Resize(size=[240, 240], BICUBIC, antialias=True)`. Fixed at the adapter (two tests) on
+  2026-10-29; the committed report and the Drive shards keep `None` as generated. Note the fix
+  changes WinCLIP's configuration hash, so a later run's shards must not be pooled with these.
+- `preprocess: None` is expected: that option exists only for PatchCore.
+
+The tripwire in the paper (abstract, §5, §8: the FAIL may stand only once this report is
+committed) is now satisfied.
+
 ### CHECKED 2026-10-29: where the WinCLIP gate evidence is, and whether e9146c8 touches it
 
 - **Nothing of the run is in the repo** (`results/reproduction/winclip/` holds only `visa/`), and by
