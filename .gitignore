@@ -42,3 +42,7 @@ checkpoints/
 !results/tables/
 results/tables/*
 !results/tables/*.tex
+# The paper's generated figures (scripts/make_figures.py), for the same reason as the tables.
+!results/figures/
+results/figures/*
+!results/figures/*.pdf

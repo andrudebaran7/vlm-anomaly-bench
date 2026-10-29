@@ -2286,6 +2286,28 @@ changes.
 -1.43 mean shortfall, the same shape as PatchCore's toothbrush in its first gate run. "Without
 screw it would pass" is a post-hoc reading §7 forbids acting on.
 
+### PRE-REGISTERED 2026-10-29, before any anomaly map was regenerated or viewed: the figure selections
+
+The author chose three image figures from spec 2026-10-01 §5 (Walnuts vs Can; the dataset across
+lighting; Sheet Metal's resize) and the condition for the anti-cherry-picking rule. Recorded here
+before any run, so the selections cannot be chosen by what they show.
+
+- **Walnuts vs Can (spec figure 4).** For each category: seed **0**, condition **`regular`**,
+  test_public. The figure image is the **median-scoring anomalous image**: anomalous rows
+  (label 1) of that condition, sorted by `image_score` ascending (ties by image path), index
+  `(n - 1) // 2`. Panels: image, ground-truth mask, anomaly map. No thresholded panel: no
+  calibration has run, so there is no pre-registered threshold to apply. If the median image is
+  unilluminating, it is reported as such; there is no second search.
+- **Legitimacy check (spec §5).** The regenerated seed-0 shard's `image_score` must equal the
+  committed v0.2.21 seed-0 shard on Drive, image by image, at full precision. If it does not, the
+  maps are not the ones behind the reported numbers, and the figure is not made from them.
+- **Dataset across lighting (spec figure 1), no model.** Walnuts, test_public: for each lighting
+  condition, the **first `good` image by filename**; plus the **first `bad` image by filename** in
+  `regular` with its mask.
+- **Sheet Metal's resize (spec figure 2), no model.** The first `good` image by filename in
+  `regular` (test_public), beside the output of the anchor's own pre-processor resize (anomalib
+  2.6.0's `Resize([256, 256])`, antialiased), computed on Colab with that transform.
+
 ### MEASURED 2026-10-29: AU-PRO grid against exact on a real category -- review #24 closed
 
 Notebook 7.1, Colab T4, commit `44ffe40`, Sheet Metal, seed 0, its own root

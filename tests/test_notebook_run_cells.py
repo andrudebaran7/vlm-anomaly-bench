@@ -364,3 +364,13 @@ def test_7_1_measures_au_pro_on_its_own_root_and_touches_no_registered_result():
     assert "results/au_pro_check/" in cell and '"--no-save"' in cell and '"--seeds", "0"' in cell
     assert "patchcore_ref" not in cell
     assert not _free_names(cell), _free_names(cell)
+
+
+def test_7_2_and_7_3_apply_the_preregistered_selection_and_touch_no_registered_result():
+    cells = [src for _, src in _code_cells() if "figure_inputs.py" in src]
+    assert len(cells) == 2
+    model = next(c for c in cells if '"model"' in c)
+    assert "results/figure_check/" in model and '"--no-save"' in model and '"--seeds", "0"' in model
+    assert "--committed" in model and "patchcore_ref_v0.2.21" in model   # read, for the check
+    for cell in cells:
+        assert not _free_names(cell), _free_names(cell)

@@ -89,7 +89,8 @@ by the notebooks in [`notebooks/`](notebooks/). Those versions are pinned in
 
 The anchor tables are generated from the committed reports: `scripts/make_tables.py` writes
 `results/tables/anchor_rows.tex` (the table above) and `anchor_per_condition.tex` (every lighting
-condition's mean ± std over seeds).
+condition's mean ± std over seeds), and `scripts/make_figures.py` (needs `pip install -e .[plots]`)
+draws `results/figures/anchor_per_condition.pdf` from the same reports.
 
 ## Repository layout
 

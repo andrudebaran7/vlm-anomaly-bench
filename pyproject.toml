@@ -18,6 +18,8 @@ dependencies = [
 # Pinned to the versions every reported number was produced with (requirements-gpu.txt).
 gpu = ["torch==2.11.0", "anomalib[clip]==2.6.0", "open-clip-torch==2.24.0"]
 test = ["pytest>=8"]
+# Only scripts/make_figures.py needs it.
+plots = ["matplotlib>=3.8"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
