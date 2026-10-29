@@ -2286,6 +2286,28 @@ changes.
 -1.43 mean shortfall, the same shape as PatchCore's toothbrush in its first gate run. "Without
 screw it would pass" is a post-hoc reading §7 forbids acting on.
 
+### DONE 2026-10-29: the review's code items #21-#26 (branch `pre-m4-hardening`)
+
+None moves a reported number. Full suite 747 passed, 2 skipped; the new CPU integration test
+passes in a fresh venv with torch 2.11.0+cpu and anomalib 2.6.0.
+- **#21** `ResultStore.is_done(expect=...)`: the runner passes `split` and `config_hash`; a
+  same-named shard from another split or configuration raises instead of being skipped.
+- **#22** calibration artifacts carry `binding` = {seed, preprocess, resize_antialias};
+  `load_artifact` requires it and `threshold_metrics` refuses maps that differ. Not
+  `config_hash`, which hashes the split. No artifact existed, so nothing was migrated.
+- **#23** `topk_quantile`: a tie across rank k steps the threshold just above it (float32-aware),
+  so `>=` flags at most alpha. float16 map storage makes such ties ordinary.
+- **#24** `au_pro(..., exact=True)` sweeps every distinct value. Measured on synthetic float16 maps
+  (8 x 1024x1224): the 200-point grid is **-3.5e-4** from exact, converging (-2.9e-7 at 50k).
+  **Still unmeasured on a real category**: the maps never leave Colab, so it needs a re-score
+  there with `exact=True`. The curve is now sorted by (FPR, PRO); for the grid this is the same
+  order as before (its FPRs are distinct), so no number moves.
+- **#25** `requirements-gpu.txt` and `pyproject` `[gpu]` pin torch 2.11.0, anomalib[clip] 2.6.0,
+  open-clip-torch 2.24.0; core deps declared; CI `integration` job runs
+  `tests/test_integration_patchcore_cpu.py` (real fit -> score, resnet18 backbone).
+- **#26** non-list `cells` no longer crashes the MLLM parser; the unreachable
+  `_apply_classic_preprocessing` is removed (git history keeps it).
+
 ### BUILT 2026-10-29: the anchor tables are generated (review item #19)
 
 `scripts/make_tables.py` (logic in `src/vlmab/viz/tables.py`, tests in `tests/test_paper_tables.py`)
