@@ -279,7 +279,9 @@ def au_pro(
     )
 
     if exact:
-        values = np.unique(np.concatenate([a.ravel() for a in amaps]).astype(np.float64))
+        # unique in float32 (the maps' own dtype here) and widen after: half the memory of
+        # widening a whole category's pixels first.
+        values = np.unique(np.concatenate([a.ravel() for a in amaps])).astype(np.float64)
         thresholds = np.union1d(
             values[values > lo], [np.nextafter(float(normal_sorted[-1]), np.inf)]
         )
