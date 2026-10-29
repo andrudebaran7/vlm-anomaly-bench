@@ -742,8 +742,8 @@ def _antialias_off_copy(transform, Compose, Resize):
     """A copy of `transform` with its Resize's antialiasing switched OFF, for stage 15.
 
     Same Resize size and interpolation, antialias=False, followed by the transform's OWN Normalize
-    (carried over the way `PatchCoreBackend._apply_classic_preprocessing` does, so no ImageNet
-    constants are re-stated here). The model's transform is not mutated. `Compose` and `Resize`
+    (carried over the way the removed `PatchCoreBackend._apply_classic_preprocessing` did --
+    see git history before 2026-10-29 -- so no ImageNet constants are re-stated here). The model's transform is not mutated. `Compose` and `Resize`
     are passed in so this is testable without torchvision; stage 15 passes torchvision's v2 ones.
     """
     steps = list(getattr(transform, "transforms", [transform]))

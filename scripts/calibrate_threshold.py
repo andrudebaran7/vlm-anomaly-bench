@@ -24,7 +24,7 @@ import numpy as np
 import pandas as pd
 
 from vlmab.eval.store import ResultStore
-from vlmab.threshold.artifact import write_artifact
+from vlmab.threshold.artifact import BINDING_KEYS, write_artifact
 from vlmab.threshold.rules import Calibration, calibrate
 
 #: Protocol §4 (v0.2.11). Both are pre-registered, so they are defaults rather than choices
@@ -35,6 +35,27 @@ DESIGNATED_RULE = "per_image_robust_z"
 
 #: Fitting a threshold on anything else is calibrating on test data.
 CALIBRATION_SPLIT = "validation"
+
+
+def _binding(df) -> dict:
+    """The configuration and seed of the run calibrated on, one value per column (review #22).
+
+    Recorded so `threshold_metrics` can refuse maps from any other run. A column absent from
+    the shards is left out rather than guessed; the seed is always present (`write` stamps it).
+    """
+    binding = {}
+    for key in BINDING_KEYS:
+        if key not in df.columns:
+            continue
+        values = sorted({None if pd.isna(v) else v for v in df[key].unique()}, key=str)
+        if len(values) != 1:
+            raise ValueError(
+                f"the shards pool {key} values {values}: a threshold is calibrated on one run's "
+                "maps, so they must share one configuration (protocol §6)"
+            )
+        value = values[0]
+        binding[key] = value.item() if hasattr(value, "item") else value
+    return binding
 
 
 def _run_id_from_maps(map_paths) -> str:
@@ -149,6 +170,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "lighting": sorted(set(df["meta_lighting"])) if "meta_lighting" in df.columns else [],
         },
         run_id=_run_id_from_maps(all_maps),
+        binding=_binding(df),
         categories=categories,
         designated_for_submission=args.designate,
     )

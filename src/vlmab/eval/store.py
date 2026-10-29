@@ -40,8 +40,36 @@ class ResultStore:
     def path_for(self, dataset: str, method: str, category: str, seed: int | None) -> Path:
         return self.root / f"{dataset}__{method}__{category}__{seed_tag(seed)}.parquet"
 
-    def is_done(self, dataset: str, method: str, category: str, seed: int | None) -> bool:
-        return self.path_for(dataset, method, category, seed).is_file()
+    def is_done(self, dataset: str, method: str, category: str, seed: int | None,
+                expect: Mapping[str, Any] | None = None) -> bool:
+        """Whether this (dataset, method, category, seed) already has a shard here.
+
+        The filename carries only those four, so a shard for another split or another
+        configuration has the same name. `expect` names the columns that must also agree --
+        the runner passes `split` and, when it has one, `config_hash` -- and a shard that
+        disagrees is refused rather than trusted (review item #21, 2026-10-29): skipping would
+        return the other run's scores under this run's name, and overwriting would destroy them.
+        """
+        path = self.path_for(dataset, method, category, seed)
+        if not path.is_file():
+            return False
+        if expect:
+            import pyarrow.parquet as pq
+
+            # Read only the columns being checked; a shard can hold tens of thousands of rows.
+            wanted = [k for k in expect if k in pq.read_schema(path).names]
+            found = pd.read_parquet(path, columns=wanted) if wanted else pd.DataFrame()
+            for key, value in expect.items():
+                if key not in found.columns:
+                    continue
+                values = set(found[key].astype(str).unique())
+                if values != {str(value)}:
+                    raise ValueError(
+                        f"{path.name} already exists with {key}={sorted(values)}, but this run "
+                        f"has {key}={value!r}. Same filename, different run: refusing to skip "
+                        "it or overwrite it. Write this run to its own results root."
+                    )
+        return True
 
     def write(
         self,

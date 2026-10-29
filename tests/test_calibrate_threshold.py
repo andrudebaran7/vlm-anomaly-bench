@@ -244,3 +244,13 @@ def test_calibrate_refuses_shards_that_pool_two_seeds(tmp_path):
     with pytest.raises(ValueError, match="pool 2 seeds"):
         _run(["--results", str(results), "--dataset", "mvtec_ad2",
               "--method", "intensity_baseline", "--out", str(tmp_path / "a.yaml")])
+
+
+def test_calibrate_binds_the_artifact_to_the_seed_that_produced_the_maps(tmp_path):
+    """Review #22: the artifact records which run's configuration it was fitted on, so
+    threshold_metrics can refuse maps from any other."""
+    results = _validation_run(tmp_path)
+    out = tmp_path / "a.yaml"
+    _run(["--results", str(results), "--dataset", "mvtec_ad2",
+          "--method", "intensity_baseline", "--out", str(out)])
+    assert yaml.safe_load(out.read_text())["binding"] == {"seed": 0}

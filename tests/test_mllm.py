@@ -230,3 +230,12 @@ def test_adapter_prompt_stays_in_sync_with_the_published_config():
     config = (Path(__file__).resolve().parents[1] / "configs/methods/mllm_qwen.yaml").read_text()
     for line in PROMPT.splitlines():
         assert line.strip() in config, f"prompt line not found in config: {line!r}"
+
+
+@pytest.mark.parametrize("cells", ["5", '"B3"', '{"B3": 1}', "null", "true"])
+def test_a_malformed_cells_field_keeps_the_score_and_drops_the_cells(cells):
+    """Review #26 (2026-10-29): `cells` that is not a list -- a number raised TypeError out of the
+    parser, a bare string was iterated character by character. The score is the field that
+    matters; a malformed location is no location, not a failed response."""
+    score, got, ok = parse_mllm_response(f'{{"anomaly_probability": 0.5, "cells": {cells}}}')
+    assert ok is True and score == pytest.approx(0.5) and got == []

@@ -160,60 +160,6 @@ class PatchCoreBackend:
         self.resize_antialias = True
         self._fitted = False
 
-    def _apply_classic_preprocessing(self, spec: dict) -> None:
-        """Replace the model's own transform with classic PatchCore's Resize -> CenterCrop.
-
-        UNREACHABLE since protocol v0.2.21 (the constructor refuses `classic`); kept, not
-        deleted, for a later decision on whether a corrected classic run is worth building.
-
-        It goes through the PreProcessor anomalib itself built on the model, and reuses that
-        object's own Normalize, rather than importing a PreProcessor class by a path taken
-        from a documentation snippet. anomalib 2.6.0's Engine API was verified on 2026-08-21;
-        its PreProcessor API was NOT, and this backend has already been bitten five separate
-        times by a call that looked reasonable and had never been run. Probe stage 13 prints
-        the real API before any fit is paid for.
-
-        Both halves of the model see this: `pre_processor` is a child module of the
-        LightningModule, so `fit` gets it through anomalib's own pipeline and `score` gets it
-        through `forward`. A transform applied to only one of them would build the memory
-        bank at one resolution and query it at another.
-
-        **Consequence for pixel metrics, recorded rather than discovered later:** a centre
-        crop means the anomaly map covers only the middle 224/256 of the frame, and
-        PatchCoreRef then upsamples it across the WHOLE native image. The reproduction gate
-        is image-level I-AUROC and is unaffected; any pixel-level number from a `classic`
-        run would be spatially wrong, and this is why the choice is recorded per shard.
-        """
-        from torchvision.transforms.v2 import CenterCrop, Compose, Resize
-
-        pre = getattr(self._model, "pre_processor", None)
-        transform = getattr(pre, "transform", None)
-        if transform is None:
-            raise RuntimeError(
-                f"preprocess='classic' cannot be applied: the model's pre_processor is "
-                f"{pre!r}, which exposes no `transform` to replace. Run probe stage 13 "
-                "(notebooks/probe_patchcore.py) to print the real API on the installed "
-                "anomalib, and fix this from what it prints -- not from the docs."
-            )
-        # Carry over anomalib's OWN Normalize instead of re-stating ImageNet's constants:
-        # those constants are not in this repo's verified record, and a second copy of them
-        # is a second thing that can drift from what the untouched path applies.
-        steps = list(getattr(transform, "transforms", [transform]))
-        normalize = [t for t in steps if type(t).__name__ == "Normalize"]
-        if not normalize:
-            raise RuntimeError(
-                f"preprocess='classic' cannot be applied: the model's transform is {steps}, "
-                "which contains no Normalize to carry over. Dropping normalisation silently "
-                "would produce a complete run of plausible, wrong numbers."
-            )
-        # Resize with a single int takes the SHORT side to 256 and preserves aspect, which
-        # is what the paper describes; Resize([256, 256]) -- anomalib's own -- does not.
-        pre.transform = Compose([
-            Resize(spec["resize"], antialias=True),
-            CenterCrop(spec["center_crop"]),
-            *normalize,
-        ])
-
     def fit(self, train_images: Iterable[np.ndarray]) -> None:
         # One backend, one fit. anomalib 2.6.0 makes a second fit on the same model and Engine a
         # silent no-op: the Engine reuses its Trainer, which has already reached max_epochs=1,

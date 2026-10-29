@@ -19,6 +19,13 @@ from vlmab.threshold.rules import RULES, Calibration
 #: report, and silently accepting it would put an unpre-registered number in a results table.
 ARTIFACT_PROTOCOL_VERSION = "0.2.11"
 
+#: The shard columns that tie an artifact to the run whose maps it was fitted on (review #22,
+#: 2026-10-29). Not `config_hash`: that hashes the split too, so a `validation` calibration and the
+#: `test_public` run it is applied to never share one. These are the columns that separate two
+#: configurations of one method (protocol §6, §3 v0.2.21) plus the seed; `threshold_metrics`
+#: refuses maps whose values differ.
+BINDING_KEYS = ("seed", "preprocess", "resize_antialias")
+
 #: How each rule's fitted scalar is named in the file. transductive_quantile fits nothing.
 VALUE_KEY = {"global_quantile": "threshold", "per_image_robust_z": "k"}
 
@@ -31,9 +38,11 @@ def write_artifact(
     alpha: float,
     calibrated_on: Mapping[str, Any],
     run_id: str,
+    binding: Mapping[str, Any],
     categories: Mapping[str, Mapping[str, Calibration]],
     designated_for_submission: str,
 ) -> Path:
+    _check_binding(binding, "write_artifact")
     if not 0.0 < alpha <= 1.0:
         raise ValueError(f"alpha must be in (0, 1]: got {alpha}")
     if designated_for_submission not in RULES:
@@ -69,6 +78,7 @@ def write_artifact(
         "alpha": float(alpha),
         "calibrated_on": dict(calibrated_on),
         "run_id": run_id,
+        "binding": dict(binding),
         "calibrated_at": date.today().isoformat(),
         "categories": blocks,
         "designated_for_submission": designated_for_submission,
@@ -77,6 +87,18 @@ def write_artifact(
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(yaml.safe_dump(document, sort_keys=False))
     return path
+
+
+def _check_binding(binding: Any, where: str) -> None:
+    if not isinstance(binding, Mapping) or "seed" not in binding:
+        raise ValueError(
+            f"{where}: the artifact's binding must be a mapping that at least names the seed "
+            f"(got {binding!r}); without it the threshold cannot be checked against the maps it "
+            "is applied to"
+        )
+    unknown = sorted(set(binding) - set(BINDING_KEYS))
+    if unknown:
+        raise ValueError(f"{where}: binding has unknown keys {unknown}; expected {BINDING_KEYS}")
 
 
 def load_artifact(path: Path) -> dict[str, Any]:
@@ -103,6 +125,8 @@ def load_artifact(path: Path) -> dict[str, Any]:
         raise ValueError(
             f"{path} has alpha {alpha_float}; alpha must be in (0, 1]"
         )
+
+    _check_binding(raw.get("binding"), str(path))
 
     designated = raw.get("designated_for_submission")
     if designated not in RULES:

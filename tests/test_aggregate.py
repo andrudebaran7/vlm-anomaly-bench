@@ -513,6 +513,7 @@ def _threshold_shard(
             "mask_path": None if mask_path is None else str(mask_path),
             "map_path": str(map_path),
             "meta_lighting": "regular",
+            "seed": 0,
             "dataset": dataset,
             "method": method,
             "category": category,
@@ -528,6 +529,7 @@ def _threshold_artifact(tmp_path, category="vial"):
         alpha=1e-3,
         calibrated_on={"split": "validation", "n_images": 4, "lighting": ["regular"]},
         run_id="deadbeef",
+        binding={"seed": 0},
         categories={category: {
             "global_quantile": Calibration("global_quantile", 1.0, 1e-3, 100, 0),
             "per_image_robust_z": Calibration("per_image_robust_z", 3.0, 1e-3, 100, 0),
@@ -653,3 +655,44 @@ def test_one_seed_is_fine_and_no_seed_column_is_fine(tmp_path):
     one["seed"] = 0
     assert image_metrics(one)["n"] == len(one)
     assert image_metrics(_shard(tmp_path))["n"] == 4
+
+
+def _bound_artifact(tmp_path, binding):
+    path = write_artifact(
+        tmp_path / "bound.yaml",
+        dataset="mvtec_ad2",
+        method="intensity_baseline",
+        alpha=1e-3,
+        calibrated_on={"split": "validation", "n_images": 4, "lighting": ["regular"]},
+        run_id="deadbeef",
+        binding=binding,
+        categories={"vial": {
+            "global_quantile": Calibration("global_quantile", 1.0, 1e-3, 100, 0),
+            "per_image_robust_z": Calibration("per_image_robust_z", 3.0, 1e-3, 100, 0),
+            "transductive_quantile": Calibration("transductive_quantile", float("nan"), 1e-3, 0, 0),
+        }},
+        designated_for_submission="per_image_robust_z",
+    )
+    return load_artifact(path)
+
+
+def test_threshold_metrics_refuses_maps_from_another_seed(tmp_path):
+    """Review #22 (2026-10-29): a threshold is fitted on one run's maps. Applied to another
+    seed's maps it cuts a distribution it was never fitted on, and nothing used to say so."""
+    df = _threshold_shard(tmp_path).assign(seed=1)
+    with pytest.raises(ValueError, match="seed"):
+        threshold_metrics(df, _bound_artifact(tmp_path, {"seed": 0}), "vial")
+
+
+def test_threshold_metrics_refuses_maps_from_another_configuration(tmp_path):
+    df = _threshold_shard(tmp_path).assign(seed=0, resize_antialias=False)
+    with pytest.raises(ValueError, match="resize_antialias"):
+        threshold_metrics(df, _bound_artifact(tmp_path, {"seed": 0, "resize_antialias": True}),
+                          "vial")
+
+
+def test_threshold_metrics_accepts_maps_from_the_calibrated_configuration(tmp_path):
+    df = _threshold_shard(tmp_path).assign(seed=0, resize_antialias=True)
+    out = threshold_metrics(df, _bound_artifact(tmp_path, {"seed": 0, "resize_antialias": True}),
+                            "vial")
+    assert out["n"] == 4

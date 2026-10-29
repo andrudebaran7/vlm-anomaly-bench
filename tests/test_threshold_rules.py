@@ -175,3 +175,24 @@ def test_transductive_quantile_cuts_on_the_maps_it_is_applied_to():
 
 def test_rules_tuple_names_exactly_the_three_designed_rules():
     assert RULES == ("global_quantile", "per_image_robust_z", "transductive_quantile")
+
+
+def test_topk_quantile_never_lets_ties_push_the_flagged_fraction_above_alpha():
+    """Review #23 (2026-10-29): prediction is `amap >= t`, so when the k-th largest value is
+    tied with values below rank k, every one of them is flagged and the realised FPR overshoots
+    alpha -- to 100% on a constant map. Maps are stored as float16, so ties are not exotic.
+    The threshold moves just above a tie that crosses rank k: the flagged fraction then stays at
+    or below alpha, the conservative side, in the same float32 comparison seg_f1_at uses."""
+    v = np.array([0.0] * 900 + [1.0] * 100, dtype=np.float32)
+    t = topk_quantile((v,), v.size, 0.05)
+    assert np.count_nonzero(v >= np.float32(t)) / v.size <= 0.05
+
+    flat = np.full(1000, 0.5, dtype=np.float32)
+    t = topk_quantile((flat,), flat.size, 0.01)
+    assert np.count_nonzero(flat >= np.float32(t)) == 0
+
+
+def test_topk_quantile_without_a_tie_at_rank_k_is_unchanged():
+    v = np.array([0.0] * 900 + [1.0] * 50 + [2.0] * 50, dtype=np.float32)
+    # k = 100 for alpha 0.1: the 100th largest is 1.0 and the 101st is 0.0, so no tie crosses.
+    assert topk_quantile((v,), v.size, 0.1) == 1.0
