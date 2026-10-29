@@ -24,6 +24,9 @@ def topk_quantile(chunks: Iterable[np.ndarray], n_total: int, alpha: float) -> f
 
     `n_total` must be the true pooled size; the caller gets it from a shape-only pass
     (`np.load(..., mmap_mode="r").shape`), the pattern `aggregate.pixel_metrics` already uses.
+
+    One exception to "exactly": when the k-th largest value is tied with the next one down, the
+    result is the next representable value above it, so `>=` flags at most a fraction alpha.
     """
     if not 0.0 < alpha <= 1.0:
         raise ValueError(f"alpha must be in (0, 1]: got {alpha}")
@@ -31,20 +34,33 @@ def topk_quantile(chunks: Iterable[np.ndarray], n_total: int, alpha: float) -> f
         raise ValueError(f"n_total must be positive: got {n_total}")
 
     k = max(1, min(int(np.ceil(alpha * n_total)), n_total))
+    # k + 1 kept, not k: the value just below rank k is what says whether a tie crosses it.
+    keep = min(k + 1, n_total)
     buf = np.empty(0, dtype=np.float64)
     seen = 0
     for chunk in chunks:
         v = np.asarray(chunk, dtype=np.float64).ravel()
         seen += v.size
         buf = np.concatenate([buf, v])
-        if buf.size > k:
-            buf = np.partition(buf, buf.size - k)[buf.size - k :]
+        if buf.size > keep:
+            buf = np.partition(buf, buf.size - keep)[buf.size - keep :]
     if seen != n_total:
         raise ValueError(
             f"stream held {seen} values but n_total said {n_total}; the counting pass and "
             "the value pass disagree, so the quantile would be computed at the wrong rank"
         )
-    return float(np.partition(buf, buf.size - k)[buf.size - k])
+    buf = np.sort(buf)
+    t = float(buf[-k])
+    if keep > k and buf[-k - 1] == t:
+        # Review #23 (2026-10-29): prediction is `amap >= t`, so a value tied across rank k
+        # flags every pixel that shares it and the realised FPR overshoots alpha (100% on a
+        # constant map; float16 map storage makes ties ordinary). Step just above the tie, in
+        # float32 when t is a float32 value -- seg_f1_at compares in float32 -- so the flagged
+        # fraction stays at or below alpha instead.
+        if np.float32(t) == t:
+            return float(np.nextafter(np.float32(t), np.float32(np.inf)))
+        return float(np.nextafter(t, np.inf))
+    return t
 
 
 #: The three pre-registered candidates (protocol §4, v0.2.11). `per_image_robust_z` is the
