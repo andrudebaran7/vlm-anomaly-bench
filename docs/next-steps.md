@@ -2313,9 +2313,10 @@ six conditions of 19 test images. The runner's own summary tripped the memory gu
 smaller than on the synthetic maps (-3.5e-4), and mostly downward at 0.3, as there. The seed-0
 grid values sit within about 1.2 seed-std of the committed three-seed means (e.g. underexposed
 0.2642 against 0.2527 +- 0.0100), consistent with the same configuration. Scope: one category,
-one seed; Sheet Metal has the most pixels per image of the eight (4224x1056), and the grid's
-error shrinks with pixel count, so the other seven are not expected to be worse, but are not
-measured.
+one seed. Sheet Metal pools ~85 M pixels per condition (19 x 4224x1056). The four 2448x2048
+categories pool more, and the grid's error shrinks with pixel count, so they are not expected to
+be worse; Vial (1400x1900), Fruit Jelly (2100x1520) and Can (2232x1024) have fewer pixels per
+image, so if any category's error is larger it is one of those three. Not measured.
 
 ### DONE 2026-10-29: the review's code items #21-#26 (branch `pre-m4-hardening`)
 
