@@ -116,6 +116,8 @@ commit any vial.md written before 6.4b (no AU-PRO, or the defective verdict).
 
 **After the grid:**
 - Re-apply the pre-registered usable/unusable-anchor criterion (random baseline) by hand, as for M3.
+  **CORRECTED 2026-10-29 (review):** no written criterion existed; the author chose one on
+  2026-10-28 after seeing the v0.2.21 numbers ("DECIDED 2026-10-28"). It is post hoc, not pre-registered.
 - Paper repo, branch `descope-c1-c3-rewrite` (**not merged; awaiting the author's review**, title
   included; review findings a–e delivered): update with the v0.2.21 anchor numbers and a
   protocol-sync v0.2.21 entry; add C3 evidence (the export-path antialias mismatch; the
@@ -159,6 +161,7 @@ commit any vial.md written before 6.4b (no AU-PRO, or the defective verdict).
 > superseded-configuration header line and are kept as evidence.
 > After the session, the pre-registered usable/unusable-anchor criterion (random baseline) must be
 > re-applied by hand to the new MVTec AD 2 grid, as it was for M3.
+> **CORRECTED 2026-10-29:** that criterion was never written down; see "DECIDED 2026-10-28" (post hoc).
 >
 > **▶ RAN 2026-10-20: the v0.2.21 gate came back at ~60 I-AUROC — a RUNNER DEFECT, confirmed
 > 2026-10-21: `run_mvtec_ad.py` reused one PatchCore backend across categories, so every category
