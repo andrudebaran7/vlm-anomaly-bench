@@ -126,7 +126,13 @@ def run_evaluation(
     meta = {**meta, "seed": method.seed}
 
     wanted = list(categories) if categories is not None else dataset.categories()
-    todo = [c for c in wanted if not store.is_done(dataset.name, method.name, c, method.seed)]
+    # A shard only counts as done if it was written for this split and, where the caller states
+    # one, this configuration; is_done refuses a same-named shard from another run.
+    expect = {"split": split}
+    if meta.get("config_hash"):
+        expect["config_hash"] = meta["config_hash"]
+    todo = [c for c in wanted
+            if not store.is_done(dataset.name, method.name, c, method.seed, expect=expect)]
     if not todo:
         return []
 

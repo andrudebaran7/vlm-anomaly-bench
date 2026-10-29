@@ -549,3 +549,33 @@ def test_two_seeds_do_not_share_a_map_directory(tmp_path, fake_dataset):
     for path, data in first.items():
         assert Path(path).exists(), "the second seed deleted the first seed's maps"
         assert np.array_equal(np.load(path), data), "the second seed overwrote them"
+
+
+def test_resume_refuses_a_shard_written_for_another_split(tmp_path, fake_dataset, counting_method):
+    """Review #21 (2026-10-29): the resume key is (dataset, method, category, seed), so a
+    `validation` run pointed at a root that holds `test_public` shards used to find them "done"
+    and skip every category silently. It must refuse instead -- skipping returns the wrong
+    split's scores, and overwriting would destroy the other run's results."""
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {}, split="test_public")
+    with pytest.raises(ValueError, match="split"):
+        run_evaluation(fake_dataset, counting_method, store, {}, split="validation")
+
+
+def test_resume_refuses_a_shard_written_under_another_configuration(
+    tmp_path, fake_dataset, counting_method
+):
+    """Same key, different configuration: protocol §6 forbids pooling the two, and a silent
+    skip would report the old configuration's numbers under the new one's name."""
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {"config_hash": "aaaa"})
+    with pytest.raises(ValueError, match="config_hash"):
+        run_evaluation(fake_dataset, counting_method, store, {"config_hash": "bbbb"})
+
+
+def test_resume_with_the_same_split_and_configuration_still_skips(
+    tmp_path, fake_dataset, counting_method
+):
+    store = ResultStore(tmp_path)
+    run_evaluation(fake_dataset, counting_method, store, {"config_hash": "aaaa"})
+    assert run_evaluation(fake_dataset, counting_method, store, {"config_hash": "aaaa"}) == []
