@@ -134,9 +134,10 @@ def pro_thresholds(
     against `au_pro(..., exact=True)` on synthetic smooth float16 maps (8 x
     1024x1224): -3.5e-4 at the default 200 thresholds, -2.9e-7 at 50,000 -- a small
     *downward* bias that converges (`test_the_grid_error_on_float16_maps_...`). On that
-    data it is under one unit in the third decimal of a reported AU-PRO. It has NOT
-    been measured on a real MVTec AD 2 category: the maps never leave the Colab VM,
-    so doing so means re-scoring one there with `exact=True` alongside.
+    data it is under one unit in the third decimal of a reported AU-PRO. On a real
+    category it is ten times smaller: Sheet Metal, seed 0, all six lighting conditions at
+    both limits, max |grid - exact| = 3.7e-5 and no value changed at three decimals
+    (scripts/au_pro_exact_check.py on Colab, 2026-10-29, docs/next-steps.md).
 
     Two deliberate properties are preserved:
 
