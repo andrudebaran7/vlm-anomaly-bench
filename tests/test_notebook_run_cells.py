@@ -368,9 +368,10 @@ def test_7_1_measures_au_pro_on_its_own_root_and_touches_no_registered_result():
 
 def test_7_2_and_7_3_apply_the_preregistered_selection_and_touch_no_registered_result():
     cells = [src for _, src in _code_cells() if "figure_inputs.py" in src]
-    assert len(cells) == 2
-    model = next(c for c in cells if '"model"' in c)
-    assert "results/figure_check/" in model and '"--no-save"' in model and '"--seeds", "0"' in model
-    assert "--committed" in model and "patchcore_ref_v0.2.21" in model   # read, for the check
+    assert len(cells) == 3   # 7.2, 7.3, and 7.4 doing both
+    for model in (c for c in cells if '"model"' in c):
+        assert "results/figure_check/" in model and '"--no-save"' in model
+        assert '"--seeds", "0"' in model
+        assert "--committed" in model and "patchcore_ref_v0.2.21" in model   # read, for the check
     for cell in cells:
         assert not _free_names(cell), _free_names(cell)
