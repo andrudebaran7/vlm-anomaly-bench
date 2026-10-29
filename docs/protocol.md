@@ -214,6 +214,17 @@ to substitute.
   standard PatchCore regime and is fixed here so the anchor's numbers are comparable across
   categories.
 
+- **When the anchor is a usable ceiling (v0.2.22, POST HOC).** This rule was **not** fixed before
+  the results: it was chosen by the author on 2026-10-28, after the v0.2.21 MVTec AD 2 numbers
+  existed, and any text that reports it must say so. Earlier documents call a usable/unusable
+  criterion "pre-registered"; none was ever written down. The rule is on **detection only**: a
+  category's anchor is usable when its I-AUROC (mean over lighting conditions of the per-condition
+  mean over seeds, §6) is clearly above chance. No numeric threshold is fixed; on v0.2.21 the eight
+  values fall into two groups, 0.723–0.888 and 0.452–0.537, and the split is read from that gap.
+  AU-PRO, as a multiple of its random baseline (§4), is reported beside it for every category and
+  never gates. A second, localisation condition was considered and rejected: no bar on the record
+  orders the categories consistently, so one would have had to be invented after the data.
+
 - **AnomalyCLIP (auxiliary-trained).** AnomalyCLIP learns object-agnostic prompts on an auxiliary AD
   dataset and scores zero-shot; the auxiliary data must not overlap the test set (§3.1 credibility
   requirement). Provenance is the official repo at a pinned commit (anomalib does not ship it). The
@@ -672,3 +683,13 @@ pre-processing that produced them.
   overwritten. `preprocess="classic"` is refused. The size of the effect on real categories is NOT
   measured by this entry. No metric definition changed; no existing number moves.
   Provenance: docs/next-steps.md, "MEASURED 2026-10-19 — check (b)".
+- 2026-10-29 — v0.2.22. §3: when the full-shot anchor is a usable ceiling — detection only,
+  I-AUROC clearly above chance, AU-PRO ×random reported beside it and never gating. **Post hoc:**
+  decided by the author on 2026-10-28, after the v0.2.21 grid's numbers existed, over a second
+  reading (detection + localisation) that had no threshold the record supports. Entered here on
+  2026-10-29 after a review found that earlier documents called the criterion "pre-registered"
+  while none had been written; this entry is the first written statement of it. Under it the
+  anchor is usable on Vial, Walnuts, Sheet Metal, Fruit Jelly and Fabric, and not on Rice, Wall
+  Plugs and Can. No metric definition changed and no existing number moves.
+  Provenance: docs/next-steps.md, "DECIDED 2026-10-28 by the author" and "(as prepared, before
+  the decision)".

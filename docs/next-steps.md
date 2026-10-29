@@ -43,7 +43,48 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## Next steps, in order
 
-## ▶ RESUME HERE — session handoff of 2026-10-21 (written at the author's request)
+## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
+
+**UPDATE 2026-10-28: GRID COMPLETE, 8 of 8** (walnuts and fabric run 2026-10-28, both reports on
+Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 here are done.
+**Reports committed 2026-10-28** under `results/mvtec_ad2/patchcore_ref_v0.2.21/` (downloaded from
+Drive by the author). Each was checked cell by cell against its recorded table: all 8 match
+(fruit_jelly has 4 conditions, as recorded); all carry commit `6f4b2a0` and the gate-PASS line.
+**Criterion DECIDED 2026-10-28: reading A, detection only → 5 usable of 8** (see "DECIDED
+2026-10-28" below). **Paper prose DRAFTED 2026-10-28** on `descope-c1-c3-rewrite` (`954bf01`..`4b118ba`):
+abstract, §1, §5, §6.A–C, Threats, §7, §8 on the v0.2.21 anchor. **Next: the author reviews the
+whole branch.** Open: WinCLIP gate report (tripwire), private split / threshold rule, figures (G). **Grid under v0.2.21: 6 of 8 done**, each with a report carrying AU-PRO on Drive. The categories are
+sheet_metal, fruit_jelly, wallplugs, can, vial (re-fit by 6.4b) and rice. The tables are recorded
+verbatim in the "MEASURED 2026-10-25" sections below. **Owed: walnuts and fabric**, which are
+2448×2048 and take about one free-Colab session each. Start each at the top of a fresh session.
+
+**Next Colab session:**
+1. Phase 0 → 1.1.
+2. **Walnuts first, setting its map-less shards aside:** `!mv .../patchcore_ref_v0.2.21/walnuts/shards
+   .../walnuts/shards_no_maps_2026-10-26`. The exact command is in "INCOMPLETE 2026-10-26" below. The
+   session ended in seed 2 and seeds 0/1 have no maps, so a plain re-run would resume them.
+3. 6.4 with `CATEGORY = "walnuts"`. When the guard trips, run
+   `--summarise-only --max-bytes 12000000000 && cp -v <report> <Drive>` in one cell on the same VM.
+4. Fabric the same way, in another session; it has no shards yet.
+5. Still do NOT run 6.5.
+
+**Branches, all local and none merged or pushed:**
+- Bench `mvtec-ad2-grid-v0.2.21`: the records of this grid.
+- Paper `descope-c1-c3-rewrite` (`c1f9ba3` on top of the 2026-10-19 rewrite): every anchor claim is
+  marked pre-v0.2.21, and protocol-sync has a v0.2.21 entry. No prose has changed. It still awaits
+  the author's review.
+
+**Already changed by v0.2.21 (provisional, 6 of 8):** Sheet Metal's detection went from chance
+(0.510) to 0.797. The paper's headline "five of eight unusable" therefore cannot carry over. See
+"PROVISIONAL 2026-10-26" below.
+
+**After the grid:**
+- Download the eight `<cat>.md` reports from Drive and compare each against its recorded table.
+  Commit them under `results/mvtec_ad2/patchcore_ref_v0.2.21/`.
+- The author applies the usable/unusable criterion.
+- Then the paper prose, plus the remaining items of the 2026-10-21 "After the grid" list below.
+
+## ▶ (superseded by the block above) session handoff of 2026-10-21 (written at the author's request)
 
 **Where things stand (master `bc7f660`, pushed):**
 - **PatchCore v0.2.21 gate PASSED: 98.22 ± 0.03** vs 99.0 (re-run 2026-10-21 after the
@@ -75,11 +116,14 @@ commit any vial.md written before 6.4b (no AU-PRO, or the defective verdict).
 
 **After the grid:**
 - Re-apply the pre-registered usable/unusable-anchor criterion (random baseline) by hand, as for M3.
+  **CORRECTED 2026-10-29 (review):** no written criterion existed; the author chose one on
+  2026-10-28 after seeing the v0.2.21 numbers ("DECIDED 2026-10-28"). It is post hoc, not pre-registered.
 - Paper repo, branch `descope-c1-c3-rewrite` (**not merged; awaiting the author's review**, title
   included; review findings a–e delivered): update with the v0.2.21 anchor numbers and a
   protocol-sync v0.2.21 entry; add C3 evidence (the export-path antialias mismatch; the
   shared-backend runner defect, ~60 → 98.22); bring in WinCLIP's gate report (tripwire).
-- Open question for the write-up: toothbrush is −8.31 under both configurations, so the
+- Open question for the write-up: toothbrush is −8.22 (old configuration, `_3seed.md`) and −8.31
+  (v0.2.21) — corrected 2026-10-28, this line said −8.31 for both — so the
   export-path fix is not its cause; five categories sit outside ±1.0.
 
 > **⚠️ SCOPE REDUCED — protocol v0.2.18 (spec 2026-10-01, written into the protocol 2026-10-03).**
@@ -117,6 +161,7 @@ commit any vial.md written before 6.4b (no AU-PRO, or the defective verdict).
 > superseded-configuration header line and are kept as evidence.
 > After the session, the pre-registered usable/unusable-anchor criterion (random baseline) must be
 > re-applied by hand to the new MVTec AD 2 grid, as it was for M3.
+> **CORRECTED 2026-10-29:** that criterion was never written down; see "DECIDED 2026-10-28" (post hoc).
 >
 > **▶ RAN 2026-10-20: the v0.2.21 gate came back at ~60 I-AUROC — a RUNNER DEFECT, confirmed
 > 2026-10-21: `run_mvtec_ad.py` reused one PatchCore backend across categories, so every category
@@ -407,6 +452,364 @@ the VM that runs 6.5 (minutes per seed). **DECIDED 2026-10-21 by the author: re-
 cell **6.4b** moves vial's shards aside to `shards_no_maps_2026-10-20` (VM and Drive, never
 deleted) and runs vial afresh; since `e9a6f89` the script also copies each category's report to
 Drive. Run it after the seven remaining categories, on any VM.
+
+## MEASURED 2026-10-25 — MVTec AD 2 sheet_metal under v0.2.21 (6.4), pasted from the Colab session
+
+**Run 2026-10-25 (commit `6f4b2a0`, one category per process).** Layout check OK: train regular=137,
+validation regular=19, test_public 19 per condition × 6 (overexposed, regular, shift_1–3,
+underexposed; sheet_metal has no shift_4), test_private 142, test_private_mixed 142. Seeds 0/1/2
+each finished and were copied to Drive (3 shards). The summary then hit the pixel-metric memory
+guard: `overexposed` pools 84,750,336 pixels, about 6.8 GB at peak, against the default
+`max_bytes=6.0 GB`, with 9.8 GB available. On the **same VM** (the maps present), the author re-ran
+`--summarise-only --max-bytes 7797030911` (the script's own 1.15× suggestion). Because
+`--summarise-only` never copies the report to Drive, it was copied by hand:
+`cp -v results/mvtec_ad2/patchcore_ref_v0.2.21/sheet_metal.md
+/content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/sheet_metal/` (confirmed by `cp -v`).
+
+Per-lighting table as pasted, mean ± std over seeds 0/1/2, each aggregated separately (protocol §6):
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.8222 ± 0.0509 | 0.2344 ± 0.0023 | 0.0811 ± 0.0010 |
+| regular | 0.8222 ± 0.0255 | 0.2433 ± 0.0069 | 0.0833 ± 0.0010 |
+| shift_1 | 0.7500 ± 0.0667 | 0.2081 ± 0.0012 | 0.0513 ± 0.0051 |
+| shift_2 | 0.7667 ± 0.0928 | 0.2057 ± 0.0022 | 0.0474 ± 0.0044 |
+| shift_3 | 0.7444 ± 0.0509 | 0.2209 ± 0.0010 | 0.0595 ± 0.0061 |
+| underexposed | 0.8778 ± 0.0481 | 0.2527 ± 0.0100 | 0.0853 ± 0.0017 |
+
+Not yet interpreted. AU-PRO is far below vial's (≈0.21–0.25 vs ≈0.90 at 0.30 FPR), and with 19
+images per condition the image-level stds are wide. Report on Drive:
+`MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/sheet_metal/sheet_metal.md`. It still has to be
+brought back and committed.
+
+## MEASURED 2026-10-25 — MVTec AD 2 fruit_jelly under v0.2.21 (6.4), pasted from the Colab session
+
+**Run 2026-10-25 (same VM as sheet_metal, commit `6f4b2a0`, one category per process).** Seeds
+0/1/2 each finished and were copied to Drive (3 shards; the coreset selection ran over 26,930
+patches against sheet_metal's 14,027). The layout-check lines and the console summary were not
+transcribed: the paste starts at `OK`. Whether the memory guard fired, and with which
+`--max-bytes`, was not stated. The report was copied to Drive by hand (`cp -v`:
+`results/mvtec_ad2/patchcore_ref_v0.2.21/fruit_jelly.md` ->
+`/content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/fruit_jelly/fruit_jelly.md`). The
+table below is from the report itself (`cat` on the VM; generated 2026-10-25 17:06 UTC;
+anomalib 2.6.0, torch 2.11.0+cu130). Four lighting conditions only:
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.8089 ± 0.0077 | 0.6371 ± 0.0021 | 0.3840 ± 0.0039 |
+| regular | 0.7600 ± 0.0133 | 0.6325 ± 0.0026 | 0.3709 ± 0.0034 |
+| shift_1 | 0.7600 ± 0.0231 | 0.6372 ± 0.0025 | 0.3833 ± 0.0041 |
+| underexposed | 0.7644 ± 0.0204 | 0.6284 ± 0.0026 | 0.3763 ± 0.0028 |
+
+Not yet interpreted. Report on Drive, still to be brought back and committed.
+
+## MEASURED 2026-10-25 — MVTec AD 2 wallplugs under v0.2.21 (6.4), pasted from the Colab session
+
+**Run 2026-10-25 (same VM as sheet_metal and fruit_jelly, commit `6f4b2a0`).** The layout-check
+lines were not transcribed; the paste starts at `OK`. Seeds 0/1/2 each finished and were copied to
+Drive (3 shards; coreset bar 30,002). The guard tripped: `overexposed` pools 125,337,600 pixels,
+about 10.0 GB at peak, against the default 6.0 GB, with **9.7 GB available**. The script printed ⚠️
+(the requirement is above free RAM). Following M3's precedent (Wall Plugs went through at 11 GB with
+~9 GB suggested), the author re-ran `--summarise-only --max-bytes 11531059200` on the same VM, and
+it completed. Per-lighting table as pasted, mean ± std over seeds 0/1/2:
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.4978 ± 0.0454 | 0.3674 ± 0.0118 | 0.1595 ± 0.0045 |
+| regular | 0.4956 ± 0.0379 | 0.3610 ± 0.0129 | 0.1577 ± 0.0031 |
+| shift_1 | 0.5578 ± 0.0582 | 0.4397 ± 0.0283 | 0.0963 ± 0.0282 |
+| shift_2 | 0.3422 ± 0.0139 | 0.2173 ± 0.0050 | 0.0243 ± 0.0019 |
+| shift_3 | 0.5267 ± 0.0371 | 0.3633 ± 0.0288 | 0.0904 ± 0.0073 |
+| underexposed | 0.4911 ± 0.0367 | 0.3573 ± 0.0132 | 0.1545 ± 0.0026 |
+
+Not yet interpreted. Image-level is at or below chance in every condition, as it was under the old
+configuration (`results/mvtec_ad2/patchcore_ref/wallplugs.md`: 0.3956–0.5000). The usable-anchor
+criterion is applied after the grid.
+
+**⚠️ The Drive copy of `wallplugs.md` is NOT confirmed.** The later notebook paste shows the `cp -v`
+cell failing with `cannot stat 'results/mvtec_ad2/patchcore_ref_v0.2.21/wallplugs.md'` and a
+`cat` of the same path failing with `No such file or directory`, while the summarise cell between
+them shows `wrote results/mvtec_ad2/patchcore_ref_v0.2.21/wallplugs.md`. The execution order of the
+three cells is not known from the paste. The table above is the console transcription. A report
+with AU-PRO can only be regenerated on the VM that holds wallplugs' maps.
+
+**RESOLVED 2026-10-25 (same VM):** the maps were still there (one directory per seed,
+`mvtec_ad2__patchcore_ref__70399e2f4175__wallplugs__seed{0,1,2}`). One cell ran
+`--summarise-only --max-bytes 11531059200 && cp -v`. The table came out **identical to four decimals**
+to the one above, and the copy was confirmed: `.../patchcore_ref_v0.2.21/wallplugs/wallplugs.md`
+(1876 bytes, 20:30). An `ls` of Drive then showed all five reports: can (19:21), fruit_jelly
+(17:11), sheet_metal (16:38), vial (20:02), wallplugs (20:30).
+
+## MEASURED 2026-10-25 — MVTec AD 2 can under v0.2.21 (6.4), pasted from the Colab session
+
+**Run 2026-10-25 (same VM as the three before, commit `6f4b2a0`).** Layout (pasted later): 1262
+images; train regular=412, validation regular=46, test_public 27 × 6 (overexposed, regular,
+shift_1–3, underexposed), test_private 321, test_private_mixed 321. Seeds 0/1/2 each finished and were copied to Drive (3 shards;
+coreset bar 42,187, about 4m43s of selection per seed). The memory guard did **not** trip, as
+predicted, and the script copied the report to Drive itself
+(`MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/can/can.md`). Per-lighting table as pasted,
+mean ± std over seeds 0/1/2:
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.4519 ± 0.0370 | 0.2841 ± 0.0018 | 0.0401 ± 0.0016 |
+| regular | 0.4519 ± 0.0285 | 0.2903 ± 0.0081 | 0.0372 ± 0.0014 |
+| shift_1 | 0.3704 ± 0.0463 | 0.2478 ± 0.0099 | 0.0045 ± 0.0047 |
+| shift_2 | 0.4444 ± 0.0147 | 0.1913 ± 0.0061 | 0.0021 ± 0.0024 |
+| shift_3 | 0.4759 ± 0.0085 | 0.1868 ± 0.0050 | 0.0000 ± 0.0000 |
+| underexposed | 0.5148 ± 0.0672 | 0.2205 ± 0.0048 | 0.0082 ± 0.0017 |
+
+Not yet interpreted. Image-level is below chance in five of six conditions, as it was under the old
+configuration (`results/mvtec_ad2/patchcore_ref/can.md`: 0.3259–0.4426). The usable-anchor criterion
+is applied after the grid.
+
+## MEASURED 2026-10-25 — vial re-fit under v0.2.21 (6.4b), pasted from the Colab session
+
+**Run 2026-10-25 (same VM as the four above, commit `6f4b2a0`).** Report generated 2026-10-25
+20:02 UTC (anomalib 2.6.0, torch 2.11.0+cu130). 6.4b's console output, pasted afterwards: the local
+`vial/shards` was absent (fresh VM); the Drive copy was moved to
+`MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/vial/shards_no_maps_2026-10-20`. Layout OK (train
+291, validation 41, test_public 20 × 7 conditions, test_private 276, test_private_mixed 276). Seeds
+0/1/2 were **fitted afresh** (coreset bar 29,797 each, about 2m19s), each copied to Drive (3
+shards). The script copied the report itself:
+`report saved to .../patchcore_ref_v0.2.21/vial/vial.md`.
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.8711 ± 0.0204 | 0.8763 ± 0.0034 | 0.6019 ± 0.0014 |
+| regular | 0.8800 ± 0.0353 | 0.9033 ± 0.0004 | 0.6067 ± 0.0013 |
+| shift_1 | 0.9378 ± 0.0154 | 0.9025 ± 0.0006 | 0.5992 ± 0.0013 |
+| shift_2 | 0.8800 ± 0.0231 | 0.9060 ± 0.0004 | 0.6086 ± 0.0009 |
+| shift_3 | 0.8667 ± 0.0231 | 0.9063 ± 0.0005 | 0.6102 ± 0.0015 |
+| shift_4 | 0.9289 ± 0.0077 | 0.9002 ± 0.0005 | 0.5866 ± 0.0006 |
+| underexposed | 0.8533 ± 0.0481 | 0.6479 ± 0.0077 | 0.3591 ± 0.0108 |
+
+**Identical to four decimals, pixel metrics included, to the 2026-10-20 console transcription**
+(first VM, commit `ee78196`; see "MEASURED — MVTec AD 2 vial under v0.2.21" above). The re-fit on a
+fresh VM, five days and two commits later, reproduces it exactly. This is the `vial.md` to commit,
+and the one written before 6.4b is not.
+
+## MEASURED 2026-10-25 — MVTec AD 2 rice under v0.2.21 (6.4), pasted from the Colab session
+
+**Run 2026-10-25 (same VM as the five above, commit `6f4b2a0`).** Before the run: `df -h /content`
+showed 37 GB available, and `free -g` showed 10 GB available of 12 GB, with no swap. Layout (pasted
+later): `rice.tar.gz` (6.30 GiB) extracted to `data/mvtec_ad2/rice`, 1034 images; train
+regular=313, validation regular=35, test_public 22 × 6 (overexposed, regular, shift_1–3,
+underexposed), test_private 277, test_private_mixed 277; `OK`. Seeds 0/1/2 each finished and were copied to
+Drive (3 shards; coreset bar 32,050, about 2m41s of selection per seed). The guard tripped:
+`overexposed` pools 110,297,088 pixels, about 8.8 GB at peak, against the default 6.0 GB, with
+**9.7 GB available**. The script printed ⚠️ and suggested `--max-bytes 10147332096`. The author re-ran
+`--summarise-only --max-bytes 12000000000` on the same VM (M3 precedent), and it completed with
+`wrote results/mvtec_ad2/patchcore_ref_v0.2.21/rice.md`. Per-lighting table as pasted, mean ± std
+over seeds 0/1/2:
+
+| lighting | i_auroc | au_pro_030 | au_pro_005 |
+|---|---|---|---|
+| overexposed | 0.4603 ± 0.0334 | 0.3861 ± 0.0062 | 0.1391 ± 0.0136 |
+| regular | 0.5429 ± 0.0190 | 0.4038 ± 0.0073 | 0.1423 ± 0.0128 |
+| shift_1 | 0.5460 ± 0.0306 | 0.4658 ± 0.0080 | 0.1364 ± 0.0117 |
+| shift_2 | 0.5524 ± 0.0330 | 0.4640 ± 0.0064 | 0.2379 ± 0.0071 |
+| shift_3 | 0.4984 ± 0.0291 | 0.4864 ± 0.0072 | 0.2502 ± 0.0083 |
+| underexposed | 0.6190 ± 0.0756 | 0.3928 ± 0.0092 | 0.1312 ± 0.0125 |
+
+Not yet interpreted. Image-level is near chance in every condition (0.46–0.62), as it was under the
+old configuration (`results/mvtec_ad2/patchcore_ref/rice.md`: 0.4381–0.5619). The usable-anchor
+criterion is applied after the grid.
+
+**The Drive copy of `rice.md` is not yet confirmed.** The paste ends at the `wrote` line and has no
+`cp -v` output.
+
+**⚠️ That VM is now gone** (the session ended during walnuts, below). If the `cp` was never run, the
+only report with AU-PRO for rice died with it. Drive then holds rice's 3 shards and no maps, and
+rice needs a re-fit like vial's 6.4b. First check in the next session:
+`ls -l /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/rice/`. If `rice.md` is there,
+compare it against the table above before trusting it.
+
+**RESOLVED 2026-10-26: the report survived.** The author pasted `rice.md` as rendered Markdown, and confirmed
+on 2026-10-26 that they read it from Drive, after the VM was gone. It was generated 2026-10-25 22:16 UTC at
+commit `6f4b2a0` (anomalib 2.6.0, torch 2.11.0+cu130), over seeds 0, 1, 2, with shards at
+`results/mvtec_ad2/patchcore_ref_v0.2.21/rice/shards`. Its caveats include the v0.2.21 antialiasing
+line and the pointer to the gate. Its table is **identical to four decimals, pixel metrics
+included**, to the console transcription above. This is the `rice.md` to commit. It does not
+document the `ls`/`cp` line itself, so download it from Drive when committing and compare it again.
+
+## INCOMPLETE 2026-10-26 — MVTec AD 2 walnuts under v0.2.21 (6.4): the Colab session ended mid-run
+
+**Same VM as the six above, commit `6f4b2a0`.** Layout OK: 1086 images; train regular=432,
+validation regular=48, test_public 25 × 6 (overexposed, regular, shift_1–3, underexposed),
+test_private 228, test_private_mixed 228. Seed 0 finished and was copied to Drive (1 shard;
+coreset bar 44,235, 5m07s of selection). Seed 1 finished the same way (2 shards; 44,235, 5m07s).
+Seed 2 had started (`[seed 3/3] walnuts at seed 2`) when **the Colab session ended**. That is the
+free tier's limit, not an error in the run. No summary and no report exist.
+
+**The two shards on Drive cannot be resumed.** Their anomaly maps stayed on the dead VM. The runner
+restores shards from Drive and skips the seeds it finds done (`restore_from_drive`,
+`scripts/run_mvtec_ad2.py`). So a plain 6.4 re-run would fit only seed 2 and produce a report whose
+seeds 0/1 have no pixel metrics. This is the same situation as vial on 2026-10-20.
+
+**Next session, before 6.4 walnuts:** set the Drive shards aside, as 6.4b did for vial. Move them;
+never delete:
+
+```
+!mv /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/walnuts/shards /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/walnuts/shards_no_maps_2026-10-26
+```
+
+**DONE 2026-10-28:** the move above ran, after mounting Drive; the first attempt failed only
+because Drive was not mounted yet. `ls -R` afterwards: `walnuts/` holds only
+`shards_no_maps_2026-10-26/` with `…__walnuts__seed0.parquet` and `…__walnuts__seed1.parquet`.
+
+**6.4 walnuts RAN 2026-10-28, commit `6f4b2a0`:** no restore message (the move worked); layout as
+above (1086 images); seeds 0, 1, 2 each fitted fresh, coreset bar 44,235 (5m09s, 5m09s, 5m10s),
+each saved to Drive (1, 2, 3 shards there). Then the guard tripped as expected: overexposed group
+125,337,600 pooled pixels, estimated 10.0 GB at 80 B/px against max_bytes 6.0 GB; 9.7 GB free
+reported. Summarise next with `--max-bytes 12000000000` on the same VM.
+
+**MEASURED 2026-10-28 — walnuts summary, same VM, commit `6f4b2a0`, `--summarise-only
+--max-bytes 12000000000`** (console output verbatim; it ended `wrote
+results/mvtec_ad2/patchcore_ref_v0.2.21/walnuts.md`). The summary paste showed no `cp -v` line; **the Drive copy was then confirmed by a separate
+`cp -v`** (`-> .../patchcore_ref_v0.2.21/walnuts/walnuts.md`, 1872 bytes, 12:53; `ls -l` shows
+`shards/`, `shards_no_maps_2026-10-26/`, `walnuts.md`).
+
+```
+Per lighting condition — mean ± std over 3 seed(s), each aggregated separately (protocol §6):
+  overexposed    i_auroc 0.8533 ± 0.0200 | au_pro_030 0.7806 ± 0.0005 | au_pro_005 0.4700 ± 0.0077
+  regular        i_auroc 0.8556 ± 0.0168 | au_pro_030 0.7819 ± 0.0011 | au_pro_005 0.4695 ± 0.0086
+  shift_1        i_auroc 0.9356 ± 0.0168 | au_pro_030 0.6585 ± 0.0016 | au_pro_005 0.3302 ± 0.0046
+  shift_2        i_auroc 0.8244 ± 0.0473 | au_pro_030 0.7756 ± 0.0021 | au_pro_005 0.4492 ± 0.0108
+  shift_3        i_auroc 0.8778 ± 0.0102 | au_pro_030 0.6980 ± 0.0040 | au_pro_005 0.3478 ± 0.0045
+  underexposed   i_auroc 0.8200 ± 0.0306 | au_pro_030 0.7821 ± 0.0027 | au_pro_005 0.4667 ± 0.0077
+```
+
+Then run 6.4 with `CATEGORY = "walnuts"`, so all three seeds are fitted fresh. Expect the guard to
+trip. Summarise on the same VM with `--max-bytes 12000000000`, then `cp` the report by hand. Budget:
+about 5 min of coreset per seed, plus scoring, plus about 10 min to extract and summarise. Start
+walnuts at the beginning of a session, not after another category. Fabric is in the same position.
+
+## RAN 2026-10-28 — MVTec AD 2 fabric under v0.2.21 (6.4), fresh session
+
+**Fresh VM (`Mounted at /content/drive`), commit `6f4b2a0`.** Extracted `fabric.tar.gz` (10.09 GiB).
+Layout OK: 1214 images; train regular=387, validation regular=43, test_public 26 × 6 (overexposed,
+regular, shift_1–3, underexposed), test_private 314, test_private_mixed 314. No restore message.
+Seeds 0, 1, 2 each fitted fresh, coreset bar 39,627 (4m12s, 4m13s, 4m13s), each saved to Drive
+(1, 2, 3 shards there). The guard then tripped as expected: overexposed group 130,351,104 pooled
+pixels, estimated 10.4 GB at 80 B/px against max_bytes 6.0 GB; 9.6 GB free reported. Summarise
+next with `--max-bytes 12000000000` on the same VM (about 8.6 GB at the measured ~66 B/px).
+
+**MEASURED 2026-10-28 — fabric summary, same VM, commit `6f4b2a0`, `--summarise-only
+--max-bytes 12000000000`** (console output verbatim; it ended `wrote
+results/mvtec_ad2/patchcore_ref_v0.2.21/fabric.md`). **Drive copy confirmed by `cp -v`:**
+`'results/mvtec_ad2/patchcore_ref_v0.2.21/fabric.md' ->
+'/content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21/fabric/fabric.md'`.
+
+```
+Per lighting condition — mean ± std over 3 seed(s), each aggregated separately (protocol §6):
+  overexposed    i_auroc 0.7374 ± 0.0273 | au_pro_030 0.2194 ± 0.0380 | au_pro_005 0.0074 ± 0.0012
+  regular        i_auroc 0.7394 ± 0.0219 | au_pro_030 0.2161 ± 0.0458 | au_pro_005 0.0063 ± 0.0008
+  shift_1        i_auroc 0.7313 ± 0.0229 | au_pro_030 0.2714 ± 0.0444 | au_pro_005 0.0060 ± 0.0001
+  shift_2        i_auroc 0.6707 ± 0.0394 | au_pro_030 0.2975 ± 0.0218 | au_pro_005 0.0940 ± 0.0101
+  shift_3        i_auroc 0.7152 ± 0.0061 | au_pro_030 0.3114 ± 0.0334 | au_pro_005 0.0484 ± 0.0183
+  underexposed   i_auroc 0.7414 ± 0.0286 | au_pro_030 0.2065 ± 0.0437 | au_pro_005 0.0057 ± 0.0003
+```
+
+**The v0.2.21 grid is complete, 8 of 8, each report on Drive with AU-PRO.**
+
+## PROVISIONAL 2026-10-26 — six of eight under v0.2.21 against the M3 grid (walnuts, fabric unrun)
+
+This is arithmetic on the six tables recorded above, not a new measurement. Each figure is the
+unweighted mean over a category's lighting conditions, the way the M3 grid ("M3 IS COMPLETE",
+below) was built. Pixel metrics are also shown as multiples of the measured random baselines,
+0.1487 and 0.0249. Δ is v0.2.21 minus M3.
+
+| category | i_auroc (Δ) | per-condition i_auroc | au_pro_030 ×rnd (Δ) | au_pro_005 ×rnd (Δ) | M3 anchor |
+|---|---|---|---|---|---|
+| **Fabric (added 2026-10-28)** | **0.723 (+0.161)** | 0.671–0.741 | 0.2537 1.71× (+0.108) | 0.0280 1.12× (+0.020) | no |
+| Walnuts (added 2026-10-28) | 0.861 (+0.037) | 0.820–0.936 | 0.7461 5.02× (−0.013) | 0.4222 16.96× (−0.026) | usable |
+| Vial | 0.888 (−0.022) | 0.853–0.938 | 0.8632 5.81× (+0.022) | 0.5675 22.79× (−0.004) | usable |
+| Fruit Jelly | 0.773 (−0.010) | 0.760–0.809 | 0.6338 4.26× (−0.006) | 0.3786 15.21× (−0.008) | usable |
+| **Sheet Metal** | **0.797 (+0.287)** | **0.744–0.878** | 0.2275 1.53× (−0.025) | 0.0680 2.73× (+0.000) | no |
+| Rice | 0.537 (+0.018) | 0.460–0.619 | 0.4331 2.91× (+0.080) | 0.1728 6.94× (+0.003) | no |
+| Wall Plugs | 0.485 (+0.038) | 0.342–0.558 | 0.3510 2.36× (−0.068) | 0.1138 4.57× (−0.005) | no |
+| Can | 0.452 (+0.064) | 0.370–0.515 | 0.2368 1.59× (−0.062) | 0.0153 0.62× (+0.013) | no |
+
+**Sheet Metal's detection is no longer at chance.** It is 0.74–0.88 in all six conditions, where M3
+had 0.46–0.56. Its localisation has not moved (1.53× and 2.73× random). **This is not evidence for
+the 2026-09-20 aspect-ratio mechanism.** v0.2.21 leaves the square resize as it was. What it removes
+is the train/test mismatch: the bank was antialiased and the queries were aliased. Sheet Metal does
+have the largest downsampling factor in the dataset, 4224→256, about 16.5× on its long axis. The
+2448-wide categories are at about 9.6×, and Wall Plugs among them barely moved. So downsampling
+factor alone does not order the effect. The other five categories move by less than 0.07 I-AUROC. Can's AU-PRO@0.05 is still below random, though less so (0.62×, against 0.10×).
+
+**Nothing here applies the usable/unusable criterion.** That waits for the full grid and is the
+author's step. But Sheet Metal no longer fits the M3 description "at chance on detection AND
+localisation". The paper's headline ("five of eight unusable", abstract and §1 C1) and its
+"four distinct failure forms" therefore cannot be carried over to v0.2.21 unchanged.
+
+## DECIDED 2026-10-28 by the author: reading A (detection only) — the v0.2.21 anchor is usable on 5 of 8
+
+**Usable: Vial, Walnuts, Sheet Metal, Fruit Jelly, Fabric. Unusable: Rice, Wall Plugs, Can.** The
+author chose A on 2026-10-28, after seeing the v0.2.21 numbers; the paper must state that the
+criterion was made explicit post hoc (no numeric criterion was ever written), and report
+localisation ×random alongside as before. The preparation follows unchanged.
+
+**Derived 2026-10-28 for the paper draft (arithmetic on the recorded means, scipy `spearmanr`):**
+- Detection–localisation rank agreement, I-AUROC vs AU-PRO@0.05 over the eight: **ρ = 0.738**
+  (M3: 0.833, re-computed the same way to confirm it was this pair; vs AU-PRO@0.30 it is 0.571,
+  M3 0.643).
+- Orderings. Detection: Vial, Walnuts, Sheet Metal, Fruit Jelly, Fabric, Rice, Wall Plugs, Can.
+  AU-PRO@0.05: Vial, Walnuts, Fruit Jelly, Rice, Wall Plugs, Sheet Metal, Fabric, Can. Top two and
+  bottom one agree; Sheet Metal is 3rd by detection and 6th by localisation, Fabric 5th and 7th;
+  Rice and Wall Plugs the reverse (6th/4th, 7th/5th). Both dissociation directions still occur.
+- The three unusable categories fail in two forms, not four: Rice and Wall Plugs at chance on
+  detection with localisation above random (2.91×/6.94×, 2.36×/4.57×); Can below chance on
+  detection (0.452) and below random on AU-PRO@0.05 (0.62×).
+- Geometry: the four 2448×2048 categories now split 2–2 (Walnuts, Fabric usable; Rice, Wall Plugs
+  not), so frame size still does not separate usable from unusable.
+
+**Derived 2026-10-28 for §6.A/§6.B (arithmetic on the eight committed v0.2.21 reports):**
+- `regular` (the only training condition) is the best condition for detection on **none** of the
+  eight categories; it is best on 1 of 24 category×metric pairs (Can, AU-PRO@0.3). Not significant
+  on its own (a uniform chance of being best gives roughly a one-in-five chance of never), so read
+  as "no training-condition advantage", not as a penalty.
+- Intensity (regular/over/under) vs direction (shift_*) at AU-PRO@0.05: intensity better on
+  Walnuts, Sheet Metal, Wall Plugs, Can; shifts better on Vial, Fruit Jelly (by 0.006), Fabric, Rice.
+  **4–4.** The M3 verdict (dead) stands.
+- Vial `underexposed`: worst on all three metrics, and its localisation collapses (AU-PRO@0.3
+  0.648 vs 0.876–0.906 in the other six; @0.05 0.359 vs 0.587–0.610) while detection is 0.853
+  against a 0.853–0.938 range.
+- Wall Plugs `shift_2`: I-AUROC 0.342, AU-PRO@0.05 0.0243 (0.98× random).
+- **Fabric AU-PRO@0.05 is below random in 4 of 6 conditions** (overexposed 0.30×, regular 0.25×,
+  shift_1 0.24×, underexposed 0.23×); shift_2 3.78×, shift_3 1.94×. Its 1.12× mean is carried by
+  two conditions. Detection meanwhile is 0.671–0.741.
+- Walnuts `shift_1`: best detection (0.936) and worst localisation (AU-PRO@0.3 0.659, @0.05 0.330),
+  as under M3.
+
+### (as prepared, before the decision)
+
+**No written, numeric criterion was found.** `docs/protocol.md` contains no "usable", "chance" or
+"random baseline" text; the specs and handoffs call it "pre-registered" but never state it. The only
+operative wording is the paper's abstract (descope branch): the anchor gives "a usable detection
+ceiling" on three categories, and "on the other five its image-level detection is near or below
+chance". That is a **detection** reading, with localisation (×random) reported alongside, not a
+second gate. M3 needed no threshold: usable 0.783–0.910, unusable 0.388–0.562, a 0.22 gap.
+
+Under v0.2.21 that gap closes. Two readings, both arithmetic on the recorded tables:
+
+| category | i_auroc | min condition | au_pro_030 ×rnd | au_pro_005 ×rnd | A: detection only | B: detection + localisation |
+|---|---|---|---|---|---|---|
+| Vial | 0.888 | 0.853 | 5.81× | 22.79× | usable | usable |
+| Walnuts | 0.861 | 0.820 | 5.02× | 16.96× | usable | usable |
+| Sheet Metal | 0.797 | 0.744 | 1.53× | 2.73× | **usable** | no |
+| Fruit Jelly | 0.773 | 0.760 | 4.26× | 15.21× | usable | usable |
+| Fabric | 0.723 | 0.671 | 1.71× | 1.12× | **usable** | no |
+| Rice | 0.537 | 0.460 | 2.91× | 6.94× | no | no |
+| Wall Plugs | 0.485 | 0.342 | 2.36× | 4.57× | no | no |
+| Can | 0.452 | 0.370 | 1.59× | 0.62× | no | no |
+
+A gives **5–3**, B keeps **3–5**. Under A the gap is between Fabric (0.723) and Rice (0.537), as
+clean as M3's. B has no threshold that both the record supports and that orders consistently: Rice
+and Wall Plugs localise better than Sheet Metal and Fabric, so a localisation bar that excludes the
+latter two would admit nothing new and would have to be invented now, after the data. **Either way
+the reading is chosen after seeing v0.2.21, and the paper must say so.**
 
 ## The PatchCore Colab sessions (2026-08-21 and 2026-08-26) — what they settled
 
@@ -1882,6 +2285,51 @@ changes.
 **One arithmetic observation, explicitly NOT a conclusion:** screw's -11.13 is ~-0.74 of the
 -1.43 mean shortfall, the same shape as PatchCore's toothbrush in its first gate run. "Without
 screw it would pass" is a post-hoc reading §7 forbids acting on.
+
+### RAN 2026-10-29: WinCLIP's MVTec AD gate re-run — FAIL 90.37 again, to the hundredth; report committed
+
+Notebook 0.1 → 0.2 → restart → 0.3 → 4.1 → 4.2 → 4.3 → 4.4, Colab T4, commit `6f4b2a0`
+(`origin/master`), anomalib 2.6.0, torch 2.11.0+cu130, seed 0, 15 categories, 4.2 wall time 37.9
+min. Report `results/reproduction/winclip_mvtec_ad.md`, written verbatim from the 4.4 print as
+pasted by the author; Drive copy confirmed by 4.4: `copied to /content/drive/MyDrive/reproduction/
+winclip -> ['mvtec_ad_shards', 'winclip_mvtec_ad.md']`.
+
+- **Verdict: FAIL, 90.37 against 91.8 (−1.43)**, and the same seven categories outside ±1.0 with
+  the same deltas as 2026-10-03 (cable −1.55, capsule −4.61, hazelnut −1.15, pill +2.11, screw
+  −11.13, toothbrush −1.94, wood −1.77). A reproducibility check across 26 days, a fresh VM, and
+  the per-category runner of `e9146c8`.
+- **Checked against the config:** the fifteen published values equal `configs/reproduction/
+  winclip.yaml` `per_category` (Table 10, K=0); every delta is measured − published; the measured
+  mean is 90.37.
+- **Provenance defect in the report, not in the scores: `resize_antialias: None`.** `WinClipRef`
+  did not pass the backend's declaration on (PatchCoreRef does), so `method_meta` read None. The
+  run did antialias: `WinClipBackend.__init__` calls `use_antialiased_forward`, which raises unless
+  the pre-processor's Resize has `antialias=True`, and cell 1.1 of the same session printed
+  `Resize(size=[240, 240], BICUBIC, antialias=True)`. Fixed at the adapter (two tests) on
+  2026-10-29; the committed report and the Drive shards keep `None` as generated. Note the fix
+  changes WinCLIP's configuration hash, so a later run's shards must not be pooled with these.
+- `preprocess: None` is expected: that option exists only for PatchCore.
+- **Cell 0.3 of the same session (pasted 2026-10-29):** anomalib 2.6.0, open-clip-torch 2.24.0,
+  torch 2.11.0+cu130, CUDA available — the same three as `configs/methods/winclip.yaml` pins and
+  the 2026-10-03 run recorded, so the environment did not move between the two runs.
+
+The tripwire in the paper (abstract, §5, §8: the FAIL may stand only once this report is
+committed) is now satisfied.
+
+### CHECKED 2026-10-29: where the WinCLIP gate evidence is, and whether e9146c8 touches it
+
+- **Nothing of the run is in the repo** (`results/reproduction/winclip/` holds only `visa/`), and by
+  the record above cell 4.4 — the only cell that copies to `MyDrive/reproduction/winclip/` — never
+  ran; 4.2/4.3 write to the VM's local `results/`. Drive itself was not inspected from here (no
+  Drive access); expected empty. To be confirmed by the author.
+- **The shared-backend defect (`e9146c8`, 2026-10-21) does not reach the 90.37.** It was a no-op
+  second `fit()`; WinCLIP is zero-shot and never fits, and `WinClipBackend._use_category` rebuilds
+  the text embeddings on every change of category and raises unless `class_name` and the
+  embeddings match it. Read from the code, not measured.
+- **The backend has not changed since the run's `6f18419`** except for moving
+  `use_antialiased_forward` into a shared helper with the same checks (diff read 2026-10-29). A
+  re-run of 4.1–4.4 at HEAD is therefore the same configuration, and since WinCLIP is
+  bit-identical across runs (A.4) it must give 90.37 exactly; any other number is itself a finding.
 
 ### What was pre-registered for exactly this case
 
