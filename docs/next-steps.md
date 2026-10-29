@@ -2286,6 +2286,37 @@ changes.
 -1.43 mean shortfall, the same shape as PatchCore's toothbrush in its first gate run. "Without
 screw it would pass" is a post-hoc reading §7 forbids acting on.
 
+### MEASURED 2026-10-29: AU-PRO grid against exact on a real category -- review #24 closed
+
+Notebook 7.1, Colab T4, commit `44ffe40`, Sheet Metal, seed 0, its own root
+`results/au_pro_check/sheet_metal`, `--no-save` (no registered result or Drive copy touched).
+Pasted by the author. 137 train images (coreset bar 14027 -> 14028 rows = floor(137 x 102.4)),
+six conditions of 19 test images. The runner's own summary tripped the memory guard
+(6.8 GB needed against 6.0 GB), as expected and harmless; the check ran after it.
+
+| lighting | limit | grid | exact | grid - exact |
+|---|---|---|---|---|
+| overexposed | 0.3 | 0.236869 | 0.236883 | -1.43e-05 |
+| overexposed | 0.05 | 0.081340 | 0.081338 | +2.52e-06 |
+| regular | 0.3 | 0.250969 | 0.250981 | -1.21e-05 |
+| regular | 0.05 | 0.082775 | 0.082780 | -4.45e-06 |
+| shift_1 | 0.3 | 0.208322 | 0.208322 | +4.65e-08 |
+| shift_1 | 0.05 | 0.045443 | 0.045442 | +1.41e-06 |
+| shift_2 | 0.3 | 0.207589 | 0.207607 | -1.80e-05 |
+| shift_2 | 0.05 | 0.042517 | 0.042515 | +2.28e-06 |
+| shift_3 | 0.3 | 0.219860 | 0.219889 | -2.92e-05 |
+| shift_3 | 0.05 | 0.052829 | 0.052829 | -2.78e-07 |
+| underexposed | 0.3 | 0.264208 | 0.264245 | -3.69e-05 |
+| underexposed | 0.05 | 0.083920 | 0.083932 | -1.17e-05 |
+
+**max |grid - exact| = 3.69e-05; the value at three decimals differs in 0 of 12.** Ten times
+smaller than on the synthetic maps (-3.5e-4), and mostly downward at 0.3, as there. The seed-0
+grid values sit within about 1.2 seed-std of the committed three-seed means (e.g. underexposed
+0.2642 against 0.2527 +- 0.0100), consistent with the same configuration. Scope: one category,
+one seed; Sheet Metal has the most pixels per image of the eight (4224x1056), and the grid's
+error shrinks with pixel count, so the other seven are not expected to be worse, but are not
+measured.
+
 ### DONE 2026-10-29: the review's code items #21-#26 (branch `pre-m4-hardening`)
 
 None moves a reported number. Full suite 747 passed, 2 skipped; the new CPU integration test
