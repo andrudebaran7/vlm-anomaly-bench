@@ -7,8 +7,7 @@ the 2025 benchmark on which no zero-shot or VLM-based method appears among the p
 or the official leaderboard. It reports instead why that comparison could not be made as planned:
 the full-shot PatchCore anchor is a usable detection ceiling on only five of the eight categories,
 and the one zero-shot method carried to its reproduction check, WinCLIP, did not pass it. Protocol,
-code and every reported number are here; the companion paper is
-[vlm-anomaly-paper](https://github.com/andrudebaran7/vlm-anomaly-paper).
+code and every reported number are here.
 
 **Status (2026-10-29):** protocol at v0.2.22 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
 public-split grid complete for the anchor; private split and evaluation-server submission not run.
