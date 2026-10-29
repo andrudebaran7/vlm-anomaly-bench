@@ -2309,6 +2309,9 @@ winclip -> ['mvtec_ad_shards', 'winclip_mvtec_ad.md']`.
   2026-10-29; the committed report and the Drive shards keep `None` as generated. Note the fix
   changes WinCLIP's configuration hash, so a later run's shards must not be pooled with these.
 - `preprocess: None` is expected: that option exists only for PatchCore.
+- **Cell 0.3 of the same session (pasted 2026-10-29):** anomalib 2.6.0, open-clip-torch 2.24.0,
+  torch 2.11.0+cu130, CUDA available — the same three as `configs/methods/winclip.yaml` pins and
+  the 2026-10-03 run recorded, so the environment did not move between the two runs.
 
 The tripwire in the paper (abstract, §5, §8: the FAIL may stand only once this report is
 committed) is now satisfied.
