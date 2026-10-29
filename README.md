@@ -103,7 +103,8 @@ results/    committed reports; shards and anomaly maps stay on Drive
 
 ## Author
 
-**Sergio Duarte** — Machine Vision & AI Engineer (MSc, University of Luxembourg).
+**Sergio Duarte** — Independent Researcher, Luxembourg · saduartep@gmail.com ·
+ORCID [0009-0009-7079-0160](https://orcid.org/0009-0009-7079-0160).
 Companion to the survey *Post-Saturation Industrial Visual Anomaly Detection: A Cross-Vertical
 Comparative Survey (2020–2026)* (Zenodo, 2026, [doi:10.5281/zenodo.20649845](https://doi.org/10.5281/zenodo.20649845)).
 
