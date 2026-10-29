@@ -78,8 +78,9 @@ python -m venv .venv && .venv/bin/pip install -r requirements.txt && .venv/bin/p
 ```
 
 GPU runs were made on Google Colab (Tesla T4) with anomalib 2.6.0 and torch 2.11.0+cu130, driven
-by the notebooks in [`notebooks/`](notebooks/). The notebooks pin anomalib; torch is the build
-Colab ships, and `requirements.txt` pins neither. Each report records the commit, seed, GPU and library versions that produced it.
+by the notebooks in [`notebooks/`](notebooks/). Those versions are pinned in
+[`requirements-gpu.txt`](requirements-gpu.txt) (also `pip install -e .[gpu]`);
+`requirements.txt` is the CPU core the tests need. Each report records the commit, seed, GPU and library versions that produced it.
 
 - PatchCore anchor: `notebooks/patchcore_colab.ipynb`, phase 6, which runs
   `scripts/run_mvtec_ad2.py --category <c>` per category.

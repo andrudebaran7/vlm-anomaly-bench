@@ -1,15 +1,11 @@
-torch>=2.2
-torchvision
-open_clip_torch
-transformers>=4.44
-anomalib>=1.1        # PatchCore anchor + some loaders
-scikit-learn
-scikit-image
-numpy
-pandas
-pyarrow
-pyyaml
-pillow
-tqdm
-matplotlib
-pytest
+# Core: everything the test suite and the CPU-side pipeline (metrics, loaders, runner,
+# aggregation, threshold rules, tables) import. No torch, no anomalib -- those are in
+# requirements-gpu.txt, pinned to the versions the reported numbers were produced with.
+numpy>=2.0
+scipy>=1.11
+scikit-learn>=1.4
+pandas>=2.1
+pyarrow>=14
+pillow>=10
+pyyaml>=6
+pytest>=8

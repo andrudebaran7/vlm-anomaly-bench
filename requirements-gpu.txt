@@ -1,0 +1,12 @@
+# The method backends, pinned to what produced every reported number (review #25, 2026-10-29).
+# Recorded in configs/methods/{patchcore_ref,winclip}.yaml and in each report's provenance:
+# anomalib 2.6.0, open-clip-torch 2.24.0 (what anomalib[clip]'s range resolved to), torch 2.11.0
+# (Colab's build was 2.11.0+cu130 on a Tesla T4). The notebooks install these on Colab; CI's
+# integration job installs them as CPU wheels:
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0 torchvision
+#   pip install -r requirements-gpu.txt
+# torchvision, lightning and timm are left to anomalib's own resolution and are not pinned here:
+# no run recorded them.
+torch==2.11.0
+anomalib[clip]==2.6.0
+open-clip-torch==2.24.0
