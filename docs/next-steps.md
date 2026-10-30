@@ -58,6 +58,16 @@ locally in either repo.
   (only Sheet Metal measured, max |grid − exact| 3.69e-5).
 - Still never run notebook cell 6.5.
 
+**DECIDED 2026-10-30 — new thesis and title (the author chose option A).** The tenth literature pass
+(paper `docs/verified-literature-facts.md`) broke the old thesis: VAND 4.0 (arXiv:2610.04392) ran an
+official zero-shot track on MVTec AD 2, the IJCV dataset paper has a GPT-4o-mini result on Fabric
+TEST_pub, and IEEE Access 10.1109/ACCESS.2026.3735579 already reports a PatchCore-style baseline on
+TEST_pub for all eight categories (without any reproduction gate). New thesis: **a reproduction
+gate that passes on MVTec AD (98.02 → 98.22) does not certify the pipeline on MVTec AD 2 — the
+antialias fix moves Sheet Metal 0.510 → 0.797 and Fabric 0.562 → 0.723.** Zero-shot becomes
+motivation and discussion. New title: "What a Passing Reproduction Check Does Not Certify: A Gated
+PatchCore Reference on MVTec AD 2". Drop "pre-registered" and "ceiling" from the title.
+
 **UPDATE 2026-10-28: GRID COMPLETE, 8 of 8** (walnuts and fabric run 2026-10-28, both reports on
 Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 here are done.
 **Reports committed 2026-10-28** under `results/mvtec_ad2/patchcore_ref_v0.2.21/` (downloaded from
