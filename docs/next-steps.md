@@ -58,6 +58,42 @@ locally in either repo.
   (only Sheet Metal measured, max |grid − exact| 3.69e-5).
 - Still never run notebook cell 6.5.
 
+**DECIDED 2026-10-30 — new thesis and title (the author chose option A).** The tenth literature pass
+(paper `docs/verified-literature-facts.md`) broke the old thesis: VAND 4.0 (arXiv:2610.04392) ran an
+official zero-shot track on MVTec AD 2, the IJCV dataset paper has a GPT-4o-mini result on Fabric
+TEST_pub, and IEEE Access 10.1109/ACCESS.2026.3735579 already reports a PatchCore-style baseline on
+TEST_pub for all eight categories (without any reproduction gate). New thesis: **a reproduction
+gate that passes on MVTec AD (98.02 → 98.22) does not certify the pipeline on MVTec AD 2 — the
+antialias fix moves Sheet Metal 0.510 → 0.797 and Fabric 0.562 → 0.723.** Zero-shot becomes
+motivation and discussion. New title: "What a Passing Reproduction Check Does Not Certify: A Gated
+PatchCore Reference on MVTec AD 2". Drop "pre-registered" and "ceiling" from the title.
+
+**CHECKED 2026-10-30 — is the before/after-antialias grid a clean ablation? Not yet.** What exists:
+- All 8 pre-v0.2.21 reports are committed (`results/mvtec_ad2/patchcore_ref/`, runs 2026-09-21 to
+  2026-10-01, seeds 0/1/2, `preprocess=anomalib`, `test_public`, same lighting conditions as
+  v0.2.21). Vial's per-condition table has 2 decimals only and its commit is a range; its category
+  means (0.910 / 0.8414 / 0.5714) are in "M3 IS COMPLETE". The other seven have 4 decimals.
+- Both gates are committed: old 98.02 ± 0.07 (`patchcore_mvtec_ad_3seed.md`, commit `45462ea`) and
+  v0.2.21 98.22 ± 0.03 (`patchcore_mvtec_ad_v0.2.21.md`).
+- Code: `git diff 45462ea 6f4b2a0` touches no file under `src/vlmab/metrics`, `eval/aggregate.py` or
+  `datasets`; in the PatchCore backend the only scoring change is `use_antialiased_forward` (plus
+  the `classic` refusal and the second-fit guard, neither on the anomalib path; old runs already
+  built a fresh backend per seed). `src/vlmab` is unchanged between `45462ea` and `0fd705a`.
+- **CONFOUND:** every old number ran on Colab torch 2.11.0+**cu128**; every v0.2.21 number on
+  **cu130** ("Colab's torch build has moved", 2026-10-02). Old reports do not stamp the build (it
+  is known from the pin and the date). So the before/after differs in two things — the antialias
+  routing and the CUDA build — and **no run separates them on MVTec AD 2**. The only isolating
+  evidence is probe stage 15 (2026-10-21, cu130): one non-square image, train path 32.635822 vs
+  antialias-off copy 50.480389 — a mechanism, not an effect size. Same confound for the gate's
+  98.02 → 98.22.
+- **Consequence:** the paper may not attribute Sheet Metal 0.510 → 0.797 or Fabric 0.562 → 0.723
+  to antialiasing alone. A CUDA build is expected to move low-order bits only, but that is an
+  expectation, never measured here.
+- **Fix (the review's "experiment A"):** on one cu130 VM, score the same category with the forward
+  path antialias-off and antialias-on, same seeds — needs a diagnostic-only switch, since v0.2.21
+  hard-wires antialias on. Sheet Metal is the cheap case (~30 s per seed fit); Fabric is
+  2448×2048 and needs its own session. Not done; the author decides.
+
 **UPDATE 2026-10-28: GRID COMPLETE, 8 of 8** (walnuts and fabric run 2026-10-28, both reports on
 Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 here are done.
 **Reports committed 2026-10-28** under `results/mvtec_ad2/patchcore_ref_v0.2.21/` (downloaded from
