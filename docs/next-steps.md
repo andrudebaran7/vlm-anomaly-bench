@@ -68,7 +68,7 @@ antialias fix moves Sheet Metal 0.510 → 0.797 and Fabric 0.562 → 0.723.** Ze
 motivation and discussion. New title: "What a Passing Reproduction Check Does Not Certify: A Gated
 PatchCore Reference on MVTec AD 2". Drop "pre-registered" and "ceiling" from the title.
 
-**CHECKED 2026-10-30 — is the before/after-antialias grid a clean ablation? Not yet.** What exists:
+**CHECKED 2026-10-30 — is the before/after-antialias grid a clean ablation? Sheet Metal: yes (see RESULT below); the rest: not yet.** What exists:
 - All 8 pre-v0.2.21 reports are committed (`results/mvtec_ad2/patchcore_ref/`, runs 2026-09-21 to
   2026-10-01, seeds 0/1/2, `preprocess=anomalib`, `test_public`, same lighting conditions as
   v0.2.21). Vial's per-condition table has 2 decimals only and its commit is a range; its category
@@ -93,6 +93,27 @@ PatchCore Reference on MVTec AD 2". Drop "pre-registered" and "ceiling" from the
   path antialias-off and antialias-on, same seeds — needs a diagnostic-only switch, since v0.2.21
   hard-wires antialias on. Sheet Metal is the cheap case (~30 s per seed fit); Fabric is
   2448×2048 and needs its own session. Not done; the author decides.
+
+**RESULT 2026-10-30 — experiment A on Sheet Metal: the build moved nothing; the before/after is
+the resize alone.** One Colab VM, torch 2.11.0+**cu130**, bench commit `536c366`, seeds 0/1/2,
+`scripts/antialias_ablation.py --category sheet_metal --max-bytes 12000000000` (notebook cell 8.1),
+return code 0. Output pasted by the author in session.
+- `aliased` on cu130 vs the committed pre-v0.2.21 report (cu128,
+  `results/mvtec_ad2/patchcore_ref/sheet_metal.md`): **18 of 18 cells equal** at the report's 4
+  decimals (I-AUROC, AU-PRO@0.30, AU-PRO@0.05 × 6 conditions). So cu128 → cu130 changed no
+  reported digit on Sheet Metal.
+- `antialiased` on the same VM vs the committed v0.2.21 report: **18 of 18 equal**. This VM
+  reproduces the reported anchor.
+- I-AUROC seed mean, aliased → antialiased (same VM): overexposed 0.5111 → 0.8222 (+0.3111),
+  regular 0.5500 → 0.8222 (+0.2722), shift_1 0.4611 → 0.7500 (+0.2889), shift_2 0.5611 → 0.7667
+  (+0.2056), shift_3 0.4889 → 0.7444 (+0.2556), underexposed 0.4889 → 0.8778 (+0.3889); **mean
+  0.5102 → 0.7972 (+0.2870)**.
+- **What the paper may now say:** on Sheet Metal, the 0.510 → 0.797 change is attributable to the
+  forward resize's antialiasing alone (measured with the build held fixed). Diagnostic, post hoc,
+  protocol v0.2.23 exception. **Not shown:** Fabric 0.562 → 0.723 and the gate's 98.02 → 98.22
+  stay confounded with the build until run the same way (Fabric needs its own session).
+- Shards are on the Colab VM only (`results/antialias_ablation/`, not committed, not on Drive);
+  the comparison above is the record.
 
 **UPDATE 2026-10-28: GRID COMPLETE, 8 of 8** (walnuts and fabric run 2026-10-28, both reports on
 Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 here are done.
