@@ -207,6 +207,10 @@ to substitute.
   the label `patchcore_ref_v0.2.21`. `preprocess="classic"` is refused: its pipeline cannot be
   routed to a matching transform here, and its 2026-09-17 result measured a mismatched pipeline.
   Hyperparameters are unchanged. Old numbers are kept as evidence, never overwritten.
+  **Diagnostic exception (v0.2.23):** the backend's `diagnostic_aliased_forward` switch restores
+  the superseded antialias-off forward for experiment A only (`scripts/antialias_ablation.py`). No
+  registered runner can pass it, its shards record `resize_antialias: False` under their own
+  root, and no number it produces is a result of the anchor.
 
 - **Full-shot anchors.** A full-shot method (the PatchCore anchor) builds a per-category memory
   bank from that category's defect-free `train` split before scoring its test images. It declares
@@ -693,3 +697,10 @@ pre-processing that produced them.
   Plugs and Can. No metric definition changed and no existing number moves.
   Provenance: docs/next-steps.md, "DECIDED 2026-10-28 by the author" and "(as prepared, before
   the decision)".
+- 2026-10-30 — v0.2.23. §3: a diagnostic-only exception to v0.2.21's hard-wired antialiased
+  forward, for experiment A. The pre-v0.2.21 grid ran on Colab torch 2.11.0+cu128 and the v0.2.21
+  grid on cu130, so the reported before/after (e.g. Sheet Metal 0.510 → 0.797) changed the resize
+  and the CUDA build together. Experiment A scores one category both ways on one VM, same seeds,
+  and compares each against its committed report. Exploratory and post hoc: decided on
+  2026-10-30, after both grids existed, in response to reviews. No registered configuration
+  changes and no existing number moves. Provenance: docs/next-steps.md, "CHECKED 2026-10-30".

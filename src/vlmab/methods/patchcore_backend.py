@@ -76,6 +76,7 @@ class PatchCoreBackend:
         num_workers: int = 2,
         seed: int | None = None,
         preprocess: str = "anomalib",
+        diagnostic_aliased_forward: bool = False,
     ):
         # BEFORE the lazy import, so a typo fails in a millisecond rather than after the
         # install, the weights and a 40-minute fit.
@@ -117,7 +118,15 @@ class PatchCoreBackend:
         # ONNX export, while fit goes through `transform` (antialiased). That mismatch built the
         # memory bank on one image statistic and queried it with another. Route forward to the
         # training transform; the helper refuses if that transform has no antialiasing Resize.
-        use_antialiased_forward(self._model.pre_processor, "protocol §3 v0.2.21")
+        #
+        # `diagnostic_aliased_forward` keeps anomalib's antialias-off forward -- the superseded
+        # pre-v0.2.21 configuration -- for experiment A only (scripts/antialias_ablation.py,
+        # 2026-10-30): the old grid ran on torch cu128 and v0.2.21 on cu130, so the two differ
+        # in more than the resize, and only both configurations on one VM separate them. No
+        # registered runner passes it (a test checks `gpu.py`), and the shards record it as
+        # `resize_antialias: False`, which the gate and `summarise` refuse to pool with True.
+        if not diagnostic_aliased_forward:
+            use_antialiased_forward(self._model.pre_processor, "protocol §3 v0.2.21")
         # The Engine configuration below is EXACTLY the one verified to work on
         # anomalib 2.6.0 / Colab T4 (2026-08-21), reached by testing four candidates and
         # measuring which filled the coreset. Nothing is added on top of it: three separate
@@ -156,8 +165,8 @@ class PatchCoreBackend:
         # every shard's provenance which pre-processing actually ran.
         self.preprocess = spec["name"]
         # Public for the same reason: shards declare it, and the gate refuses to mix it.
-        # Always True; there is deliberately no antialias-off code path.
-        self.resize_antialias = True
+        # True on every registered path; False only under the experiment-A diagnostic above.
+        self.resize_antialias = not diagnostic_aliased_forward
         self._fitted = False
 
     def fit(self, train_images: Iterable[np.ndarray]) -> None:

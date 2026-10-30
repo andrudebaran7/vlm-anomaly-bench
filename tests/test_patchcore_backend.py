@@ -110,6 +110,14 @@ def test_the_backend_routes_forward_to_the_antialiased_transform(monkeypatch):
     assert pre.export_transform is pre.transform
     assert b.resize_antialias is True
 
+    # Experiment A (2026-10-30): the diagnostic switch leaves anomalib's own antialias-off
+    # forward in place, and says so in the attribute every shard records.
+    d = PatchCoreBackend(device="cpu", diagnostic_aliased_forward=True)
+    pre = d._model.pre_processor
+    assert pre.export_transform is not pre.transform
+    assert pre.export_transform.transforms[0].antialias is False
+    assert d.resize_antialias is False
+
 
 def test_the_config_records_the_preprocessing_the_backend_defaults_to():
     """Two places state the pre-processing — the YAML a reader consults and the default a Colab
@@ -162,3 +170,14 @@ def test_a_second_fit_on_the_same_backend_is_refused():
     backend._fitted = True
     with pytest.raises(RuntimeError, match="fresh backend"):
         backend.fit(iter([]))
+
+
+def test_the_registered_builder_never_passes_the_diagnostic_switch():
+    """The aliased forward exists only for experiment A (scripts/antialias_ablation.py). The
+    builder every runner uses must not be able to reach it, or a registered result could be
+    the superseded configuration under the v0.2.21 label."""
+    import inspect
+
+    from vlmab.methods import gpu
+
+    assert "diagnostic_aliased_forward" not in inspect.getsource(gpu)
