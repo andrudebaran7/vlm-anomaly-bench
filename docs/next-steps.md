@@ -45,6 +45,19 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-10-30 (read this first).** Everything is committed and pushed; nothing is pending
+locally in either repo.
+- Bench `master` = `bc35b4f` on origin: review items 1–26 done, protocol v0.2.22 (criterion post
+  hoc), WinCLIP gate report committed (FAIL 90.37, re-run identical), tables and the four figures
+  built (image figures only under the gitignored `results/figures/images/`).
+- Paper `descope-c1-c3-rewrite` = `5bd21a4` on the private origin, **not merged** into the paper's
+  master. 12 pages, four figures, Appendix A (Table IV).
+- **Open, all the author's call:** (1) the author's final read of the paper, then the merge into
+  the paper's master; (2) page budget — if the venue caps it, Appendix A or Fig. 4 (resize) can go
+  to supplementary; (3) optional: the AU-PRO exact check (notebook 7.1) on Vial, Fruit Jelly or Can
+  (only Sheet Metal measured, max |grid − exact| 3.69e-5).
+- Still never run notebook cell 6.5.
+
 **UPDATE 2026-10-28: GRID COMPLETE, 8 of 8** (walnuts and fabric run 2026-10-28, both reports on
 Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 here are done.
 **Reports committed 2026-10-28** under `results/mvtec_ad2/patchcore_ref_v0.2.21/` (downloaded from
