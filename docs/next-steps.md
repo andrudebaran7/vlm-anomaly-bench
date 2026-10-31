@@ -68,7 +68,7 @@ antialias fix moves Sheet Metal 0.510 → 0.797 and Fabric 0.562 → 0.723.** Ze
 motivation and discussion. New title: "What a Passing Reproduction Check Does Not Certify: A Gated
 PatchCore Reference on MVTec AD 2". Drop "pre-registered" and "ceiling" from the title.
 
-**CHECKED 2026-10-30 — is the before/after-antialias grid a clean ablation? Sheet Metal: yes (see RESULT below); the rest: not yet.** What exists:
+**CHECKED 2026-10-30 — is the before/after-antialias grid a clean ablation? Sheet Metal: yes; Fabric detection: yes (see RESULTs below); the gate: not yet.** What exists:
 - All 8 pre-v0.2.21 reports are committed (`results/mvtec_ad2/patchcore_ref/`, runs 2026-09-21 to
   2026-10-01, seeds 0/1/2, `preprocess=anomalib`, `test_public`, same lighting conditions as
   v0.2.21). Vial's per-condition table has 2 decimals only and its commit is a range; its category
@@ -114,6 +114,25 @@ return code 0. Output pasted by the author in session.
   stay confounded with the build until run the same way (Fabric needs its own session).
 - Shards are on the Colab VM only (`results/antialias_ablation/`, not committed, not on Drive);
   the comparison above is the record.
+
+**RESULT 2026-10-31 — experiment A on Fabric: detection isolated too; localisation not seen.** Same
+script, `--category fabric --max-bytes 12000000000`, cu130 Colab VM, seeds 0/1/2, return code 0
+(the commit line scrolled out of the pasted output; the run followed cell 1.1 on `master` =
+`9873c67`, which changed only docs since `536c366`). Colab truncated the output to its last 5000
+lines, so the `== aliased` comparison block is NOT in the paste.
+- `antialiased` vs the committed v0.2.21 report: **18 of 18 cells equal** (4 decimals).
+- `aliased` vs the committed pre-v0.2.21 report (cu128, `results/mvtec_ad2/patchcore_ref/fabric.md`):
+  checked by hand from the final I-AUROC table only — **I-AUROC 6 of 6 equal** at 4 decimals
+  (0.5131, 0.5152, 0.5414, 0.6848, 0.5636, 0.5556). The 12 AU-PRO cells of the aliased mode were
+  printed but truncated; **unverified**.
+- I-AUROC seed mean, aliased -> antialiased (same VM): overexposed 0.5131 -> 0.7374 (+0.2242),
+  regular 0.5152 -> 0.7394 (+0.2242), shift_1 0.5414 -> 0.7313 (+0.1899), shift_2 0.6848 -> 0.6707
+  (**-0.0141**, the only condition that does not improve), shift_3 0.5636 -> 0.7152 (+0.1515),
+  underexposed 0.5556 -> 0.7414 (+0.1859); **mean 0.5623 -> 0.7226 (+0.1603)**.
+- **What the paper may now say:** the Fabric detection change 0.562 -> 0.723 is the resize alone
+  (build held fixed, I-AUROC reproduces the cu128 report exactly). Fabric's AU-PRO before/after
+  stays unclaimed as an isolated effect until the aliased AU-PRO cells are seen. The gate's
+  98.02 -> 98.22 remains confounded with the build (not run).
 
 **UPDATE 2026-10-28: GRID COMPLETE, 8 of 8** (walnuts and fabric run 2026-10-28, both reports on
 Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 here are done.
