@@ -51,7 +51,10 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 conclusion; `b184120` on origin), then trimmed to **10 pages** in `1b82fdf` (local): Fig. 4
 (resize) and the overlap-audit table cut, §III condensed, VisA validation-cost paragraph cut;
 Appendix A kept (protocol §6 per-condition seed spread). Open: the author's final read and the
-merge; whether CC BY-NC-SA ShareAlike affects the image figures; optional exact AU-PRO on Can.
+merge; whether CC BY-NC-SA ShareAlike affects the image figures. **Exact AU-PRO on Can:
+prepared, not run** — notebook cell 7.1 now runs Can (`4588b1f`, pushed). Session path: phase 0 ->
+1.1 -> 7.1, needs `MyDrive/mvtec_ad2/can.tar.gz`; paste the output, record it here under a
+MEASURED heading beside Sheet Metal's (2026-10-29), then say whether any 3-decimal value moves.
 
 **STATE 2026-10-30 (read this first).** Everything is committed and pushed; nothing is pending
 locally in either repo.
