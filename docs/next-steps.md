@@ -45,6 +45,14 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-10-31 (read this first; supersedes the block below where they differ).** Bench
+`master` = `ab0cff1` on origin (experiment A recorded, L/2 baseline, ablation table). Paper
+`descope-c1-c3-rewrite`: thesis A rewrite done end to end (abstract, §I, §II, Results, §V-D,
+conclusion; `b184120` on origin), then trimmed to **10 pages** in `1b82fdf` (local): Fig. 4
+(resize) and the overlap-audit table cut, §III condensed, VisA validation-cost paragraph cut;
+Appendix A kept (protocol §6 per-condition seed spread). Open: the author's final read and the
+merge; whether CC BY-NC-SA ShareAlike affects the image figures; optional exact AU-PRO on Can.
+
 **STATE 2026-10-30 (read this first).** Everything is committed and pushed; nothing is pending
 locally in either repo.
 - Bench `master` = `bc35b4f` on origin: review items 1–26 done, protocol v0.2.22 (criterion post
