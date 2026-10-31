@@ -138,6 +138,20 @@ lines, so the `== aliased` comparison block is NOT in the paste.
   cu130 VM. The gate's
   98.02 -> 98.22 remains confounded with the build (not run).
 
+**DONE 2026-10-31 — tables for the Results rewrite (review N3 and the before/after table).**
+- Random AU-PRO baseline in `src/vlmab/viz/tables.py` is now the analytic L/2 (0.15 / 0.025), not the
+  measured 0.1487 / 0.0249 (which no longer reproduce: 0.1503 / 0.0248). Means are unchanged; the
+  multiples move in the second decimal (e.g. Rice AU-PRO@0.05 6.94x -> 6.91x, Wall Plugs 4.57x ->
+  4.55x, Can 0.62x -> 0.61x, Sheet Metal / Fabric @0.3 1.53x / 1.71x -> 1.52x / 1.69x, Wall Plugs
+  shift_2 0.98x -> 0.97x). Table 2 and Fig. 3 regenerated.
+- New `results/tables/ablation_rows.tex` (`make_tables.py`), from the committed pre-v0.2.21 and
+  v0.2.21 reports, which experiment A reproduced cell for cell on one runtime. Category means over
+  conditions, aliased -> antialiased:
+  Sheet Metal I-AUROC 0.510 -> 0.797, AU-PRO@0.3 0.252 -> 0.228, AU-PRO@0.05 0.068 -> 0.068;
+  Fabric I-AUROC 0.562 -> 0.723, AU-PRO@0.3 0.146 -> 0.254, AU-PRO@0.05 0.008 -> 0.028.
+  **Note:** on Sheet Metal the correction raised detection only; localisation did not improve (it
+  fell slightly at the 0.3 limit). On Fabric both rose, localisation from random (0.97x) to 1.69x.
+
 **UPDATE 2026-10-28: GRID COMPLETE, 8 of 8** (walnuts and fabric run 2026-10-28, both reports on
 Drive, confirmed by `cp -v`). Next is "After the grid" below; the steps 1–5 here are done.
 **Reports committed 2026-10-28** under `results/mvtec_ad2/patchcore_ref_v0.2.21/` (downloaded from
