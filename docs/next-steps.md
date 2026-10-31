@@ -77,7 +77,7 @@ locally in either repo.
   the paper's master; (2) page budget — if the venue caps it, Appendix A or Fig. 4 (resize) can go
   to supplementary; (3) optional: the AU-PRO exact check (notebook 7.1) on Vial, Fruit Jelly or Can
   (only Sheet Metal measured, max |grid − exact| 3.69e-5).
-- Still never run notebook cell 6.5.
+- Notebook cell 6.5 retired 2026-10-31 (stops on its first line; the reports already carry the verdict).
 
 **DECIDED 2026-10-30 — new thesis and title (the author chose option A).** The tenth literature pass
 (paper `docs/verified-literature-facts.md`) broke the old thesis: VAND 4.0 (arXiv:2610.04392) ran an
