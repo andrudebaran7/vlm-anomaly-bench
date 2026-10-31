@@ -45,6 +45,16 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-10-31, later (licence; read first).** Colab GPU quota ran out, so the Can AU-PRO run
+is still pending; cell 7.1 now also prints the archive's `readme.txt` and `license.txt` — paste
+both, the copyright holder's name goes verbatim into a © line in the paper. Licence settled by
+the author (option A): the preprint (Zenodo, perhaps arXiv; journal undecided) is CC BY 4.0 with
+Figs. 1–2 excluded, Fig. 2 licensed CC BY-NC-SA 4.0 as an adaptation, licence links in both
+captions. Paper commit `e4ad244` (local, not pushed; 10 pages), provenance in the paper's
+`docs/verified-literature-facts.md`, "What CC BY-NC-SA 4.0 requires of the paper". When a journal
+is chosen: an IEEE copyright transfer or a CC BY OA licence cannot cover Figs. 1–2 — MVTec's
+written permission, third-party marking, or supplementary.
+
 **STATE 2026-10-31 (read this first; supersedes the block below where they differ).** Bench
 `master` = `ab0cff1` on origin (experiment A recorded, L/2 baseline, ablation table). Paper
 `descope-c1-c3-rewrite`: thesis A rewrite done end to end (abstract, §I, §II, Results, §V-D,
