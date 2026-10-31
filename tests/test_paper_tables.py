@@ -56,15 +56,16 @@ def _committed():
     return {c: (REPORTS / f"{c}.md").read_text() for c in tables.CATEGORY_ORDER}
 
 
-def test_table2_rows_match_the_paper_as_published_2026_10_28():
+def test_table2_rows_against_the_analytic_random_baseline():
+    # Multiples re-based on L/2 (0.15 / 0.025) on 2026-10-31; the means are unchanged since 2026-10-28.
     rows = tables.anchor_rows(_committed())
-    assert rows[0] == (r"Vial & 0.888 & 0.853--0.938 & 0.863 (5.81$\times$) & "
-                       r"0.567 (22.79$\times$) & usable \\")
+    assert rows[0] == (r"Vial & 0.888 & 0.853--0.938 & 0.863 (5.75$\times$) & "
+                       r"0.567 (22.70$\times$) & usable \\")
     assert rows[5] == r"\midrule"
-    assert rows[6] == (r"Rice & 0.537 & 0.460--0.619 & 0.433 (2.91$\times$) & "
-                       r"0.173 (6.94$\times$) & not usable \\")
-    assert rows[-1] == (r"Can & 0.452 & 0.370--0.515 & 0.237 (1.59$\times$) & "
-                        r"0.015 (0.62$\times$) & not usable \\")
+    assert rows[6] == (r"Rice & 0.537 & 0.460--0.619 & 0.433 (2.89$\times$) & "
+                       r"0.173 (6.91$\times$) & not usable \\")
+    assert rows[-1] == (r"Can & 0.452 & 0.370--0.515 & 0.237 (1.58$\times$) & "
+                        r"0.015 (0.61$\times$) & not usable \\")
     assert len(rows) == 9
 
 
@@ -80,3 +81,19 @@ def test_per_condition_table_has_one_row_per_condition_with_seed_std():
     # three-decimal std would print 0.000 for a spread that exists.
     assert (r"Vial & underexposed & 0.8533 $\pm$ 0.0481 & 0.6479 $\pm$ 0.0077 & "
             r"0.3591 $\pm$ 0.0108 \\") in rows
+
+
+def test_the_random_baseline_is_half_the_limit():
+    assert tables.RANDOM_BASELINE == {"au_pro_030": Decimal("0.15"), "au_pro_005": Decimal("0.025")}
+
+
+def test_ablation_rows_pair_each_category_before_and_after():
+    aliased = {c: (ROOT / "results" / "mvtec_ad2" / "patchcore_ref" / f"{c}.md").read_text()
+               for c in tables.ABLATION_CATEGORIES}
+    assert tables.ablation_rows(aliased, _committed()) == [
+        r"Sheet Metal & aliased & 0.510 & 0.252 (1.68$\times$) & 0.068 (2.71$\times$) \\",
+        r"Sheet Metal & antialiased & 0.797 & 0.228 (1.52$\times$) & 0.068 (2.72$\times$) \\",
+        r"\midrule",
+        r"Fabric & aliased & 0.562 & 0.146 (0.97$\times$) & 0.008 (0.30$\times$) \\",
+        r"Fabric & antialiased & 0.723 & 0.254 (1.69$\times$) & 0.028 (1.12$\times$) \\",
+    ]

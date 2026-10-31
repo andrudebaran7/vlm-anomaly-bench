@@ -20,12 +20,12 @@ def test_one_point_per_category_and_condition():
 
 def test_points_carry_the_facts_the_text_states():
     """§6.A/§6.C: Fabric's AU-PRO@0.05 is below random in four of six conditions, and Wall Plugs
-    shift_2 sits at 0.98x; `regular` is the best detection condition in no category."""
+    shift_2 sits at 0.97x (0.98x against the measured 0.0249 until 2026-10-31); `regular` is the best detection condition in no category."""
     pts = figures.points(_committed())
     fabric = [p.au_pro_005_x for p in pts if p.category == "fabric"]
     assert sum(x < 1 for x in fabric) == 4 and len(fabric) == 6
     shift_2 = next(p for p in pts if p.category == "wallplugs" and p.condition == "shift_2")
-    assert round(shift_2.au_pro_005_x, 2) == 0.98
+    assert round(shift_2.au_pro_005_x, 2) == 0.97
     for c in tables.CATEGORY_ORDER:
         mine = [p for p in pts if p.category == c]
         best = max(mine, key=lambda p: p.i_auroc)
@@ -35,7 +35,7 @@ def test_points_carry_the_facts_the_text_states():
 def test_category_means_are_table_twos():
     means = figures.category_means(_committed())
     assert round(means["vial"][0], 3) == 0.888
-    assert round(means["can"][1], 2) == 0.62
+    assert round(means["can"][1], 2) == 0.61
 
 
 def test_the_figure_draws(tmp_path):

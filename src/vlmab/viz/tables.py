@@ -18,9 +18,16 @@ from decimal import ROUND_HALF_UP, Decimal
 
 METRICS = ("i_auroc", "au_pro_030", "au_pro_005")
 
-#: AU-PRO of an uninformative map at the 0.3 and 0.05 limits, as computed by this repository's
-#: implementation; analytically L/2. Pinned by tests/test_au_pro_random_baseline.py.
-RANDOM_BASELINE = {"au_pro_030": Decimal("0.1487"), "au_pro_005": Decimal("0.0249")}
+#: AU-PRO of an uninformative map at the 0.3 and 0.05 limits: analytically L/2. Until 2026-10-31
+#: this held the implementation's measured 0.1487 / 0.0249, which no longer reproduce (the test's
+#: fixture gives 0.1503 / 0.0248; tests/test_au_pro_random_baseline.py pins only +-5 % of L/2), so
+#: the paper divides by the analytic value.
+RANDOM_BASELINE = {"au_pro_030": Decimal("0.15"), "au_pro_005": Decimal("0.025")}
+
+#: The two categories whose verdict the v0.2.21 correction changed. Experiment A (2026-10-30/31,
+#: docs/next-steps.md "RESULT") reproduced both reports of each, cell for cell, on one runtime, so
+#: their before/after is the forward resize alone.
+ABLATION_CATEGORIES = ("sheet_metal", "fabric")
 
 #: Table 2's row order (by I-AUROC under v0.2.21) and the paper's category names.
 CATEGORY_ORDER = ("vial", "walnuts", "sheet_metal", "fruit_jelly", "fabric", "rice", "wallplugs",
@@ -114,4 +121,18 @@ def per_condition_rows(reports: dict[str, str]) -> list[str]:
         for r in parse_report(reports[c]):
             cells = " & ".join(f"{r.mean[k]} $\\pm$ {r.std[k]}" for k in METRICS)
             rows.append(f"{NAMES[c]} & {r.condition.replace('_', chr(92) + '_')} & {cells} \\\\")
+    return rows
+
+
+def ablation_rows(aliased: dict[str, str], antialiased: dict[str, str]) -> list[str]:
+    """The before/after table: each category's mean over conditions under both forward resizes."""
+    rows = []
+    for c in ABLATION_CATEGORIES:
+        if rows:
+            rows.append(r"\midrule")
+        for label, reports in (("aliased", aliased), ("antialiased", antialiased)):
+            s = summarise(parse_report(reports[c]))
+            rows.append(f"{NAMES[c]} & {label} & {fmt(s.i_auroc)} & "
+                        f"{_multiple(s.au_pro_030, 'au_pro_030')} & "
+                        f"{_multiple(s.au_pro_005, 'au_pro_005')} \\\\")
     return rows
