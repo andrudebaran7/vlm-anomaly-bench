@@ -1,17 +1,22 @@
 # vlm-anomaly-bench
 
-**A full-shot anchor and a reproduction record for zero-shot anomaly detection on MVTec AD 2.**
+**What a passing reproduction check does not certify: a gated PatchCore reference on MVTec AD 2.**
 
-This repository set out to evaluate zero-shot and vision-language anomaly detection on MVTec AD 2,
-the 2025 benchmark on which no zero-shot or VLM-based method appears among the published baselines
-or the official leaderboard. It reports instead why that comparison could not be made as planned:
-the full-shot PatchCore anchor is a usable detection ceiling on only five of the eight categories,
-and the one zero-shot method carried to its reproduction check, WinCLIP, did not pass it. Protocol,
-code and every reported number are here.
+A reproduction check, matching a method's published score on its original benchmark, is the usual
+safeguard before a pipeline is trusted on a new one. This repository documents a case in which the
+check passes and still misses what decides the verdict on the new dataset. Our full-shot PatchCore
+pipeline built its memory bank from antialiased images and scored test images resized without
+antialiasing. It passed its MVTec AD check (98.02 ± 0.07 I-AUROC against a published 99.0), yet
+left Sheet Metal at chance on MVTec AD 2 (0.510). A same-runtime ablation with the same seeds
+attributes the change to the resize alone. The corrected pipeline is reported as a reference on all
+eight categories of the public split. The study was planned as a zero-shot comparison against that
+reference; the one zero-shot method carried to its reproduction check, WinCLIP, did not pass it, so
+no MVTec AD 2 number is reported for it. Protocol, code and every reported number are here.
 
-**Status (2026-10-29):** protocol at v0.2.22 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
-public-split grid complete for the anchor; private split and evaluation-server submission not run.
-Operational state and history: [`docs/next-steps.md`](docs/next-steps.md).
+**Status (2026-11-02):** protocol at v0.2.23 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
+public-split grid complete for the anchor; same-runtime ablation run on Sheet Metal and Fabric;
+private split and evaluation-server submission not run. The paper is in preparation. Operational
+state and history: [`docs/next-steps.md`](docs/next-steps.md).
 
 ## Results
 
@@ -27,26 +32,48 @@ WinCLIP's failure means, under the protocol, that no MVTec AD 2 number is report
 **The PatchCore anchor on MVTec AD 2** (`test_public`, three seeds, mean over lighting conditions of
 the per-condition mean over seeds; AU-PRO also as a multiple of its random baseline):
 
-| Category | I-AUROC | AU-PRO@0.3 | AU-PRO@0.05 | Usable ceiling |
+| Category | I-AUROC | AU-PRO@0.3 | AU-PRO@0.05 | Usable reference |
 |---|---|---|---|---|
-| Vial | 0.888 | 0.863 (5.81×) | 0.567 (22.79×) | yes |
-| Walnuts | 0.861 | 0.746 (5.02×) | 0.422 (16.96×) | yes |
-| Sheet Metal | 0.797 | 0.228 (1.53×) | 0.068 (2.73×) | yes |
-| Fruit Jelly | 0.773 | 0.634 (4.26×) | 0.379 (15.21×) | yes |
-| Fabric | 0.723 | 0.254 (1.71×) | 0.028 (1.12×) | yes |
-| Rice | 0.537 | 0.433 (2.91×) | 0.173 (6.94×) | no |
-| Wall Plugs | 0.485 | 0.351 (2.36×) | 0.114 (4.57×) | no |
-| Can | 0.452 | 0.237 (1.59×) | 0.015 (0.62×) | no |
+| Vial | 0.888 | 0.863 (5.75×) | 0.567 (22.70×) | yes |
+| Walnuts | 0.861 | 0.746 (4.97×) | 0.422 (16.89×) | yes |
+| Sheet Metal | 0.797 | 0.228 (1.52×) | 0.068 (2.72×) | yes |
+| Fruit Jelly | 0.773 | 0.634 (4.23×) | 0.379 (15.15×) | yes |
+| Fabric | 0.723 | 0.254 (1.69×) | 0.028 (1.12×) | yes |
+| Rice | 0.537 | 0.433 (2.89×) | 0.173 (6.91×) | no |
+| Wall Plugs | 0.485 | 0.351 (2.34×) | 0.114 (4.55×) | no |
+| Can | 0.452 | 0.237 (1.58×) | 0.015 (0.61×) | no |
+
+The random baseline is half the false-positive limit: 0.15 at 0.3 and 0.025 at 0.05. Mean over all
+eight categories: I-AUROC 0.689, AU-PRO@0.3 0.468, AU-PRO@0.05 0.221; over the five usable ones:
+0.808, 0.545, 0.293.
 
 Per-condition and per-seed values are in
 [`results/mvtec_ad2/patchcore_ref_v0.2.21/`](results/mvtec_ad2/patchcore_ref_v0.2.21/). The
 usable/unusable criterion is on detection only and was fixed **after** these numbers existed
 (protocol v0.2.22); it is stated as post hoc wherever it is used.
 
-**Superseded configuration, kept as evidence.** Until protocol v0.2.21 the anchor's memory bank was
-built from antialiased resizes and its test queries were scored without antialiasing. Those
-numbers are kept, marked, in [`results/mvtec_ad2/patchcore_ref/`](results/mvtec_ad2/patchcore_ref/)
-and the older reports under `results/reproduction/`; none of them is an anchor number.
+**What the reproduction check did not see.** Until protocol v0.2.21 the anchor's memory bank was
+built from antialiased resizes and its test queries were scored without antialiasing. That
+configuration passed the MVTec AD check at 98.02 ± 0.07. On MVTec AD 2, correcting it changed the
+verdict on two categories, and none of the other six moved by more than 0.064 I-AUROC:
+
+| Category | Configuration | I-AUROC | AU-PRO@0.3 | AU-PRO@0.05 |
+|---|---|---|---|---|
+| Sheet Metal | aliased (first run) | 0.510 | 0.252 (1.68×) | 0.068 (2.71×) |
+| Sheet Metal | antialiased (corrected) | 0.797 | 0.228 (1.52×) | 0.068 (2.72×) |
+| Fabric | aliased (first run) | 0.562 | 0.146 (0.97×) | 0.008 (0.30×) |
+| Fabric | antialiased (corrected) | 0.723 | 0.254 (1.69×) | 0.028 (1.12×) |
+
+Both configurations of each category were re-run on one runtime with the same three seeds, and
+each reproduced its committed grid in all 18 cells to four decimals, so the change is the
+pre-processing alone. This ablation was added after the results existed, as a diagnostic (protocol
+v0.2.23); the runs are recorded in [`docs/next-steps.md`](docs/next-steps.md), "RESULT 2026-10-30 —
+experiment A on Sheet Metal" and "RESULT 2026-10-31 — experiment A on Fabric". The check itself
+moved from 98.02 to 98.22, but those two runs also differ in CUDA build, and the two causes have
+not been separated. The superseded numbers are kept, marked, in
+[`results/mvtec_ad2/patchcore_ref/`](results/mvtec_ad2/patchcore_ref/) and the older reports under
+`results/reproduction/`; none of them is an anchor number. The table is
+`results/tables/ablation_rows.tex`.
 
 ## Scope
 
@@ -57,7 +84,7 @@ is part of the paper's analysis. Efficiency measurements (latency, VRAM) are out
 
 | Dataset | Role |
 |---|---|
-| MVTec AD 2 | the frontier benchmark (eight categories, lighting conditions) — see [`docs/datasets-access.md`](docs/datasets-access.md) |
+| MVTec AD 2 | the target benchmark (eight categories, lighting conditions); see [`docs/datasets-access.md`](docs/datasets-access.md) |
 | MVTec AD (classic) | per-method reproduction check against published numbers |
 | VisA | secondary check, reported only, never gating |
 
@@ -88,8 +115,9 @@ by the notebooks in [`notebooks/`](notebooks/). Those versions are pinned in
   `scripts/reproduction_gate.py`; WinCLIP's is cells 4.1–4.4 of `notebooks/winclip_colab.ipynb`.
 
 The anchor tables are generated from the committed reports: `scripts/make_tables.py` writes
-`results/tables/anchor_rows.tex` (the table above) and `anchor_per_condition.tex` (every lighting
-condition's mean ± std over seeds), and `scripts/make_figures.py` (needs `pip install -e .[plots]`)
+`results/tables/anchor_rows.tex` (the anchor table above), `anchor_per_condition.tex` (every
+lighting condition's mean ± std over seeds) and `ablation_rows.tex` (the before/after table), and
+prints both means; and `scripts/make_figures.py` (needs `pip install -e .[plots]`)
 draws `results/figures/anchor_per_condition.pdf` from the same reports.
 
 ## Repository layout

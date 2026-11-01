@@ -5,7 +5,7 @@
     results/tables/anchor_per_condition.tex  per-condition mean ± std over seeds (supplementary)
     results/tables/ablation_rows.tex         Sheet Metal and Fabric under both forward resizes
 
-and print the mean over the usable categories, which Table 2's caption states. The paper repository
+and print the mean over the usable categories and over all eight, which Table 2's caption states. The paper repository
 copies results/tables/*.tex in with its scripts/pull_results.sh. Nothing here reads a shard: the
 reports are the committed record, and every number in the paper must be traceable to one.
 """
@@ -40,6 +40,8 @@ def main() -> None:
     i, a, b = tables.usable_mean(reports)
     print(f"wrote {args.out.relative_to(ROOT)}/anchor_rows.tex, anchor_per_condition.tex, ablation_rows.tex")
     print(f"mean over the usable categories: I-AUROC {i}, AU-PRO@0.3 {a}, AU-PRO@0.05 {b}")
+    i, a, b = tables.overall_mean(reports)
+    print(f"mean over all eight categories: I-AUROC {i}, AU-PRO@0.3 {a}, AU-PRO@0.05 {b}")
 
 
 if __name__ == "__main__":

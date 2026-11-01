@@ -97,3 +97,7 @@ def test_ablation_rows_pair_each_category_before_and_after():
         r"Fabric & aliased & 0.562 & 0.146 (0.97$\times$) & 0.008 (0.30$\times$) \\",
         r"Fabric & antialiased & 0.723 & 0.254 (1.69$\times$) & 0.028 (1.12$\times$) \\",
     ]
+
+
+def test_overall_mean_matches_the_caption():
+    assert tables.overall_mean(_committed()) == ("0.689", "0.468", "0.221")

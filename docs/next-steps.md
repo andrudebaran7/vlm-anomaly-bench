@@ -45,6 +45,22 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-11-02 (read first).** Two external reviews of the 10-page PDF (author's folder
+`revision_last_paper/revisionV2`, not in either repo) were checked claim by claim. Text fixes done
+in the paper (`b9b34f6`): one rule for a failing method (withheld, per the descope spec's
+2026-10-01 contingency; protocol §2 still says "flagged", so a protocol clarification is the
+author's call), 99.0 framed as a published-number check, how the mismatch was found moved into
+Section V-C, all-eight mean (0.689 / 0.468 / 0.221, now printed by `make_tables.py` and pinned by a
+test) beside the usable mean, Can shift_3 zero explained, six canonical references added with
+provenance, abstract / intro / Section III shortened. Also new since 2026-11-01: paper Section III
+"System and Evaluation Method" (TikZ pipeline figure), Section IX "Future Work", "Section IV-B"
+cross-references, no page number on page 1. README rewritten for thesis A (it still said "no
+zero-shot method appears" and "usable ceiling", and carried the pre-re-base AU-PRO multiples).
+Rejected from the reviews: the VisualAD 90.4 corroboration (different backbone, provenance
+unstated; paper facts file, "VisualAD — paper READ"); "the downscale factor explains it" (four
+categories share 2448x2048 and only Fabric moved). Owed for a journal: same-runtime gate on MVTec
+AD, paired bootstrap CIs, Section VI-D as a table.
+
 **STATE 2026-11-01 (read first).** Exact AU-PRO on Can MEASURED (max 1.81e-4, no printed paper
 value moves; see "MEASURED 2026-11-01") and the archive's readme read: "Copyright 2025 MVTec
 Software GmbH". Paper: second read, abstract fixes, Acknowledgment, supplement after the

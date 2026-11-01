@@ -112,6 +112,12 @@ def usable_mean(reports: dict[str, str]) -> tuple[str, str, str]:
     return tuple(fmt(sum(getattr(x, k) for x in s) / len(s)) for k in METRICS)
 
 
+def overall_mean(reports: dict[str, str]) -> tuple[str, str, str]:
+    """Mean over all eight categories, so the usable mean is never the only summary printed."""
+    s = [summarise(parse_report(reports[c])) for c in CATEGORY_ORDER]
+    return tuple(fmt(sum(getattr(x, k) for x in s) / len(s)) for k in METRICS)
+
+
 def per_condition_rows(reports: dict[str, str]) -> list[str]:
     """Every condition's seed mean ± std, verbatim at the reports' four decimals."""
     rows = []
