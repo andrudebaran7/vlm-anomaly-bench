@@ -45,8 +45,13 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
-**STATE 2026-10-31, later (licence; read first).** Colab GPU quota ran out, so the Can AU-PRO run
-is still pending; cell 7.1 now also prints the archive's `readme.txt` and `license.txt` — paste
+**STATE 2026-11-01 (read first).** Exact AU-PRO on Can MEASURED (max 1.81e-4, no printed paper
+value moves; see "MEASURED 2026-11-01") and the archive's readme read: "Copyright 2025 MVTec
+Software GmbH". Paper: second read, abstract fixes, Acknowledgment, supplement after the
+references (`c95a0cc`, pushed, unmerged).
+
+**STATE 2026-10-31, later (licence).** Colab GPU quota ran out, so the Can AU-PRO run
+was pending; cell 7.1 now also prints the archive's `readme.txt` and `license.txt` — paste
 both, the copyright holder's name goes verbatim into a © line in the paper. Licence settled by
 the author (option A): the preprint (Zenodo, perhaps arXiv; journal undecided) is CC BY 4.0 with
 Figs. 1–2 excluded, Fig. 2 licensed CC BY-NC-SA 4.0 as an adaptation, licence links in both
@@ -76,7 +81,7 @@ locally in either repo.
 - **Open, all the author's call:** (1) the author's final read of the paper, then the merge into
   the paper's master; (2) page budget — if the venue caps it, Appendix A or Fig. 4 (resize) can go
   to supplementary; (3) optional: the AU-PRO exact check (notebook 7.1) on Vial, Fruit Jelly or Can
-  (only Sheet Metal measured, max |grid − exact| 3.69e-5).
+  (Sheet Metal max |grid − exact| 3.69e-5; Can 1.81e-4, measured 2026-11-01).
 - Notebook cell 6.5 retired 2026-10-31 (stops on its first line; the reports already carry the verdict).
 
 **DECIDED 2026-10-30 — new thesis and title (the author chose option A).** The tenth literature pass
@@ -2486,6 +2491,51 @@ one seed. Sheet Metal pools ~85 M pixels per condition (19 x 4224x1056). The fou
 categories pool more, and the grid's error shrinks with pixel count, so they are not expected to
 be worse; Vial (1400x1900), Fruit Jelly (2100x1520) and Can (2232x1024) have fewer pixels per
 image, so if any category's error is larger it is one of those three. Not measured.
+
+### MEASURED 2026-11-01: AU-PRO grid against exact on Can -- the error is larger there, as expected
+
+Notebook 7.1, Colab T4, commit `d6e7e7c` (cell 1.1 printed it), Can, seed 0, its own root
+`results/au_pro_check/can`, `--no-save`. Pasted by the author in two parts (head and tail). The head: `run_mvtec_ad2.py running from
+commit d6e7e7c`, `can.tar.gz` (2.66 GiB) extracted, 412 train images, test_public six conditions
+of 27; the memory guard did not trip. Coreset bar 42187 rows; runner return code 0, check return
+code 0.
+
+| lighting | limit | grid | exact | grid - exact | 3 dp |
+|---|---|---|---|---|---|
+| overexposed | 0.3 | 0.283537 | 0.283683 | -1.46e-04 | same |
+| overexposed | 0.05 | 0.040919 | 0.040919 | +0.00e+00 | same |
+| regular | 0.3 | 0.284498 | 0.284430 | +6.76e-05 | same |
+| regular | 0.05 | 0.038677 | 0.038677 | +0.00e+00 | same |
+| shift_1 | 0.3 | 0.252192 | 0.252281 | -8.93e-05 | same |
+| shift_1 | 0.05 | 0.009720 | 0.009720 | +0.00e+00 | same |
+| shift_2 | 0.3 | 0.184553 | 0.184642 | -8.89e-05 | same |
+| shift_2 | 0.05 | 0.000442 | 0.000442 | +0.00e+00 | same |
+| shift_3 | 0.3 | 0.189406 | 0.189585 | -1.80e-04 | 0.189 vs 0.190 |
+| shift_3 | 0.05 | 0.000000 | 0.000000 | +0.00e+00 | same |
+| underexposed | 0.3 | 0.218195 | 0.218376 | -1.81e-04 | same |
+| underexposed | 0.05 | 0.009086 | 0.009086 | +0.00e+00 | same |
+
+**max |grid - exact| = 1.81e-04 (underexposed, 0.3); three-decimal rounding differs in 1 of 12**
+(shift_3 at 0.3, seed 0 alone). About five times Sheet Metal's 3.69e-5, still under the synthetic
+-3.5e-4, and again mostly downward at 0.3; at 0.05 the grid is exact to the printed digits on
+every condition. Seed-0 values sit within about 1.1 seed-std of the committed three-seed means
+(e.g. shift_2 0.1846 against 0.1913 +- 0.0061); the report has no per-seed column, so this is a
+consistency check, not a cell-for-cell reproduction.
+
+**What it moves in the paper: nothing at the precision printed.** Table II's Can AU-PRO@0.3 is
+the mean of six conditions, 0.23680 from the four-decimal report; the seed-0 mean error at 0.3 is
+-1.03e-4, so the exact value is about 0.2369 -> still **0.237** and **1.58x**. AU-PRO@0.05
+(0.015, 0.61x) has zero grid error on seed 0. Table IV prints four decimals, so its Can 0.3
+column can be off by up to ~2 in the last digit (e.g. shift_3 0.1868). Scope: one seed of one
+category; Vial and Fruit Jelly unmeasured.
+
+**The archive's own attribution, read on the same VM** (`data/mvtec_ad2/readme.txt`): "Copyright
+2025 MVTec Software GmbH"; "This work is licensed under a Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 International License"; cite Heckler-Kram, Neudeck,
+Scheler, König, Steger, arXiv:2503.21622, 2025; "For using the data in a way that falls under the
+commercial use clause of the license, please contact us." `license.txt` is the standard CC
+BY-NC-SA 4.0 legal code (§1(a) and §3(b) as read on the CC site, paper
+`docs/verified-literature-facts.md`).
 
 ### DONE 2026-10-29: the review's code items #21-#26 (branch `pre-m4-hardening`)
 
