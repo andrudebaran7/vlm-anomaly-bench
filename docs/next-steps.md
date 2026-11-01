@@ -48,7 +48,8 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 **STATE 2026-11-01 (read first).** Exact AU-PRO on Can MEASURED (max 1.81e-4, no printed paper
 value moves; see "MEASURED 2026-11-01") and the archive's readme read: "Copyright 2025 MVTec
 Software GmbH". Paper: second read, abstract fixes, Acknowledgment, supplement after the
-references (`c95a0cc`, pushed, unmerged).
+references, © line in Figs. 1-2; **merged into the paper master 2026-11-01** (`7ac426c`, pushed;
+branch `descope-c1-c3-rewrite` kept).
 
 **STATE 2026-10-31, later (licence).** Colab GPU quota ran out, so the Can AU-PRO run
 was pending; cell 7.1 now also prints the archive's `readme.txt` and `license.txt` — paste
