@@ -375,3 +375,19 @@ def test_7_2_and_7_3_apply_the_preregistered_selection_and_touch_no_registered_r
         assert "--committed" in model and "patchcore_ref_v0.2.21" in model   # read, for the check
     for cell in cells:
         assert not _free_names(cell), _free_names(cell)
+
+
+def test_phase_9_runs_both_modes_on_their_own_root_and_touches_no_registered_result():
+    """Experiment B (protocol v0.2.25): the gate under both forward resizes. It may write only
+    under results/antialias_ablation and its own Drive folder, must copy each finished (mode,
+    seed) to Drive before the next, and must stand on its own."""
+    cells = [src for _, src in _code_cells() if "gate_antialias_ablation.py" in src]
+    assert len(cells) == 2                                     # 9.1 runs, 9.2 compares
+    run, compare = cells
+    for cell in cells:
+        assert "results/antialias_ablation/mvtec_ad" in cell
+        assert "patchcore_ref" not in cell and "reproduction_gate" not in cell
+        assert not _free_names(cell), _free_names(cell)
+    assert '"--mode", mode, "--seeds", str(seed)' in run
+    assert run.index("p.wait()") < run.index("shutil.copy2(f, DRIVE")
+    assert '"--compare-only"' in compare

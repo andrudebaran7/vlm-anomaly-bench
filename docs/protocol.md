@@ -217,6 +217,10 @@ to substitute.
   the superseded antialias-off forward for experiment A only (`scripts/antialias_ablation.py`). No
   registered runner can pass it, its shards record `resize_antialias: False` under their own
   root, and no number it produces is a result of the anchor.
+  **Extended (v0.2.25)** to experiment B, the MVTec AD gate under both forward resizes on one VM
+  (`scripts/gate_antialias_ablation.py`, notebook phase 9), on the same terms: its own root
+  (`results/antialias_ablation/mvtec_ad/`), never the registered gate root or report, and no
+  number it produces is a gate verdict. The registered verdict stays 98.22 ± 0.03, PASS.
 
 - **Full-shot anchors.** A full-shot method (the PatchCore anchor) builds a per-category memory
   bank from that category's defect-free `train` split before scoring its test images. It declares
@@ -717,3 +721,10 @@ pre-processing that produced them.
   states the applied rule, with the old sentence struck through. Prompted by an external review
   (2026-11-02) that found the paper giving both readings ("withheld or flagged"); the paper, its
   pipeline figure, the results and the README now state this one rule.
+- 2026-11-02 — v0.2.25. §3: the v0.2.23 diagnostic exception is extended to experiment B, which
+  runs the MVTec AD gate (15 categories, seeds 0/1/2) with the forward resize aliased and
+  antialiased on one VM. Why: the gate's 98.02 → 98.22 changed the resize and the CUDA build
+  together (cu128 → cu130; docs/next-steps.md, "CHECKED 2026-10-30"), and both external reviews of
+  2026-11-02 rank separating them first. Exploratory and post hoc: decided 2026-11-02, after both
+  gate reports existed. No registered configuration changes, no existing number moves, and the
+  registered gate verdict is not re-decided by it.

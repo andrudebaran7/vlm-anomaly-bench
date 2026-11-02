@@ -45,6 +45,18 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-11-02, experiment B prepared (read first).** The gate's 98.02 → 98.22 is still
+confounded with the CUDA build. Experiment B separates them: `scripts/gate_antialias_ablation.py`
+(protocol v0.2.25) runs the 15 MVTec AD categories at seeds 0/1/2 with the forward resize aliased
+and antialiased on one VM, into `results/antialias_ablation/mvtec_ad/<mode>/`, then scores both
+with `reproduction_gate.py --all-seeds` and compares each against its committed gate report
+(`_3seed.md` for aliased, `_v0.2.21.md` for antialiased) at two decimals, plus the within-VM
+delta. **Next: Colab session 0 → 1.1 → 6.1 → 9.1 (about 4 h, resumable per (mode, seed) through
+`MyDrive/mvtec_ad_results/antialias_ablation/mvtec_ad/`) → 9.2; the author pastes 9.2's output.**
+Needs the 15 `MyDrive/mvtec_ad/*.tar.xz`. Reading rule, written before any run: the within-VM
+delta is the correction's effect on the gate; if `antialiased` does not reproduce the v0.2.21
+report, this VM's build differs and only the within-VM delta is reported.
+
 **STATE 2026-11-02, later (read first).** Protocol **v0.2.24** (§2 clarification, no rule
 change, no number moves): a method that fails its gate has its check reported and its MVTec AD 2
 results withheld, the rule pre-registered 2026-10-01 and applied; the old "flagged" sentence is
