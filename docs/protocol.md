@@ -34,8 +34,14 @@ overlap table required in the paper).
   for the 1024px variant) is incompatible with the Colab compute budget. Recorded as a stated
   limitation, not an omission.
 - **VisA + MVTec AD (classic)** — used only to validate our re-implementations against published
-  numbers (tolerance ±1.0 I-AUROC). If we can't reproduce a method's published VisA/MVTec numbers,
-  its frontier results are flagged as such in every table.
+  numbers (tolerance ±1.0 I-AUROC). ~~If we can't reproduce a method's published VisA/MVTec numbers,
+  its frontier results are flagged as such in every table.~~ **Rule as pre-registered and applied
+  (v0.2.24): a method that fails its gate gets no MVTec AD 2 number. Its gate report is published;
+  its MVTec AD 2 results are withheld, not reported with a flag.** This is the contingency recorded
+  on 2026-10-01 in docs/superpowers/specs/2026-10-01-short-paper-descope-design.md ("§2 blocks
+  every MVTec AD 2 number for it"), before WinCLIP's first gate run on 2026-10-03, and it is the
+  rule that was applied when WinCLIP failed. The struck sentence is the v0.2 wording, kept so the
+  history stays visible; no method was ever reported under it.
 
   **Which of the two is the pass/fail gate is fixed per method, and fixed by one rule: the
   reproduction target must come from the method's own paper, at the configuration this repo
@@ -704,3 +710,10 @@ pre-processing that produced them.
   and compares each against its committed report. Exploratory and post hoc: decided on
   2026-10-30, after both grids existed, in response to reviews. No registered configuration
   changes and no existing number moves. Provenance: docs/next-steps.md, "CHECKED 2026-10-30".
+- 2026-11-02 — v0.2.24. §2: clarification, no rule changes and no number moves. §2 said a method
+  that fails its gate has its frontier results "flagged as such in every table"; the descope
+  spec's pre-registered contingency (2026-10-01, before WinCLIP's first gate run on 2026-10-03)
+  says the failure blocks every MVTec AD 2 number for it, and that is what was applied. §2 now
+  states the applied rule, with the old sentence struck through. Prompted by an external review
+  (2026-11-02) that found the paper giving both readings ("withheld or flagged"); the paper, its
+  pipeline figure, the results and the README now state this one rule.

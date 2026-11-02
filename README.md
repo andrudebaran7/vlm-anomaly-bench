@@ -13,7 +13,7 @@ eight categories of the public split. The study was planned as a zero-shot compa
 reference; the one zero-shot method carried to its reproduction check, WinCLIP, did not pass it, so
 no MVTec AD 2 number is reported for it. Protocol, code and every reported number are here.
 
-**Status (2026-11-02):** protocol at v0.2.23 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
+**Status (2026-11-02):** protocol at v0.2.24 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
 public-split grid complete for the anchor; same-runtime ablation run on Sheet Metal and Fabric;
 private split and evaluation-server submission not run. The paper is in preparation. Operational
 state and history: [`docs/next-steps.md`](docs/next-steps.md).
@@ -27,7 +27,8 @@ state and history: [`docs/next-steps.md`](docs/next-steps.md).
 | PatchCore (anchor) | 98.22 ± 0.03 (3 seeds) | 99.0 | pass | [`patchcore_mvtec_ad_v0.2.21.md`](results/reproduction/patchcore_mvtec_ad_v0.2.21.md) |
 | WinCLIP | 90.37 (deterministic, 1 run) | 91.8 | **fail** | [`winclip_mvtec_ad.md`](results/reproduction/winclip_mvtec_ad.md) |
 
-WinCLIP's failure means, under the protocol, that no MVTec AD 2 number is reported for it.
+Under the protocol (§2, v0.2.24), a method that fails its gate gets no MVTec AD 2 number: its gate
+report is published and its MVTec AD 2 results are withheld. That is what happened to WinCLIP.
 
 **The PatchCore anchor on MVTec AD 2** (`test_public`, three seeds, mean over lighting conditions of
 the per-condition mean over seeds; AU-PRO also as a multiple of its random baseline):

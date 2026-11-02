@@ -45,6 +45,16 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-11-02, later (read first).** Protocol **v0.2.24** (§2 clarification, no rule
+change, no number moves): a method that fails its gate has its check reported and its MVTec AD 2
+results withheld, the rule pre-registered 2026-10-01 and applied; the old "flagged" sentence is
+struck through, kept for history. Paper (author's decisions): that one rule in Fig. 1, Section
+III-D and Section IV-A; VisualAD's 90.4 stated as NOT corroborating our 90.37 (ViT-L/14@336px vs
+our ViT-B/16+ `laion400m_e31`, provenance unstated); Sections III and IV merged as "System and
+Evaluation Method" with Fig. 1 kept; Future Work kept separate from the Conclusion; Section VI-D
+condensed to a table, its paragraphs moved verbatim to Supplemental Material B. Main text 9 pages
++ 2 supplement pages.
+
 **STATE 2026-11-02 (read first).** Two external reviews of the 10-page PDF (author's folder
 `revision_last_paper/revisionV2`, not in either repo) were checked claim by claim. Text fixes done
 in the paper (`b9b34f6`): one rule for a failing method (withheld, per the descope spec's
