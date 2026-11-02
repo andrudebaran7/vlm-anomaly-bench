@@ -438,6 +438,20 @@ Three seeds where any stochasticity exists; report mean ± std. No cherry-pickin
 every table reports all categories or states explicitly why one is excluded (e.g., official
 protocol exclusion). Failed runs are reported as failures, not silently dropped.
 
+**Test-set uncertainty (v0.2.26).** Seeds measure the run, not the draw of test images. For
+I-AUROC on MVTec AD 2 `test_public`, `scripts/bootstrap_iauroc.py` gives 95% percentile intervals
+under a scheme fixed here before any interval was computed: the resampling unit is the scene index,
+(`good`|`bad`, `{index}` of `{index}_{condition}.png`), drawn with all of its lighting conditions
+together; stratified by folder; seeds averaged in every replicate, never resampled; statistic
+the unweighted mean over conditions of the per-condition seed mean, as Table II; a replicate in
+which a condition lacks a class is redrawn and counted; B = 10,000, numpy seed 20261102. The
+change aliased → antialiased is paired: both grids are scored on the same draw. Each grid's
+shards must first reproduce its committed report at the report's decimals. Clustering by index is
+valid whether or not one index shows one physical scene in every condition; if it does not, the
+intervals are somewhat conservative. The intervals are descriptive: they do not re-decide the
+usable/unusable criterion (v0.2.22), and only Sheet Metal's and Fabric's change is free of the
+CUDA build (experiment A).
+
 Each seed is a separate run with its own shard (`…__seed<N>.parquet`) and its own anomaly-map
 directory; the seed recorded in a shard is the seed the method reports having applied, and the
 metric functions refuse a frame that pools seeds. A run that applied no seed records `unseeded`,
@@ -728,3 +742,8 @@ pre-processing that produced them.
   2026-11-02 rank separating them first. Exploratory and post hoc: decided 2026-11-02, after both
   gate reports existed. No registered configuration changes, no existing number moves, and the
   registered gate verdict is not re-decided by it.
+- 2026-11-02 — v0.2.26. §6: test-set uncertainty for I-AUROC, a paired scene-clustered
+  bootstrap whose scheme is fixed in §6 before any interval exists. Asked for by both external
+  reviews of 2026-11-02. Exploratory and post hoc with respect to the results (every point value
+  already exists); pre-registered with respect to the intervals. It changes no number and no
+  criterion.

@@ -391,3 +391,17 @@ def test_phase_9_runs_both_modes_on_their_own_root_and_touches_no_registered_res
     assert '"--mode", mode, "--seeds", str(seed)' in run
     assert run.index("p.wait()") < run.index("shutil.copy2(f, DRIVE")
     assert '"--compare-only"' in compare
+
+
+def test_phase_10_bootstraps_from_drive_reads_both_grids_and_writes_only_its_report():
+    """The bootstrap (protocol v0.2.26) is CPU work on shards already on Drive: it must name
+    both grids' roots, write only results/bootstrap, copy the report off the VM, and stand
+    on its own."""
+    cells = [src for _, src in _code_cells() if "bootstrap_iauroc.py" in src]
+    assert len(cells) == 1
+    cell = cells[0]
+    assert '"patchcore_ref_v0.2.21"' in cell and '"patchcore_ref"' in cell
+    assert 'Path("results/bootstrap/iauroc_bootstrap.md")' in cell
+    assert "run_evaluation" not in cell and "reproduction_gate" not in cell
+    assert cell.index("p.wait()") < cell.index("shutil.copy2(OUT")
+    assert not _free_names(cell), _free_names(cell)

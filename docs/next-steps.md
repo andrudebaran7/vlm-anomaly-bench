@@ -45,6 +45,14 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-11-02, bootstrap prepared (read first).** `scripts/bootstrap_iauroc.py` (protocol
+§6 v0.2.26, scheme fixed before any interval): paired, scene-clustered, stratified bootstrap of
+I-AUROC from the committed grids' shards on Drive, CPU only. **Next: Colab session 0 → 1.1 → 10.1
+(any runtime, ~10 min); the author pastes the inventory and the report.** Unknown until then:
+whether the superseded grid's shards are still under `MyDrive/mvtec_ad2_results/patchcore_ref/`;
+if not, only the anchor's intervals come out, and the paired change needs the aliased grid
+re-run. Experiment B (phase 9) is still owed and independent of this.
+
 **STATE 2026-11-02, experiment B prepared (read first).** The gate's 98.02 → 98.22 is still
 confounded with the CUDA build. Experiment B separates them: `scripts/gate_antialias_ablation.py`
 (protocol v0.2.25) runs the 15 MVTec AD categories at seeds 0/1/2 with the forward resize aliased
