@@ -58,3 +58,10 @@ def test_the_image_figures_draw_from_the_preregistered_inputs(tmp_path, draw):
     out = tmp_path / "f.pdf"
     getattr(figures, draw)(INPUTS, out)
     assert out.stat().st_size > 1000
+
+
+def test_only_the_two_can_conditions_the_caption_names_are_off_axis():
+    """A log axis cannot show them, so the figure marks them at its edge and the caption says so."""
+    off = figures.off_axis(figures.points(_committed()))
+    assert {(p.category, p.condition) for p in off} == {("can", "shift_2"), ("can", "shift_3")}
+    assert sorted(round(p.au_pro_005_x, 2) for p in off) == [0.0, 0.08]

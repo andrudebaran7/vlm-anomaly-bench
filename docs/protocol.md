@@ -765,3 +765,19 @@ pre-processing that produced them.
   of 2026-11-03, because Sheet Metal's interval rests on 4 good scenes. Exploratory and post hoc
   with respect to the results (the changes and intervals already exist); pre-registered with respect
   to this analysis. It changes no number and no criterion.
+- 2026-11-03 — v0.2.28. Records, no rule changes and no number moves. Prompted by the external reviews
+  of 2026-11-03. (1) §2/§7, post hoc: the anchor is compared by category with the PatchCore results of
+  MVTec AD 2's authors (Tables VII and IX) and of Vo et al. (Fig. 3), in
+  `results/comparison/patchcore_literature.md`, as a sanity check on the target benchmark and never a
+  gate; every value involved was already known. (2) Which document governs: this file is the record of
+  the study's decisions. The one exception on record is the failing-method rule, pre-specified in the
+  design document at commit `93628d7` and carried into this file only by v0.2.24. (3) Reporting: the
+  paper now states PatchCore's secondary VisA check (86.26 against 92.4, earlier configuration, not
+  re-run after v0.2.21), which §2 always said is reported, and that WinCLIP's VisA gate was not run
+  because its MVTec AD gate had already failed. It also states that the aggregation rule (v0.2.13) was
+  written after the single-seed miss of 2026-09-16 and before the three-seed run. (4) Wording: this file
+  keeps "pre-registered" as written at the time; it means written and pushed to version control before
+  the result, whose timestamps the author controls, not filed with a third-party registry, so the paper
+  says "pre-specified". (5) The provenance entries above that name
+  `../vlm-anomaly-paper/docs/verified-literature-facts.md` point to the author's private working record.
+  The primary sources are named beside the facts; the file itself is not part of this repository.

@@ -41,6 +41,10 @@ checkpoints/
 !results/bootstrap/
 results/bootstrap/*
 !results/bootstrap/*.md
+# The post hoc comparison with published PatchCore results (protocol v0.2.28).
+!results/comparison/
+results/comparison/*
+!results/comparison/*.md
 # The paper's generated table bodies (scripts/make_tables.py): small, derived from committed
 # reports, and what the paper pulls -- tracked so the paper can be rebuilt from a clone.
 !results/tables/

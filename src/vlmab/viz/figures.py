@@ -17,6 +17,9 @@ from vlmab.viz import tables
 
 #: The training condition, highlighted. Every MVTec AD 2 category trains on `regular` only.
 TRAIN_CONDITION = "regular"
+# Left edge of the AU-PRO panel. Can shift_2 (0.08x) and shift_3 (0x) lie beyond it (review V4); the
+# figure marks them at the edge and the caption gives their values.
+AU_PRO_AXIS_LOW = 0.15
 
 #: Emphasis palette: one hue for the highlighted condition, a neutral for the rest
 #: (dataviz reference palette, light: categorical slot 1 and the muted axis gray).
@@ -42,6 +45,11 @@ def points(reports: dict[str, str]) -> list[Point]:
             out.append(Point(c, r.condition, float(r.mean["i_auroc"]),
                              float(r.mean["au_pro_005"] / base)))
     return out
+
+
+def off_axis(pts: list[Point], low: float = AU_PRO_AXIS_LOW) -> list[Point]:
+    """The points the log axis of the AU-PRO panel cannot show; they are drawn at its left edge."""
+    return [p for p in pts if p.au_pro_005_x < low]
 
 
 def category_means(reports: dict[str, str]) -> dict[str, tuple[float, float]]:
@@ -89,6 +97,11 @@ def draw_per_condition(reports: dict[str, str], path) -> None:
         for p in pts:
             y = row[p.category]
             x = getattr(p, field)
+            if log and x < AU_PRO_AXIS_LOW:
+                # Off a log axis (0x has no position at all): marked at the edge, values in the note.
+                ax.scatter(AU_PRO_AXIS_LOW, y, marker="<", s=18, facecolor="none", edgecolor=CONTEXT,
+                           linewidth=0.9, zorder=3, clip_on=False)
+                continue
             if p.condition == TRAIN_CONDITION:
                 ax.scatter(x, y, marker="D", s=26, color=HIGHLIGHT, edgecolor="white",
                            linewidth=0.8, zorder=4)
@@ -110,7 +123,7 @@ def draw_per_condition(reports: dict[str, str], path) -> None:
         ax.text(ref, -0.75, f" {ref_label}", color=INK, fontsize=7, va="center", ha="left")
 
     axes[0].set_xlim(0.3, 1.0)
-    axes[1].set_xlim(0.15, 40)
+    axes[1].set_xlim(AU_PRO_AXIS_LOW, 40)
     axes[1].set_xticks([0.2, 0.5, 1, 2, 5, 10, 20])
     axes[1].set_xticklabels(["0.2", "0.5", "1", "2", "5", "10", "20"])
     axes[0].set_yticks(range(len(cats)))

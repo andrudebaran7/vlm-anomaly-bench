@@ -45,6 +45,12 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-11-03, review V4 acted on (read first).** See "RESULT 2026-11-03 — review V4". Branches
+`review-v4-fixes` in both repos. Owed before arXiv: the author's read, the manuscript tag, the Zenodo archive of code,
+protocol and results (the author's account; the manuscript goes to arXiv, since IEEE's pages do not name Zenodo), the
+repository description on GitHub (the author, in the web settings), and checking whether arXiv needs an endorsement.
+No Colab work is owed unless image-level scores are exported from Drive.
+
 **STATE 2026-11-03, single-scene sensitivity done (read first).** See "RESULT 2026-11-03 — single-scene
 sensitivity": no single scene decides either change. Owed before arXiv: the paper's text fixes (branch
 `review-v3-fixes`), a tag, a Zenodo archive (the author's account), and the image-level scores made
@@ -207,6 +213,24 @@ return code 0. Output pasted by the author in session.
   stay confounded with the build until run the same way (Fabric needs its own session).
 - Shards are on the Colab VM only (`results/antialias_ablation/`, not committed, not on Drive);
   the comparison above is the record.
+
+**RESULT 2026-11-03 — review V4.** Checked claim by claim against both repositories. No new run.
+- **Gate history, undisclosed until now:** seed 0 alone missed at 97.94 (-1.057) on 2026-09-16; §6 v0.2.13, which puts the
+  verdict on the mean of the seed means, was written on 2026-09-17, after that miss, and the three-seed run passed at 98.02.
+  Three seeds were already required, so this is not a re-roll, but under "every seed passes" it would have failed.
+- **VisA, undisclosed until now:** 86.26 against 92.4 (-6.14), earlier configuration, not re-run, non-gating. WinCLIP's VisA
+  gate has no report: not run.
+- **Upstream:** anomalib #2944, #3726, PR #3882 know the mismatch (paper's verified-literature-facts, eleventh pass). We
+  found it on 2026-10-03 without having read them. An exhaustive search for them was not done until review V4 asked.
+- **Fig. 4:** the axis began at 0.15x, so Can shift_2 (0.084x) and shift_3 (0x) vanished; now marked at the edge.
+- **`results/comparison/patchcore_literature.md`**, protocol v0.2.28, post hoc. Authors, AU-PRO: Spearman 0.976 / 0.905 at
+  0.05 and 0.857 / 0.952 at 0.30; means 22.1 against 28.8 / 26.0 and 46.8 against 53.8 / 50.8. Vo et al., I-AUROC: 0.619.
+- **Rejected from V4:** factor of downscale as the mechanism (categories with Fabric's frame did not move); "no tolerance
+  could have detected it" (one in [0.78, 0.98) would have); reading the authors' AU-PRO as support for "not usable" (the
+  criterion is detection-only) or their gaps on Sheet Metal and Fabric as aliasing (the anchor is already corrected). Already
+  done or stale: README's version, Table III's place, Vo's citation. The name in [1] is the survey's as published.
+- **Author's decisions (2026-11-03):** the zero-shot audit leaves C3 and becomes a complementary observation; the paper says
+  "pre-specified" for "pre-registered".
 
 **RESULT 2026-11-03 — single-scene sensitivity.** `scripts/scene_sensitivity.py`, protocol §6 v0.2.27
 (rules fixed and pushed in `c6ff748` before any output), notebook 11.1, CPU runtime, return code 0, no
