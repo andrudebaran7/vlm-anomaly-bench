@@ -1,7 +1,5 @@
 # Image-level scores, MVTec AD 2 `test_public`
 
-**Status (2026-11-03): the export has not run yet, so the CSVs are not here.**
-
 The PatchCore anchor's score for every test image, per seed, for both configurations: `antialiased` (the
 corrected one, v0.2.21) and `aliased` (the one first run). Written by `scripts/export_image_scores.py` from the
 result shards; each configuration first had to reproduce its committed report. Fruit Jelly has no `aliased` file,

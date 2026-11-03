@@ -792,3 +792,9 @@ pre-processing that produced them.
 - 2026-11-03 — v0.2.29. Header note only, no rule changes and no number moves. An external review of
   2026-11-03 pointed out that the opening paragraph claims every choice preceded every result, which the
   later entries of this log contradict. The opening stays as written, with a dated note above it.
+- 2026-11-03 — v0.2.30. Reporting, no rule changes and no number moves. At the author's request, the
+  image-level scores behind §6's intervals are published in `results/image_scores/`, for both
+  configurations on MVTec AD 2 `test_public` (Fruit Jelly: antialiased only, its aliased shards no longer
+  exist), under CC BY-NC-SA 4.0, the dataset's licence, and apart from the code's MIT. Each configuration
+  first reproduced its committed report. Recomputed from these files alone, both §6 analyses match their
+  committed reports in every value. Anomaly maps stay out of the repository.

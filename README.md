@@ -13,7 +13,7 @@ eight categories of the public split. The study was planned as a zero-shot compa
 reference; the one zero-shot method carried to its reproduction check, WinCLIP, did not pass it, so
 no MVTec AD 2 number is reported for it. Protocol, code and every reported number are here.
 
-**Status (2026-11-03):** protocol at v0.2.29 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
+**Status (2026-11-03):** protocol at v0.2.30 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
 public-split grid complete for the anchor; same-runtime ablation run on Sheet Metal, Fabric and the MVTec AD gate; test-set intervals for I-AUROC;
 private split and evaluation-server submission not run. The paper is in preparation. Operational
 state and history: [`docs/next-steps.md`](docs/next-steps.md).
@@ -60,7 +60,8 @@ verdict on two categories of this test set, and none of the other six moved by m
 I-AUROC. Under resampling of test scenes (protocol §6 v0.2.26;
 [`results/bootstrap/iauroc_bootstrap.md`](results/bootstrap/iauroc_bootstrap.md)) the paired change
 excludes zero on Sheet Metal (+0.287, 95% interval [+0.086, +0.504]) and not on Fabric (+0.160,
-[-0.096, +0.412]):
+[-0.096, +0.412]). These intervals can be recomputed from the published image-level scores in
+[`results/image_scores/`](results/image_scores/README.md) (CC BY-NC-SA 4.0):
 
 | Category | Configuration | I-AUROC | AU-PRO@0.3 | AU-PRO@0.05 |
 |---|---|---|---|---|
@@ -149,7 +150,7 @@ scripts/    run_mvtec_ad2, run_mvtec_ad, reproduction_gate, calibrate_threshold,
 notebooks/  the Colab drivers for the GPU runs
 tests/      metric correctness, adapter contracts, runner and provenance (no downloads needed)
 docs/       protocol (versioned, with changelog), dataset access, operational record
-results/    committed reports; shards and anomaly maps stay on Drive
+results/    committed reports and image-level scores; shards and anomaly maps stay on Drive
 ```
 
 ## Author
