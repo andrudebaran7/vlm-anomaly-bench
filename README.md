@@ -13,8 +13,8 @@ eight categories of the public split. The study was planned as a zero-shot compa
 reference; the one zero-shot method carried to its reproduction check, WinCLIP, did not pass it, so
 no MVTec AD 2 number is reported for it. Protocol, code and every reported number are here.
 
-**Status (2026-11-02):** protocol at v0.2.24 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
-public-split grid complete for the anchor; same-runtime ablation run on Sheet Metal and Fabric;
+**Status (2026-11-03):** protocol at v0.2.26 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
+public-split grid complete for the anchor; same-runtime ablation run on Sheet Metal, Fabric and the MVTec AD gate; test-set intervals for I-AUROC;
 private split and evaluation-server submission not run. The paper is in preparation. Operational
 state and history: [`docs/next-steps.md`](docs/next-steps.md).
 
@@ -56,7 +56,11 @@ usable/unusable criterion is on detection only and was fixed **after** these num
 **What the reproduction check did not see.** Until protocol v0.2.21 the anchor's memory bank was
 built from antialiased resizes and its test queries were scored without antialiasing. That
 configuration passed the MVTec AD check at 98.02 ± 0.07. On MVTec AD 2, correcting it changed the
-verdict on two categories, and none of the other six moved by more than 0.064 I-AUROC:
+verdict on two categories of this test set, and none of the other six moved by more than 0.064
+I-AUROC. Under resampling of test scenes (protocol §6 v0.2.26;
+[`results/bootstrap/iauroc_bootstrap.md`](results/bootstrap/iauroc_bootstrap.md)) the paired change
+excludes zero on Sheet Metal (+0.287, 95% interval [+0.086, +0.504]) and not on Fabric (+0.160,
+[-0.096, +0.412]):
 
 | Category | Configuration | I-AUROC | AU-PRO@0.3 | AU-PRO@0.05 |
 |---|---|---|---|---|
