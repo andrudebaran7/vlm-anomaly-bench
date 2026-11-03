@@ -45,16 +45,10 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
-**STATE 2026-11-03, bootstrap half done (read first).** Phase 10 ran and gave the anchor's intervals
-only; see "RESULT 2026-11-03 — bootstrap, anchor intervals". The paired change did not come out
-because cell 10.1 looked for the old grid in `MyDrive/mvtec_ad2_results/patchcore_ref/`, where it was
-never written: pre-2026-10-01 shards stay at the un-scoped `MyDrive/mvtec_ad2_results/<category>/`.
-The author checked Drive there on 2026-11-03: 3 parquet files in 7 categories, **Fruit Jelly's folder
-is empty** (not re-run: its change is small and not free of the build, so it gets the anchor's interval
-only). Cell 10.1 and the script now use that root. **Next: reload the notebook from master, 0.1 -> 1.1
--> 10.1 on a CPU runtime; the author pastes the output.** With no redraw in the aliased scoring the
-draws are the same, so the anchor intervals should come out unchanged: a check on the re-run. Paper
-untouched by this until the paired result is known.
+**STATE 2026-11-03, bootstrap done (read first).** Phase 10 re-ran with the right root; see "RESULT
+2026-11-03 — bootstrap, paired change". **Sheet Metal's change excludes zero, Fabric's does not.** The
+paper says the correction "decided the verdict on a quarter" of the categories, so its Fabric wording
+needs the author's decision before the paper changes. No Colab work is owed for the paper as it stands.
 
 **STATE 2026-11-03, experiment B done (read first).** Phase 9 ran and is recorded under "RESULT
 2026-11-03 — experiment B". Both modes reproduce their committed gate reports, 19 of 19 printed
@@ -206,12 +200,38 @@ return code 0. Output pasted by the author in session.
 - Shards are on the Colab VM only (`results/antialias_ablation/`, not committed, not on Drive);
   the comparison above is the record.
 
-**RESULT 2026-11-03 — bootstrap, anchor intervals (no paired change yet).** `scripts/bootstrap_iauroc.py`
+**RESULT 2026-11-03 — bootstrap, paired change.** Same script and cell after the root fix, commit
+`30228a7`, CPU runtime, return code 0, 0 redraws, no shards refused: the seven aliased grids on Drive
+reproduce their committed reports. Inventory: 3 shards per category in both roots, except Fruit Jelly's
+aliased 0. The anchor's intervals came out identical to the first run below, as predicted. Report
+committed: `results/bootstrap/iauroc_bootstrap.md`.
+
+| Category | Aliased | Antialiased | Change | 95% percentile interval | Free of the build |
+|---|---|---|---|---|---|
+| vial | 0.909 | 0.888 | -0.021 | [-0.110, +0.048] | no |
+| walnuts | 0.824 | 0.861 | +0.037 | [-0.026, +0.126] | no |
+| sheet_metal | 0.510 | 0.797 | +0.287 | [+0.086, +0.504] | yes (experiment A) |
+| fabric | 0.562 | 0.723 | +0.160 | [-0.096, +0.412] | yes (experiment A) |
+| rice | 0.519 | 0.537 | +0.017 | [-0.152, +0.192] | no |
+| wallplugs | 0.447 | 0.485 | +0.038 | [-0.100, +0.172] | no |
+| can | 0.388 | 0.452 | +0.063 | [-0.053, +0.184] | no |
+
+- **Two questions, kept apart.** Experiment A answers what caused the change on these images: the
+  resize, on both categories. The bootstrap answers how far it would hold under another draw of test
+  scenes: on Sheet Metal the interval excludes zero, on Fabric it does not.
+- **Limits:** seven intervals, unadjusted for multiplicity, and Sheet Metal was already known as the
+  largest change, with only 4 good-scene clusters, where percentile intervals tend to run narrow.
+  Descriptive under v0.2.26; the usable/unusable line is not re-decided.
+- **Vial's aliased mean is 0.909 from the shards; the paper and "M3 IS COMPLETE" print 0.910**, a mean
+  of a 2-decimal table. Superseded value, at paper `sections/05-results.tex` ("between 0.783 and 0.910").
+
+**RESULT 2026-11-03 — bootstrap, anchor intervals (first run, before the root fix).** `scripts/bootstrap_iauroc.py`
 (protocol §6 v0.2.26), notebook 10.1, commit `08d342c`, CPU runtime, B = 10,000, numpy seed 20261102,
 return code 0, 0 redraws everywhere, no shards refused (v0.2.21 reproduced all 8 reports). Report on
-Drive: `MyDrive/mvtec_ad2_results/bootstrap/iauroc_bootstrap.md`, not committed yet. Inventory: 3
-shards per category under `patchcore_ref_v0.2.21`, 0 under `patchcore_ref` (wrong place to look; see
-STATE 2026-11-03).
+Drive: `MyDrive/mvtec_ad2_results/bootstrap/iauroc_bootstrap.md`. Inventory: 3
+shards per category under `patchcore_ref_v0.2.21`, 0 under `patchcore_ref` (the wrong place to look:
+pre-2026-10-01 shards stay at the un-scoped `MyDrive/mvtec_ad2_results/<category>/`; Fruit Jelly's
+folder there is empty, seen by the author 2026-11-03).
 
 | Category | Clusters good / bad | I-AUROC | 95% percentile interval |
 |---|---|---|---|
@@ -231,7 +251,7 @@ independently, then averaged per replicate). The per-condition table is in the r
   0.759 is above Fabric's 0.723). Good-scene clusters are few (4 on Sheet Metal), and percentile
   intervals tend to run narrow with so few clusters, so these are not exact 95% statements.
 - **Not to be read from this table:** the aliased → antialiased change. An old point value inside or
-  outside the new interval says nothing, because the scenes are shared; that needs the paired run.
+  outside the new interval says nothing, because the scenes are shared; use the paired table above.
 - Intervals cover the test draw only; seeds are averaged, not resampled.
 
 **RESULT 2026-11-03 — experiment B on the MVTec AD gate: the build moved nothing; 98.02 → 98.22 is

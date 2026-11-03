@@ -37,6 +37,10 @@ results/mvtec_ad2/*/*
 checkpoints/
 .superpowers/
 *.egg-info/
+# The bootstrap's report (protocol v0.2.26): the record of the intervals; it reads shards on Drive.
+!results/bootstrap/
+results/bootstrap/*
+!results/bootstrap/*.md
 # The paper's generated table bodies (scripts/make_tables.py): small, derived from committed
 # reports, and what the paper pulls -- tracked so the paper can be rebuilt from a clone.
 !results/tables/
