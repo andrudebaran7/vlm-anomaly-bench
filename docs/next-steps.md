@@ -45,6 +45,13 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-11-03, single-scene sensitivity prepared (read first).** The author chose to act on review
+V3 (author's folder `revision_last_paper/revisionV3`, not in either repo). `scripts/scene_sensitivity.py`
+and protocol §6 v0.2.27 fix the analysis and its reading rules before any output exists. **Next: reload
+the notebook from master, Colab CPU: 0.1 -> 1.1 -> 11.1; the author pastes the output.** Record it here
+before the paper. Before arXiv too: text fixes (paper branch), the 0.02 margin of the 98.02 pass with the
+tolerance arithmetic, a tag, a Zenodo archive, and the image-level scores made public.
+
 **STATE 2026-11-03, bootstrap done (read first).** Phase 10 re-ran with the right root; see "RESULT
 2026-11-03 — bootstrap, paired change". **Sheet Metal's change excludes zero, Fabric's does not.** The
 author's decisions (2026-11-03): the paper states both intervals and drops "decided the verdict on a

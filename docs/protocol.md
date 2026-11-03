@@ -452,6 +452,19 @@ intervals are somewhat conservative. The intervals are descriptive: they do not 
 usable/unusable criterion (v0.2.22), and only Sheet Metal's and Fabric's change is free of the
 CUDA build (experiment A).
 
+**Sensitivity to single scenes (v0.2.27).** Fixed before any of it was computed. For the two
+categories whose change is free of the build, Sheet Metal and Fabric, `scripts/scene_sensitivity.py`
+recomputes the §6 statistic and the paired change aliased → antialiased with each (`good`|`bad`,
+`{index}`) cluster removed in turn, without resampling. It also reports each scene's share (the
+fraction of opposite-class images it ranks correctly, ties half, over seeds and conditions) per
+configuration, and the mean raw image score per class. Reading rules: a change is **scene-dependent**
+if removing any one scene flips its sign or leaves it below half the full change in size, and
+otherwise does not depend on any single scene. The hypothesis that the aliased forward inflates normal
+images' scores is **consistent** with the numbers if the correction lowers the mean good score, and
+by more than it lowers the mean bad one. Each grid must first reproduce its committed report. This is
+descriptive: it says nothing about two scenes at once, a consistent hypothesis is not an
+established mechanism, and it re-decides no criterion.
+
 Each seed is a separate run with its own shard (`…__seed<N>.parquet`) and its own anomaly-map
 directory; the seed recorded in a shard is the seed the method reports having applied, and the
 metric functions refuse a frame that pools seeds. A run that applied no seed records `unseeded`,
@@ -747,3 +760,8 @@ pre-processing that produced them.
   reviews of 2026-11-02. Exploratory and post hoc with respect to the results (every point value
   already exists); pre-registered with respect to the intervals. It changes no number and no
   criterion.
+- 2026-11-03 — v0.2.27. §6: sensitivity of the paired change to single scenes, on Sheet Metal and
+  Fabric, with its reading rules fixed before anything is computed. Asked for by the external reviews
+  of 2026-11-03, because Sheet Metal's interval rests on 4 good scenes. Exploratory and post hoc
+  with respect to the results (the changes and intervals already exist); pre-registered with respect
+  to this analysis. It changes no number and no criterion.
