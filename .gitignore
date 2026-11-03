@@ -45,6 +45,14 @@ results/bootstrap/*
 !results/comparison/
 results/comparison/*
 !results/comparison/*.md
+# The image-level scores behind the intervals (scripts/export_image_scores.py): small CSVs with no
+# path in them. Licensed apart from the code: results/image_scores/README.md.
+!results/image_scores/
+results/image_scores/*
+!results/image_scores/README.md
+!results/image_scores/*/
+results/image_scores/*/*
+!results/image_scores/*/*.csv
 # The paper's generated table bodies (scripts/make_tables.py): small, derived from committed
 # reports, and what the paper pulls -- tracked so the paper can be rebuilt from a clone.
 !results/tables/

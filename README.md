@@ -163,3 +163,4 @@ Comparative Survey (2020–2026)* (Zenodo, 2026, [doi:10.5281/zenodo.20649845](h
 
 MIT for the code in this repository. Datasets keep their own licenses; nothing from them is
 redistributed here.
+ The exception is `results/image_scores/`, scores derived from MVTec AD 2 and released under its CC BY-NC-SA 4.0; see the [README there](results/image_scores/README.md).
