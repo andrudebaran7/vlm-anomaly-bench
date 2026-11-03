@@ -70,8 +70,9 @@ each reproduced its committed grid in all 18 cells to four decimals, so the chan
 pre-processing alone. This ablation was added after the results existed, as a diagnostic (protocol
 v0.2.23); the runs are recorded in [`docs/next-steps.md`](docs/next-steps.md), "RESULT 2026-10-30 —
 experiment A on Sheet Metal" and "RESULT 2026-10-31 — experiment A on Fabric". The check itself
-moved from 98.02 to 98.22, but those two runs also differ in CUDA build, and the two causes have
-not been separated. The superseded numbers are kept, marked, in
+moved from 98.02 to 98.22, and the same re-run on MVTec AD (protocol v0.2.25; "RESULT 2026-11-03 —
+experiment B") shows that is the resize alone too: each configuration reproduced its committed
+report in all 19 printed values, to the reports' two decimals. The superseded numbers are kept, marked, in
 [`results/mvtec_ad2/patchcore_ref/`](results/mvtec_ad2/patchcore_ref/) and the older reports under
 `results/reproduction/`; none of them is an anchor number. The table is
 `results/tables/ablation_rows.tex`.

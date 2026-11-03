@@ -45,6 +45,13 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-11-03, experiment B done (read first).** Phase 9 ran and is recorded under "RESULT
+2026-11-03 — experiment B". Both modes reproduce their committed gate reports, 19 of 19 printed
+values each, so **the gate's 98.02 → 98.22 is the resize alone** at the reports' two decimals: the
+CUDA build moved nothing. This closes the last confound in the before/after. The registered verdict
+is untouched (98.22 ± 0.03, PASS; no number from this run is a gate verdict, protocol v0.2.25).
+**Still owed: phase 10 bootstrap only** (Colab, CPU: phase 0.1 -> 1.1 -> 10.1).
+
 **STATE 2026-11-02, bootstrap prepared (read first).** `scripts/bootstrap_iauroc.py` (protocol
 §6 v0.2.26, scheme fixed before any interval): paired, scene-clustered, stratified bootstrap of
 I-AUROC from the committed grids' shards on Drive, CPU only. **Next: Colab session 0 → 1.1 → 10.1
@@ -141,7 +148,7 @@ antialias fix moves Sheet Metal 0.510 → 0.797 and Fabric 0.562 → 0.723.** Ze
 motivation and discussion. New title: "What a Passing Reproduction Check Does Not Certify: A Gated
 PatchCore Reference on MVTec AD 2". Drop "pre-registered" and "ceiling" from the title.
 
-**CHECKED 2026-10-30 — is the before/after-antialias grid a clean ablation? Sheet Metal and Fabric: yes (see RESULTs below); the gate: not yet.** What exists:
+**CHECKED 2026-10-30 — is the before/after-antialias grid a clean ablation? Sheet Metal and Fabric: yes (see RESULTs below); the gate: yes since 2026-11-03 ("RESULT 2026-11-03 — experiment B").** What exists:
 - All 8 pre-v0.2.21 reports are committed (`results/mvtec_ad2/patchcore_ref/`, runs 2026-09-21 to
   2026-10-01, seeds 0/1/2, `preprocess=anomalib`, `test_public`, same lighting conditions as
   v0.2.21). Vial's per-condition table has 2 decimals only and its commit is a range; its category
@@ -187,6 +194,35 @@ return code 0. Output pasted by the author in session.
   stay confounded with the build until run the same way (Fabric needs its own session).
 - Shards are on the Colab VM only (`results/antialias_ablation/`, not committed, not on Drive);
   the comparison above is the record.
+
+**RESULT 2026-11-03 — experiment B on the MVTec AD gate: the build moved nothing; 98.02 → 98.22 is
+the resize alone.** `scripts/gate_antialias_ablation.py` (notebook 9.1, then 9.2), protocol v0.2.25,
+diagnostic only, post hoc. Every row in both modes records commit `f1248d7`, Tesla T4, anomalib
+2.6.0, torch `2.11.0+cu130`, 15 categories, seeds 0/1/2, `preprocess=anomalib`; `resize_antialias`
+True / False by mode. 9.1 ran once, with no `restored from Drive` line, and finished with
+`aliased seed 2 on Drive: 45 shards` before the session dropped. 9.2 scored on a later CPU runtime
+(reports generated 2026-11-03 01:41 UTC), return code 0.
+- `antialiased` vs the committed `patchcore_mvtec_ad_v0.2.21.md`: **19 of 19 equal** at the report's
+  two decimals (gate mean, 3 seed means, 15 category mean ± std). Same build, so the control.
+- `aliased` vs the committed `patchcore_mvtec_ad_3seed.md` (cu128): **19 of 19 equal**. This is the
+  build comparison, and it also shows `diagnostic_aliased_forward` reproduces the old pipeline.
+- Per seed, aliased -> antialiased: seed0 97.94 -> 98.23 (+0.29), seed1 98.08 -> 98.18 (+0.10),
+  seed2 98.02 -> 98.24 (+0.22). Gate mean 98.02 ± 0.07 -> 98.22 ± 0.03 (+0.20).
+- Per category, aliased -> antialiased (mean over seeds): carpet 97.62 -> 98.77 (+1.15), grid 97.99
+  -> 98.86 (+0.87), cable 97.85 -> 98.71 (+0.86), metal_nut 99.25 -> 99.77 (+0.52), capsule 98.74 ->
+  99.24 (+0.50), pill 94.17 -> 94.66 (+0.49), transistor 99.04 -> 99.43 (+0.39), toothbrush 91.48 ->
+  91.39 (-0.09), wood 98.86 -> 98.57 (-0.29), zipper 98.38 -> 97.69 (-0.69), screw 96.85 -> 96.15
+  (-0.70); bottle, hazelnut, leather, tile stay 100.00.
+- Categories outside ±1.0 of the published value: aliased 6 (cable, carpet, pill, tile, toothbrush,
+  zipper), antialiased 5 (capsule, pill, tile, toothbrush, zipper). The correction does not raise
+  every category; toothbrush misses by about 8 points either way.
+- **Shown:** at two decimals, the change of build moved nothing on the gate, so the 0.20 points are
+  the correction's. **Not shown:** anything finer than two decimals (experiment A compared four),
+  and no significance claim: three seeds, no test-set interval. Reading rule fixed before the run
+  (STATE 2026-11-02): the within-VM delta is the correction's effect; it applied, and the stricter
+  fallback was not needed because `antialiased` reproduced v0.2.21.
+- Shards and both `gate.md` are on Drive (`MyDrive/mvtec_ad_results/antialias_ablation/mvtec_ad/`),
+  not committed: this root is never a registered result, and the comparison above is the record.
 
 **RESULT 2026-10-31 — experiment A on Fabric: build moved nothing; the before/after is the resize alone.** Same
 script, `--category fabric --max-bytes 12000000000`, cu130 Colab VM, seeds 0/1/2, return code 0
