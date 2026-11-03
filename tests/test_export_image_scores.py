@@ -56,3 +56,26 @@ def test_the_scores_are_tracked_and_licensed_apart():
     probe = subprocess.run(["git", "-C", str(ROOT), "check-ignore", "-q", "results/image_scores/aliased/can.csv"])
     assert probe.returncode == 1, "the CSVs must not be gitignored"
     assert "CC BY-NC-SA 4.0" in (ROOT / "results" / "image_scores" / "README.md").read_text()
+
+
+SCORES = ROOT / "results" / "image_scores"
+
+
+@pytest.mark.parametrize("config", ["antialiased", "aliased"])
+@pytest.mark.parametrize("category", boot.CATEGORIES)
+def test_the_published_scores_reproduce_their_reports(config, category):
+    """The same refusal the bootstrap applies, on what a reader of the repository gets."""
+    if (config, category) == ("aliased", "fruit_jelly"):
+        assert not (SCORES / config / f"{category}.csv").exists(), "those shards no longer exist"
+        return
+    table = boot.load(SCORES, category, config)
+    report = (ROOT / boot.REPORTS[config] / f"{category}.md").read_text()
+    assert boot.check_against_report(boot.Paired([table]), config, report) == []
+
+
+def test_the_published_scores_have_one_row_per_image_and_seed():
+    for path in SCORES.glob("*/*.csv"):
+        table = pd.read_csv(path, dtype=str)
+        assert list(table.columns) == ex.COLUMNS
+        assert not table.duplicated(["folder", "index", "condition", "seed"]).any(), path
+        assert set(table["seed"]) == {"0", "1", "2"} and len(table) % 3 == 0, path
