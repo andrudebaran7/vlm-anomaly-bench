@@ -29,7 +29,11 @@ per-condition I-AUROC at the report's own decimals; a category that does not is 
 
     python scripts/bootstrap_iauroc.py \\
         --antialiased /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21 \\
-        --aliased /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref
+        --aliased /content/drive/MyDrive/mvtec_ad2_results
+
+The aliased root is the un-scoped one: those shards predate the method-scoped layout of 2026-10-01
+and were never migrated (run_mvtec_ad2.default_results). Fruit Jelly's are absent from Drive, so it
+gets the anchor's interval only.
 """
 import argparse
 import subprocess
@@ -169,7 +173,7 @@ def load(root: Path, category: str, config: str) -> pd.DataFrame:  # pragma: no 
     from vlmab.eval.store import ResultStore
 
     shards = root / category / "shards"
-    if not shards.is_dir():
+    if not shards.is_dir() or not any(shards.glob("*.parquet")):
         raise FileNotFoundError(f"{config}: no {shards}")
     return image_table(ResultStore(shards).load_all(), config)
 
@@ -260,6 +264,9 @@ def main(argv: Sequence[str] | None = None) -> int:  # pragma: no cover - needs 
                   f"{r['delta']:+.3f} | [{r['delta_ci'][0]:+.3f}, {r['delta_ci'][1]:+.3f}] | "
                   f"{'yes (experiment A)' if r['category'] in BUILD_ISOLATED else 'no: cu128 vs cu130'} |"
                   for r in rows if "delta" in r]
+        unpaired = [r["category"] for r in rows if "delta" not in r]
+        if unpaired:
+            lines += ["", f"No paired change for {', '.join(unpaired)}: aliased shards absent."]
     lines += ["", "## Anchor I-AUROC per lighting condition (v0.2.21)", "",
               "| Category | Condition | I-AUROC | 95% interval |", "|---|---|---|---|"]
     for r in rows:

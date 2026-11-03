@@ -110,3 +110,12 @@ def test_the_report_check_names_the_condition_that_does_not_reproduce():
     assert check_against_report(p, "antialiased", good) == []
     bad = good.replace(f"{conds['shift_1']:.4f}", "0.0001")
     assert [m.split(":")[0] for m in check_against_report(p, "antialiased", bad)] == ["shift_1"]
+
+
+def test_a_shard_directory_with_no_shards_counts_as_absent(tmp_path):
+    """An empty `shards/` must take the 'anchor interval only' path, not crash the whole run."""
+    from bootstrap_iauroc import load
+
+    (tmp_path / "fruit_jelly" / "shards").mkdir(parents=True)
+    with pytest.raises(FileNotFoundError, match="no .*fruit_jelly/shards"):
+        load(tmp_path, "fruit_jelly", "aliased")
