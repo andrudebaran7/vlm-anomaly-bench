@@ -49,8 +49,8 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 is no longer owed. Licence confirmed by the author: CC BY-NC-SA 4.0.
 
 **STATE 2026-11-03, review V5 acted on (read first).** See "RESULT 2026-11-03 — review V5". Branches `review-v5-fixes`.
-Undecided by the author: re-running VisA under the corrected configuration (about 2 h of GPU, three seeds, reported only,
-with its reading rule fixed in the protocol first).
+**Decided by the author (2026-11-03): VisA is not re-run.** The paper says why the 92.4 is not informative: no resolution,
+crop or coreset ratio stated, and an MVTec AD control of 99.8 in the same row (protocol §2).
 
 **STATE 2026-11-03, image-level scores going public at the author's request (read first).** Export path built
 (`scripts/export_image_scores.py`, notebook 12.1, CPU); `results/image_scores/` is licensed apart, CC BY-NC-SA 4.0.
