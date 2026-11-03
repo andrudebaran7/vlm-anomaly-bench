@@ -47,8 +47,10 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 **STATE 2026-11-03, bootstrap done (read first).** Phase 10 re-ran with the right root; see "RESULT
 2026-11-03 — bootstrap, paired change". **Sheet Metal's change excludes zero, Fabric's does not.** The
-paper says the correction "decided the verdict on a quarter" of the categories, so its Fabric wording
-needs the author's decision before the paper changes. No Colab work is owed for the paper as it stands.
+author's decisions (2026-11-03): the paper states both intervals and drops "decided the verdict on a
+quarter" for "moved two categories across the usability line on this test set"; a table in Supplemental
+Material C; the abstract carries both changes and the gate's 98.02 -> 98.22, as values and not a ratio.
+Paper branch `bootstrap-intervals`, for the author's read before merging. No Colab work is owed.
 
 **STATE 2026-11-03, experiment B done (read first).** Phase 9 ran and is recorded under "RESULT
 2026-11-03 — experiment B". Both modes reproduce their committed gate reports, 19 of 19 printed
