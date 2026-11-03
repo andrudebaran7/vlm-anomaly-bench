@@ -400,7 +400,8 @@ def test_phase_10_bootstraps_from_drive_reads_both_grids_and_writes_only_its_rep
     cells = [src for _, src in _code_cells() if "bootstrap_iauroc.py" in src]
     assert len(cells) == 1
     cell = cells[0]
-    assert '"patchcore_ref_v0.2.21"' in cell and '"patchcore_ref"' in cell
+    # The aliased grid sits at the un-scoped root: it predates the 2026-10-01 layout, never migrated.
+    assert '"patchcore_ref_v0.2.21"' in cell and '"aliased": DRIVE}' in cell
     assert 'Path("results/bootstrap/iauroc_bootstrap.md")' in cell
     assert "run_evaluation" not in cell and "reproduction_gate" not in cell
     assert cell.index("p.wait()") < cell.index("shutil.copy2(OUT")
