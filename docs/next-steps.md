@@ -45,6 +45,10 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-11-03, review V5 acted on (read first).** See "RESULT 2026-11-03 — review V5". Branches `review-v5-fixes`.
+Undecided by the author: re-running VisA under the corrected configuration (about 2 h of GPU, three seeds, reported only,
+with its reading rule fixed in the protocol first).
+
 **STATE 2026-11-03, image-level scores going public at the author's request (read first).** Export path built
 (`scripts/export_image_scores.py`, notebook 12.1, CPU); `results/image_scores/` is licensed apart, CC BY-NC-SA 4.0.
 **Owed:** the author runs 0.1 -> 1.1 -> 12.1 (reload the notebook from master for the cell) and downloads
@@ -219,6 +223,20 @@ return code 0. Output pasted by the author in session.
   stay confounded with the build until run the same way (Fabric needs its own session).
 - Shards are on the Colab VM only (`results/antialias_ablation/`, not committed, not on Drive);
   the comparison above is the record.
+
+**RESULT 2026-11-03 — review V5.** No new run.
+- **The tolerance window was stated without its condition, in the abstract and C1, and the paper's own disclosure contradicts
+  it.** A per-seed rule at the same tolerance separates the pipelines: aliased seeds 97.94 / 98.08 / 98.02, antialiased 98.23 /
+  98.18 / 98.24 (the two gate reports). The window holds only on the seed mean. Now stated so. "By the seed draw, not by
+  sensitivity to the defect", the review's wording, is not adopted: three seeds cannot establish it.
+- **What the protocol said before the miss** (commit 8956a38, the last before 2026-09-16): §2 "Gate: 99.0 ± 1.0 I-AUROC, mean over
+  the 15 categories"; §6 "Three seeds where any stochasticity exists; report mean ± std". No per-seed rule was ever written;
+  which number decides over seeds was unsaid until v0.2.13.
+- **Protocol header** claimed every choice preceded every result; dated note added, v0.2.29.
+- **Paper's [24]** carried a title written by us for three links; it now carries the pull request's own title.
+- **Rejected from V5:** README at v0.2.26 and the old GitHub description (both stale when checked: public README v0.2.28, About
+  already changed by the author); a single-seed VisA re-run (§6 forbids it, and "up is evidence, not up is incomparable" cannot
+  lose); Sheet Metal "especially sensitive" (no experiment); merging Analysis, Guidance and Future Work.
 
 **RESULT 2026-11-03 — review V4.** Checked claim by claim against both repositories. No new run.
 - **Gate history, undisclosed until now:** seed 0 alone missed at 97.94 (-1.057) on 2026-09-16; §6 v0.2.13, which puts the

@@ -229,6 +229,43 @@ def draw_resize(inputs, path) -> None:
     plt.close(fig)
 
 
+def defect_crop(mask, margin: int = 3, floor: int = 30) -> tuple[int, int, int, int]:
+    """(top, bottom, left, right) of a square around a mask's defect, inside the frame, at full
+    resolution: `margin` times the defect's larger side, and never under `floor` pixels a side."""
+    import numpy as np
+
+    ys, xs = np.nonzero(mask)
+    side = max(floor, margin * max(ys.max() - ys.min() + 1, xs.max() - xs.min() + 1))
+    h, w = mask.shape
+    top = min(max(0, (ys.min() + ys.max() + 1 - side) // 2), max(0, h - side))
+    left = min(max(0, (xs.min() + xs.max() + 1 - side) // 2), max(0, w - side))
+    return int(top), int(min(h, top + side)), int(left), int(min(w, left + side))
+
+
+def _defect_inset(ax, image_path, mask_full, scale: float) -> None:
+    """An enlargement of the defect, full resolution, truth outlined, in the corner of the image
+    panel farthest from it; a box on the panel marks where it comes from."""
+    import numpy as np
+    from matplotlib.patches import Rectangle
+    from PIL import Image
+
+    top, bottom, left, right = defect_crop(mask_full)
+    crop = np.asarray(Image.open(image_path).convert("RGB"))[top:bottom, left:right]
+    frame_h, frame_w = mask_full.shape
+    x0 = 0.02 if (left + right) / 2 > frame_w / 2 else 0.56
+    y0 = 0.02 if (top + bottom) / 2 < frame_h / 2 else 0.56
+    inset = ax.inset_axes([x0, y0, 0.42, 0.42])
+    inset.imshow(crop, interpolation="nearest")
+    inset.contour(mask_full[top:bottom, left:right], levels=[0.5], colors=[OUTLINE], linewidths=0.7)
+    inset.set_xticks([])
+    inset.set_yticks([])
+    for spine in inset.spines.values():
+        spine.set_edgecolor(OUTLINE)
+        spine.set_linewidth(0.8)
+    ax.add_patch(Rectangle((left * scale, top * scale), (right - left) * scale, (bottom - top) * scale,
+                           fill=False, edgecolor=OUTLINE, linewidth=0.7))
+
+
 def draw_maps(inputs, path) -> None:
     """Walnuts against Can: image, ground truth, and the anchor's map with the truth outlined."""
     import json
@@ -270,6 +307,7 @@ def draw_maps(inputs, path) -> None:
             for ax in (axes[r, 1], axes[r, 2]):
                 ax.add_patch(Circle((xs.mean(), ys.mean()), radius=0.06 * width, fill=False,
                                     edgecolor=OUTLINE, linewidth=1.0, linestyle=(0, (3, 1.5))))
+            _defect_inset(axes[r, 0], d / "image.png", mask_full, width / mask_full.shape[1])
         cb = fig.colorbar(im, ax=axes[r, 2], fraction=0.046, pad=0.02)
         cb.ax.tick_params(labelsize=6, length=2)
         cb.outline.set_linewidth(0.4)
