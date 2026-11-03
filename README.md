@@ -15,7 +15,9 @@ no MVTec AD 2 number is reported for it. Protocol, code and every reported numbe
 
 **Status (2026-11-03):** protocol at v0.2.30 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
 public-split grid complete for the anchor; same-runtime ablation run on Sheet Metal, Fabric and the MVTec AD gate; test-set intervals for I-AUROC;
-private split and evaluation-server submission not run. The paper is in preparation. Operational
+private split and evaluation-server submission not run. The paper is published as a preprint, not peer-reviewed
+([doi:10.5281/zenodo.23932259](https://doi.org/10.5281/zenodo.23932259)); this repository at tag `manuscript-v1` is archived at
+[doi:10.5281/zenodo.23932191](https://doi.org/10.5281/zenodo.23932191). Operational
 state and history: [`docs/next-steps.md`](docs/next-steps.md).
 
 ## Results
