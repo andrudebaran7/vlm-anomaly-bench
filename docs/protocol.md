@@ -1,5 +1,13 @@
 # Evaluation protocol (frozen before results)
 
+> **Note, 2026-11-03 (v0.2.29).** The heading and the paragraph below are the document's original
+> statement of intent and are kept as written. They no longer describe all of it: some rules were
+> settled or amended after results existed, among them the aggregation rule of §6 (v0.2.13, written
+> after a single-seed miss of the gate) and the usability rule of §3 (v0.2.22). Every such change is
+> dated and marked in the [Changelog](#changelog); read it with the section it amends. "Frozen" and
+> "pre-registered" here mean written and pushed to version control before the result, not filed with
+> a third-party registry.
+
 The point of freezing this document is credibility: every choice below is made **before** seeing a
 single result, so no metric or threshold can be quietly tuned to make one method look good.
 Any later change gets a dated entry in the Changelog at the bottom.
@@ -781,3 +789,6 @@ pre-processing that produced them.
   says "pre-specified". (5) The provenance entries above that name
   `../vlm-anomaly-paper/docs/verified-literature-facts.md` point to the author's private working record.
   The primary sources are named beside the facts; the file itself is not part of this repository.
+- 2026-11-03 — v0.2.29. Header note only, no rule changes and no number moves. An external review of
+  2026-11-03 pointed out that the opening paragraph claims every choice preceded every result, which the
+  later entries of this log contradict. The opening stays as written, with a dated note above it.

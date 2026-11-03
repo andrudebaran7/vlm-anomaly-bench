@@ -13,7 +13,7 @@ eight categories of the public split. The study was planned as a zero-shot compa
 reference; the one zero-shot method carried to its reproduction check, WinCLIP, did not pass it, so
 no MVTec AD 2 number is reported for it. Protocol, code and every reported number are here.
 
-**Status (2026-11-03):** protocol at v0.2.28 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
+**Status (2026-11-03):** protocol at v0.2.29 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
 public-split grid complete for the anchor; same-runtime ablation run on Sheet Metal, Fabric and the MVTec AD gate; test-set intervals for I-AUROC;
 private split and evaluation-server submission not run. The paper is in preparation. Operational
 state and history: [`docs/next-steps.md`](docs/next-steps.md).

@@ -65,3 +65,15 @@ def test_only_the_two_can_conditions_the_caption_names_are_off_axis():
     off = figures.off_axis(figures.points(_committed()))
     assert {(p.category, p.condition) for p in off} == {("can", "shift_2"), ("can", "shift_3")}
     assert sorted(round(p.au_pro_005_x, 2) for p in off) == [0.0, 0.08]
+
+
+def test_the_defect_crop_stays_in_the_frame_and_holds_the_defect():
+    import numpy as np
+
+    for y, x in ((50, 50), (0, 0), (99, 199)):
+        mask = np.zeros((100, 200), dtype=bool)
+        mask[y, x] = True
+        top, bottom, left, right = figures.defect_crop(mask)
+        assert 0 <= top < bottom <= 100 and 0 <= left < right <= 200
+        assert top <= y < bottom and left <= x < right
+        assert bottom - top == 30 and right - left == 30
