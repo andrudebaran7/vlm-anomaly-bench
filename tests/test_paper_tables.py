@@ -101,3 +101,19 @@ def test_ablation_rows_pair_each_category_before_and_after():
 
 def test_overall_mean_matches_the_caption():
     assert tables.overall_mean(_committed()) == ("0.689", "0.468", "0.221")
+
+
+def test_ablation_changes_are_read_from_the_committed_bootstrap_report():
+    text = (ROOT / "results" / "bootstrap" / "iauroc_bootstrap.md").read_text()
+    assert tables.ablation_changes(text) == {"sheet_metal": ("+0.287", "+0.086", "+0.504"),
+                                             "fabric": ("+0.160", "-0.096", "+0.412")}
+
+
+def test_ablation_rows_carry_each_categorys_change_and_interval_when_given():
+    aliased = {c: (ROOT / "results" / "mvtec_ad2" / "patchcore_ref" / f"{c}.md").read_text()
+               for c in tables.ABLATION_CATEGORIES}
+    changes = {"sheet_metal": ("+0.287", "+0.086", "+0.504"), "fabric": ("+0.160", "-0.096", "+0.412")}
+    rows = tables.ablation_rows(aliased, _committed(), changes)
+    assert rows[2] == r" & \multicolumn{4}{l}{change $+0.287$, 95\% interval $[+0.086, +0.504]$} \\"
+    assert rows[3] == r"\midrule"
+    assert rows[-1] == r" & \multicolumn{4}{l}{change $+0.160$, 95\% interval $[-0.096, +0.412]$} \\"

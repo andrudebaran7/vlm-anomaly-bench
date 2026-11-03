@@ -130,8 +130,22 @@ def per_condition_rows(reports: dict[str, str]) -> list[str]:
     return rows
 
 
-def ablation_rows(aliased: dict[str, str], antialiased: dict[str, str]) -> list[str]:
-    """The before/after table: each category's mean over conditions under both forward resizes."""
+def ablation_changes(bootstrap_report: str) -> dict[str, tuple[str, str, str]]:
+    """Each ablation category's paired change and interval, as the bootstrap report prints them."""
+    out = {}
+    for c in ABLATION_CATEGORIES:
+        m = re.search(rf"^\| {c} \| [\d.]+ \| [\d.]+ \| ([+-][\d.]+) \| "
+                      r"\[([+-][\d.]+), ([+-][\d.]+)\] \|", bootstrap_report, flags=re.M)
+        if m is None:
+            raise ValueError(f"the bootstrap report has no paired change for {c}")
+        out[c] = m.groups()
+    return out
+
+
+def ablation_rows(aliased: dict[str, str], antialiased: dict[str, str],
+                  changes: dict[str, tuple[str, str, str]] | None = None) -> list[str]:
+    """The before/after table: each category's mean over conditions under both forward resizes,
+    and its paired change with the interval when `changes` is given."""
     rows = []
     for c in ABLATION_CATEGORIES:
         if rows:
@@ -141,4 +155,8 @@ def ablation_rows(aliased: dict[str, str], antialiased: dict[str, str]) -> list[
             rows.append(f"{NAMES[c]} & {label} & {fmt(s.i_auroc)} & "
                         f"{_multiple(s.au_pro_030, 'au_pro_030')} & "
                         f"{_multiple(s.au_pro_005, 'au_pro_005')} \\\\")
+        if changes is not None:
+            change, lo, hi = changes[c]
+            rows.append(rf" & \multicolumn{{4}}{{l}}{{change ${change}$, 95\% interval "
+                        rf"$[{lo}, {hi}]$}} \\")
     return rows

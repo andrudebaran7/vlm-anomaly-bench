@@ -45,12 +45,11 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
-**STATE 2026-11-03, single-scene sensitivity prepared (read first).** The author chose to act on review
-V3 (author's folder `revision_last_paper/revisionV3`, not in either repo). `scripts/scene_sensitivity.py`
-and protocol §6 v0.2.27 fix the analysis and its reading rules before any output exists. **Next: reload
-the notebook from master, Colab CPU: 0.1 -> 1.1 -> 11.1; the author pastes the output.** Record it here
-before the paper. Before arXiv too: text fixes (paper branch), the 0.02 margin of the 98.02 pass with the
-tolerance arithmetic, a tag, a Zenodo archive, and the image-level scores made public.
+**STATE 2026-11-03, single-scene sensitivity done (read first).** See "RESULT 2026-11-03 — single-scene
+sensitivity": no single scene decides either change. Owed before arXiv: the paper's text fixes (branch
+`review-v3-fixes`), a tag, a Zenodo archive (the author's account), and the image-level scores made
+public once what MVTec's licence allows for derived scores is checked. No Colab work is owed unless the
+scores are exported from Drive.
 
 **STATE 2026-11-03, bootstrap done (read first).** Phase 10 re-ran with the right root; see "RESULT
 2026-11-03 — bootstrap, paired change". **Sheet Metal's change excludes zero, Fabric's does not.** The
@@ -208,6 +207,26 @@ return code 0. Output pasted by the author in session.
   stay confounded with the build until run the same way (Fabric needs its own session).
 - Shards are on the Colab VM only (`results/antialias_ablation/`, not committed, not on Drive);
   the comparison above is the record.
+
+**RESULT 2026-11-03 — single-scene sensitivity.** `scripts/scene_sensitivity.py`, protocol §6 v0.2.27
+(rules fixed and pushed in `c6ff748` before any output), notebook 11.1, CPU runtime, return code 0, no
+grid refused. Report committed: `results/bootstrap/scene_sensitivity.md`. Each class's shares average to
+the category value, checked by hand from the report (Sheet Metal 0.5102 and 0.7972).
+
+| Category | Change | One scene removed | Half the size | Rule |
+|---|---|---|---|---|
+| sheet_metal | +0.2870 | +0.2309 to +0.3309 | 0.1435 | no single scene decides |
+| fabric | +0.1603 | +0.1111 to +0.2219 | 0.0801 | no single scene decides |
+
+- Scene shares, aliased -> antialiased. Sheet Metal: all 4 good scenes rise; bad 10 rise, 3 fall, 2 tie
+  at 1.0000. Fabric: good 7 rise, 4 fall; bad 11 rise, 4 fall.
+- Mean raw score, correction. Sheet Metal: good -7.146, bad -5.675. Fabric: good -14.025, bad -12.855.
+  **The rule reads "consistent" on both, but the gap is small beside the drop (1.47 of 7.15; 1.17 of
+  14.03): the aliased forward raises the scores of both classes, normal ones slightly more.** Means do
+  not establish the mechanism, and I-AUROC depends on ranks, not on means.
+- **Not shown:** anything about removing two scenes (with 4 good scenes, two would be half of them); and
+  it does not change Fabric's bootstrap interval, which still includes zero: a resample can drop several
+  scenes together, which this does not test.
 
 **RESULT 2026-11-03 — bootstrap, paired change.** Same script and cell after the root fix, commit
 `30228a7`, CPU runtime, return code 0, 0 redraws, no shards refused: the seven aliased grids on Drive
