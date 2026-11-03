@@ -45,6 +45,12 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-11-03, image-level scores going public at the author's request (read first).** Export path built
+(`scripts/export_image_scores.py`, notebook 12.1, CPU); `results/image_scores/` is licensed apart, CC BY-NC-SA 4.0.
+**Owed:** the author runs 0.1 -> 1.1 -> 12.1 (reload the notebook from master for the cell) and downloads
+`MyDrive/mvtec_ad2_results/image_scores_export.zip`; then the zip is checked, the two analyses re-run from it against their
+committed reports, committed, and only then the paper's "not in the repository" sentence changes (protocol entry with it).
+
 **STATE 2026-11-03, review V4 acted on (read first).** See "RESULT 2026-11-03 — review V4". Branches
 `review-v4-fixes` in both repos. Owed before arXiv: the author's read, the manuscript tag, the Zenodo archive of code,
 protocol and results (the author's account; the manuscript goes to arXiv, since IEEE's pages do not name Zenodo), the

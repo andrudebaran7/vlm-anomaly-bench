@@ -31,6 +31,8 @@ per-condition I-AUROC at the report's own decimals; a category that does not is 
         --antialiased /content/drive/MyDrive/mvtec_ad2_results/patchcore_ref_v0.2.21 \\
         --aliased /content/drive/MyDrive/mvtec_ad2_results
 
+Both roots can also be `results/image_scores`, the published scores, which needs no Drive.
+
 The aliased root is the un-scoped one: those shards predate the method-scoped layout of 2026-10-01
 and were never migrated (run_mvtec_ad2.default_results). Fruit Jelly's are absent from Drive, so it
 gets the anchor's interval only.
@@ -169,9 +171,15 @@ def check_against_report(p: "Paired", config: str, report_text: str) -> list[str
     return bad
 
 
-def load(root: Path, category: str, config: str) -> pd.DataFrame:  # pragma: no cover - Drive
+def load(root: Path, category: str, config: str) -> pd.DataFrame:
+    """One image_table from the published CSV under `root/<config>/`, else from `root`'s Drive shards."""
     from vlmab.eval.store import ResultStore
 
+    published = root / config / f"{category}.csv"
+    if published.is_file():
+        table = pd.read_csv(published, dtype={"folder": str, "index": str, "condition": str, "seed": str},
+                            float_precision="round_trip")
+        return table.assign(config=config)
     shards = root / category / "shards"
     if not shards.is_dir() or not any(shards.glob("*.parquet")):
         raise FileNotFoundError(f"{config}: no {shards}")

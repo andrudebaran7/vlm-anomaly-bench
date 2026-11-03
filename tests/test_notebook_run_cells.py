@@ -418,3 +418,14 @@ def test_phase_11_reads_both_grids_from_drive_and_writes_only_its_report():
     assert "run_evaluation" not in cell and "reproduction_gate" not in cell
     assert cell.index("p.wait()") < cell.index("shutil.copy2(OUT")
     assert not _free_names(cell), _free_names(cell)
+
+
+def test_phase_12_reads_both_grids_from_drive_and_writes_only_the_zip():
+    """The export is CPU work on the shards phases 10 and 11 read; nothing is fitted."""
+    cells = [src for _, src in _code_cells() if "export_image_scores.py" in src]
+    assert len(cells) == 1
+    cell = cells[0]
+    assert '"patchcore_ref_v0.2.21"' in cell and '"--aliased", str(DRIVE)' in cell
+    assert "image_scores_export.zip" in cell
+    assert "run_evaluation" not in cell and "reproduction_gate" not in cell
+    assert not _free_names(cell), _free_names(cell)
