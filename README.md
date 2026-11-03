@@ -13,7 +13,7 @@ eight categories of the public split. The study was planned as a zero-shot compa
 reference; the one zero-shot method carried to its reproduction check, WinCLIP, did not pass it, so
 no MVTec AD 2 number is reported for it. Protocol, code and every reported number are here.
 
-**Status (2026-11-03):** protocol at v0.2.27 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
+**Status (2026-11-03):** protocol at v0.2.28 ([`docs/protocol.md`](docs/protocol.md)); MVTec AD 2
 public-split grid complete for the anchor; same-runtime ablation run on Sheet Metal, Fabric and the MVTec AD gate; test-set intervals for I-AUROC;
 private split and evaluation-server submission not run. The paper is in preparation. Operational
 state and history: [`docs/next-steps.md`](docs/next-steps.md).
@@ -79,7 +79,21 @@ experiment B") shows that is the resize alone too: each configuration reproduced
 report in all 19 printed values, to the reports' two decimals. The superseded numbers are kept, marked, in
 [`results/mvtec_ad2/patchcore_ref/`](results/mvtec_ad2/patchcore_ref/) and the older reports under
 `results/reproduction/`; none of them is an anchor number. The table is
-`results/tables/ablation_rows.tex`.
+`results/tables/ablation_rows.tex`. The pass itself has a history: a first single-seed run missed the
+check at 97.94, and the rule that the verdict is on the mean of the seed means (protocol §6, v0.2.13) was
+written after that miss and before the three-seed run that passed.
+
+The mismatch is known upstream, and we do not claim its discovery: anomalib's export path drops the
+antialiasing its training and test loops apply ([#2944](https://github.com/open-edge-platform/anomalib/issues/2944),
+[#3726](https://github.com/open-edge-platform/anomalib/issues/3726), proposed fix
+[#3882](https://github.com/open-edge-platform/anomalib/pull/3882)). What this repository adds is what it does to a
+reproduction check and to a target benchmark.
+
+**Against other PatchCore results on MVTec AD 2** (protocol v0.2.28, post hoc, a sanity check and not a gate;
+[`results/comparison/patchcore_literature.md`](results/comparison/patchcore_literature.md)): the category order agrees with
+the dataset authors' at both AU-PRO limits (Spearman 0.857 to 0.976, other split and backbones). It agrees less with Vo et
+al.'s PatchCore-style baseline on I-AUROC (0.619), which at 448×448 leaves Sheet Metal at 0.558, so the anchor's
+usable/not-usable split belongs to this pipeline and not to the categories.
 
 ## Scope
 
@@ -92,7 +106,7 @@ is part of the paper's analysis. Efficiency measurements (latency, VRAM) are out
 |---|---|
 | MVTec AD 2 | the target benchmark (eight categories, lighting conditions); see [`docs/datasets-access.md`](docs/datasets-access.md) |
 | MVTec AD (classic) | per-method reproduction check against published numbers |
-| VisA | secondary check, reported only, never gating |
+| VisA | PatchCore: secondary check, reported, never gating (86.26 against a third-party 92.4, earlier configuration, [`patchcore_ref_visa.md`](results/reproduction/patchcore_ref_visa.md)). WinCLIP: a gate under the protocol, not run because its MVTec AD gate had already failed |
 
 Raw data is never committed.
 
