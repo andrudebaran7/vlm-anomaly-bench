@@ -45,6 +45,14 @@ published VisA image-AUROC within ±1.0 (protocol §2) before any MVTec AD 2 num
 
 ## ▶ RESUME HERE — session handoff of 2026-10-26 (written at the author's request)
 
+**STATE 2026-11-03, published on Zenodo; arXiv dropped, the author's decision (read first).** Manuscript
+[doi:10.5281/zenodo.23932259](https://doi.org/10.5281/zenodo.23932259), code, protocol and results at tag `manuscript-v1`
+[doi:10.5281/zenodo.23932191](https://doi.org/10.5281/zenodo.23932191). Tag `manuscript-v1` is on both repos (bench e633972).
+Checked against the public API on 2026-11-03: files match the local copies by MD5; bench licences are MIT and CC BY-NC-SA 4.0.
+Known and left as they are, the author's decisions or optional: creator name is the survey's, not the PDF's; the manuscript's
+two relations read "is described by"; both descriptions carry a pasted "Additional description, type Notes:" label. All
+metadata, editable with no new version. Nothing is owed; this supersedes the "before arXiv" lists in the blocks below.
+
 **STATE 2026-11-03, image-level scores recorded (read first).** See "RESULT 2026-11-03 — image-level scores". The export
 is no longer owed. Licence confirmed by the author: CC BY-NC-SA 4.0.
 
